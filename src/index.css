@@ -1,0 +1,238 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --background: 220 13% 95%;
+    --foreground: 220 15% 22%;
+
+    --card: 220 14% 97%;
+    --card-foreground: 220 15% 22%;
+
+    --popover: 220 14% 97%;
+    --popover-foreground: 220 15% 22%;
+
+    --primary: 214 70% 46%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 10% 90%;
+    --secondary-foreground: 220 15% 22%;
+
+    --muted: 220 10% 91%;
+    --muted-foreground: 220 9% 36%;
+
+    --accent: 213 24% 86%;
+    --accent-foreground: 220 15% 18%;
+
+    --success: 142 48% 32%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 36 72% 40%;
+    --warning-foreground: 0 0% 100%;
+
+    --destructive: 0 54% 36%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 11% 82%;
+    --input: 220 11% 82%;
+    --ring: 214 70% 46%;
+
+    --radius: 0.5rem;
+
+    --bg-glow-1: 214 18% 83%;
+    --bg-glow-2: 216 12% 88%;
+    --bg-glow-3: 220 10% 85%;
+    --bg-grid: 216 13% 78%;
+
+    --sidebar-background: 220 11% 96%;
+    --sidebar-foreground: 220 15% 22%;
+    --sidebar-primary: 214 70% 46%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 11% 90%;
+    --sidebar-accent-foreground: 220 15% 22%;
+    --sidebar-border: 220 11% 82%;
+    --sidebar-ring: 214 70% 46%;
+  }
+
+  .dark {
+    --background: 220 19% 10%;
+    --foreground: 210 40% 98%;
+
+    --card: 218 17% 15%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 218 17% 15%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 197 82% 58%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 217 14% 19%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 14% 18%;
+    --muted-foreground: 214 18% 72%;
+
+    --accent: 191 74% 55%;
+    --accent-foreground: 0 0% 100%;
+
+    --success: 142 50% 35%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 68% 44%;
+    --warning-foreground: 0 0% 100%;
+
+    --destructive: 0 58% 48%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 215 14% 24%;
+    --input: 215 14% 24%;
+    --ring: 197 82% 58%;
+
+    --bg-glow-1: 199 83% 56%;
+    --bg-glow-2: 217 72% 57%;
+    --bg-glow-3: 263 40% 30%;
+    --bg-grid: 216 16% 22%;
+
+    --sidebar-background: 218 19% 12%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 197 82% 58%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 217 14% 18%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 215 14% 24%;
+    --sidebar-ring: 197 82% 58%;
+  }
+
+  :root[data-surface='studio'] {
+    --background: 216 18% 94%;
+    --card: 217 24% 97%;
+    --primary: 216 53% 45%;
+    --accent: 215 31% 84%;
+    --sidebar-background: 216 18% 95%;
+    --bg-glow-1: 214 24% 84%;
+    --bg-glow-2: 219 20% 88%;
+    --bg-glow-3: 207 18% 82%;
+    --bg-grid: 216 13% 76%;
+  }
+
+  :root[data-surface='metal'] {
+    --background: 210 9% 92%;
+    --card: 210 10% 96%;
+    --primary: 211 37% 39%;
+    --accent: 210 14% 83%;
+    --sidebar-background: 210 9% 94%;
+    --bg-glow-1: 210 8% 82%;
+    --bg-glow-2: 210 10% 88%;
+    --bg-glow-3: 210 8% 79%;
+    --bg-grid: 215 9% 74%;
+  }
+
+  :root[data-surface='neon'] {
+    --background: 216 42% 93%;
+    --card: 0 0% 98%;
+    --primary: 196 78% 43%;
+    --accent: 272 72% 85%;
+    --sidebar-background: 216 40% 95%;
+    --bg-glow-1: 198 82% 78%;
+    --bg-glow-2: 223 76% 83%;
+    --bg-glow-3: 272 42% 83%;
+    --bg-grid: 219 18% 76%;
+  }
+
+  :root[data-surface='sunset'] {
+    --background: 24 32% 92%;
+    --card: 24 36% 96%;
+    --primary: 15 58% 44%;
+    --accent: 20 47% 83%;
+    --sidebar-background: 24 32% 94%;
+    --bg-glow-1: 24 48% 82%;
+    --bg-glow-2: 12 42% 85%;
+    --bg-glow-3: 36 34% 80%;
+    --bg-grid: 25 18% 74%;
+  }
+
+  .dark[data-surface='studio'] {
+    --bg-glow-1: 205 54% 45%;
+    --bg-glow-2: 221 44% 34%;
+    --bg-glow-3: 197 31% 22%;
+    --bg-grid: 214 16% 22%;
+  }
+
+  .dark[data-surface='metal'] {
+    --background: 214 16% 11%;
+    --card: 214 15% 16%;
+    --sidebar-background: 214 17% 12%;
+    --bg-glow-1: 210 10% 34%;
+    --bg-glow-2: 212 13% 24%;
+    --bg-glow-3: 210 8% 18%;
+    --bg-grid: 214 12% 23%;
+  }
+
+  .dark[data-surface='neon'] {
+    --background: 225 24% 9%;
+    --card: 222 22% 13%;
+    --primary: 185 100% 56%;
+    --accent: 278 90% 67%;
+    --sidebar-background: 224 24% 10%;
+    --bg-glow-1: 185 100% 52%;
+    --bg-glow-2: 224 94% 62%;
+    --bg-glow-3: 289 68% 38%;
+    --bg-grid: 224 19% 19%;
+  }
+
+  .dark[data-surface='sunset'] {
+    --background: 14 21% 10%;
+    --card: 15 18% 14%;
+    --sidebar-background: 15 22% 11%;
+    --primary: 20 82% 60%;
+    --accent: 8 76% 58%;
+    --bg-glow-1: 16 73% 38%;
+    --bg-glow-2: 28 71% 32%;
+    --bg-glow-3: 348 42% 24%;
+    --bg-grid: 16 17% 20%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply text-foreground;
+    background-color: hsl(var(--background));
+    background-image:
+      radial-gradient(circle at top left, hsl(var(--bg-glow-1) / 0.18), transparent 28rem),
+      radial-gradient(circle at top right, hsl(var(--bg-glow-2) / 0.14), transparent 24rem),
+      radial-gradient(circle at bottom center, hsl(var(--bg-glow-3) / 0.14), transparent 32rem),
+      linear-gradient(180deg, hsl(var(--background)), hsl(var(--background)));
+    background-attachment: fixed;
+  }
+
+  #root {
+    min-height: 100vh;
+    background-image:
+      linear-gradient(hsl(var(--bg-grid) / 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--bg-grid) / 0.08) 1px, transparent 1px);
+    background-position: center;
+    background-size: 44px 44px;
+  }
+
+  ::selection {
+    background: hsl(var(--accent) / 0.35);
+    color: hsl(var(--foreground));
+  }
+
+  .dark input::selection,
+  .dark textarea::selection,
+  .dark [contenteditable='true']::selection {
+    background: hsl(var(--accent) / 0.45);
+    color: hsl(var(--foreground));
+  }
+}

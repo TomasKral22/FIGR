@@ -1,0 +1,1215 @@
+================================================================================
+                           FINANCE APP - KOMPLETNÍ KÓD
+================================================================================
+                         Rozděleno do 3 částí: HTML, CSS, JS
+================================================================================
+
+
+================================================================================
+                              ČÁST 1: HTML
+================================================================================
+
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Finance App</title>
+  <meta name="description" content="Aplikace pro správu osobních financí" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="root"></div>
+  <script src="app.js"></script>
+</body>
+</html>
+
+
+================================================================================
+                              ČÁST 2: CSS
+================================================================================
+
+/* ===== DESIGN SYSTEM - CSS VARIABLES ===== */
+
+:root {
+  /* Light mode */
+  --background: 0 0% 98%;
+  --foreground: 220 10% 15%;
+  --card: 0 0% 100%;
+  --card-foreground: 220 10% 15%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 220 10% 15%;
+  --primary: 217 91% 60%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 220 10% 15%;
+  --muted: 220 15% 95%;
+  --muted-foreground: 220 10% 45%;
+  --accent: 217 91% 60%;
+  --accent-foreground: 0 0% 100%;
+  --success: 142 71% 45%;
+  --success-foreground: 0 0% 100%;
+  --warning: 38 92% 50%;
+  --warning-foreground: 0 0% 100%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 220 13% 91%;
+  --input: 220 13% 91%;
+  --ring: 217 91% 60%;
+  --radius: 0.5rem;
+}
+
+.dark {
+  /* Dark mode */
+  --background: 222 20% 8%;
+  --foreground: 210 40% 98%;
+  --card: 222 18% 12%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222 18% 12%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 217 91% 60%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 222 18% 18%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 222 18% 15%;
+  --muted-foreground: 215 20% 65%;
+  --accent: 217 91% 60%;
+  --accent-foreground: 0 0% 100%;
+  --success: 142 71% 45%;
+  --success-foreground: 0 0% 100%;
+  --warning: 38 92% 50%;
+  --warning-foreground: 0 0% 100%;
+  --destructive: 0 63% 31%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 222 18% 20%;
+  --input: 222 18% 20%;
+  --ring: 217 91% 60%;
+}
+
+/* ===== BASE STYLES ===== */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border-color: hsl(var(--border));
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  line-height: 1.5;
+}
+
+/* ===== UTILITY CLASSES ===== */
+
+.container { max-width: 1200px; margin: 0 auto; padding: 0 1rem; }
+.flex { display: flex; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.gap-2 { gap: 0.5rem; }
+.gap-4 { gap: 1rem; }
+.gap-6 { gap: 1.5rem; }
+.p-4 { padding: 1rem; }
+.p-6 { padding: 1.5rem; }
+.px-4 { padding-left: 1rem; padding-right: 1rem; }
+.py-4 { padding-top: 1rem; padding-bottom: 1rem; }
+.mb-2 { margin-bottom: 0.5rem; }
+.mb-3 { margin-bottom: 0.75rem; }
+.mt-2 { margin-top: 0.5rem; }
+.mt-4 { margin-top: 1rem; }
+.space-y-2 > * + * { margin-top: 0.5rem; }
+.space-y-4 > * + * { margin-top: 1rem; }
+.space-y-8 > * + * { margin-top: 2rem; }
+.text-sm { font-size: 0.875rem; }
+.text-xs { font-size: 0.75rem; }
+.text-xl { font-size: 1.25rem; }
+.text-2xl { font-size: 1.5rem; }
+.font-bold { font-weight: 700; }
+.font-semibold { font-weight: 600; }
+.font-medium { font-weight: 500; }
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.rounded-lg { border-radius: 0.5rem; }
+.border { border-width: 1px; }
+.border-b { border-bottom-width: 1px; }
+.border-l { border-left-width: 1px; }
+.border-r { border-right-width: 1px; }
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+.min-h-screen { min-height: 100vh; }
+.sticky { position: sticky; }
+.top-0 { top: 0; }
+.z-50 { z-index: 50; }
+.overflow-y-auto { overflow-y: auto; }
+.backdrop-blur-sm { backdrop-filter: blur(4px); }
+
+/* Colors */
+.bg-background { background-color: hsl(var(--background)); }
+.bg-card { background-color: hsl(var(--card)); }
+.bg-muted { background-color: hsl(var(--muted)); }
+.bg-primary { background-color: hsl(var(--primary)); }
+.text-foreground { color: hsl(var(--foreground)); }
+.text-muted-foreground { color: hsl(var(--muted-foreground)); }
+.text-success { color: hsl(var(--success)); }
+.text-destructive { color: hsl(var(--destructive)); }
+.text-warning { color: hsl(var(--warning)); }
+.text-primary { color: hsl(var(--primary)); }
+.border-border { border-color: hsl(var(--border)); }
+.border-primary { border-color: hsl(var(--primary)); }
+
+/* Grid */
+.grid { display: grid; }
+.grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+.grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+@media (min-width: 768px) {
+  .md\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .md\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* ===== COMPONENT STYLES ===== */
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius);
+  font-weight: 500;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+}
+
+.btn-primary {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+}
+
+.btn-outline {
+  background-color: transparent;
+  border-color: hsl(var(--border));
+  color: hsl(var(--foreground));
+}
+
+.btn-outline:hover {
+  background-color: hsl(var(--muted));
+}
+
+.btn-ghost {
+  background-color: transparent;
+  color: hsl(var(--foreground));
+}
+
+.btn-ghost:hover {
+  background-color: hsl(var(--muted));
+}
+
+.btn-sm { padding: 0.25rem 0.75rem; font-size: 0.75rem; }
+.btn-icon { padding: 0.5rem; width: 2.25rem; height: 2.25rem; }
+
+/* Inputs */
+.input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid hsl(var(--input));
+  border-radius: var(--radius);
+  background-color: transparent;
+  color: hsl(var(--foreground));
+  font-size: 0.875rem;
+}
+
+.input:focus {
+  outline: none;
+  border-color: hsl(var(--ring));
+  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2);
+}
+
+/* Labels */
+.label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: hsl(var(--foreground));
+  margin-bottom: 0.25rem;
+  display: block;
+}
+
+/* Select */
+.select {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid hsl(var(--input));
+  border-radius: var(--radius);
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+/* Cards */
+.card {
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: hsl(var(--background) / 0.8);
+  backdrop-filter: blur(4px);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.modal-content {
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* Slide panel */
+.slide-panel {
+  position: fixed;
+  inset: 0;
+  background-color: hsl(var(--background) / 0.8);
+  backdrop-filter: blur(4px);
+  z-index: 50;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.slide-panel-content {
+  background-color: hsl(var(--card));
+  width: 100%;
+  max-width: 28rem;
+  height: 100%;
+  border-left: 1px solid hsl(var(--border));
+  box-shadow: -10px 0 40px rgb(0 0 0 / 0.1);
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+/* Header */
+.header {
+  border-bottom: 1px solid hsl(var(--border));
+  background-color: hsl(var(--card) / 0.5);
+  backdrop-filter: blur(8px);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 16rem;
+  border-right: 1px solid hsl(var(--border));
+  background-color: hsl(var(--card) / 0.3);
+  backdrop-filter: blur(8px);
+  min-height: calc(100vh - 4rem);
+  padding: 1rem;
+}
+
+/* Charts container */
+.chart-container {
+  height: 20rem;
+  width: 100%;
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  padding: 1rem;
+  box-shadow: 0 10px 40px rgb(0 0 0 / 0.1);
+  z-index: 100;
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+
+================================================================================
+                              ČÁST 3: JAVASCRIPT
+================================================================================
+
+// ===== TYPY A KONSTANTY =====
+
+const TransactionTypes = {
+  INCOME: 'income',
+  EXPENSE: 'expense',
+  TRANSFER: 'transfer'
+};
+
+const ExpenseCategories = {
+  NECESSITIES: 'necessities',
+  WHIMS: 'whims',
+  INVESTMENTS: 'investments',
+  SAVINGS: 'savings'
+};
+
+const CategoryLabels = {
+  necessities: 'Nutnosti',
+  whims: 'Rozmary',
+  investments: 'Investice',
+  savings: 'Spoření'
+};
+
+const STORAGE_KEYS = {
+  TRANSACTIONS: 'finance_transactions',
+  BANK_ACCOUNTS: 'finance_bank_accounts',
+  BROKER_ACCOUNTS: 'finance_broker_accounts',
+  BUDGET: 'finance_budget',
+  PORTFOLIO: 'finance_portfolio',
+  THEME: 'finance_theme',
+  LAST_TRANSACTION: 'finance_last_transaction'
+};
+
+// ===== UTILITY FUNKCE =====
+
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+function formatCurrency(amount) {
+  return new Intl.NumberFormat('cs-CZ', {
+    style: 'currency',
+    currency: 'CZK',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(amount);
+}
+
+function formatMonth(monthStr) {
+  const [year, month] = monthStr.split('-');
+  const date = new Date(parseInt(year), parseInt(month) - 1);
+  return date.toLocaleDateString('cs-CZ', { year: 'numeric', month: 'long' });
+}
+
+function getCurrentMonth() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function getCategoryPercentage(categoryAmount, totalIncome) {
+  if (totalIncome === 0) return 0;
+  return (categoryAmount / totalIncome) * 100;
+}
+
+function groupTransactionsByMonth(transactions) {
+  const grouped = transactions.reduce((acc, transaction) => {
+    const month = transaction.month;
+    if (!acc[month]) {
+      acc[month] = {
+        month,
+        income: [],
+        expenses: [],
+        transfers: [],
+        totalIncome: 0,
+        totalExpenses: 0,
+        totalTransfers: 0,
+        balance: 0,
+        categoryBreakdown: {
+          necessities: 0,
+          whims: 0,
+          investments: 0,
+          savings: 0
+        }
+      };
+    }
+
+    if (transaction.type === 'income') {
+      acc[month].income.push(transaction);
+      acc[month].totalIncome += transaction.amount;
+    } else if (transaction.type === 'expense') {
+      acc[month].expenses.push(transaction);
+      acc[month].totalExpenses += transaction.amount;
+      if (transaction.category) {
+        acc[month].categoryBreakdown[transaction.category] += transaction.amount;
+      }
+    } else if (transaction.type === 'transfer') {
+      acc[month].transfers.push(transaction);
+      acc[month].totalTransfers += transaction.amount;
+    }
+
+    return acc;
+  }, {});
+
+  Object.values(grouped).forEach((monthData) => {
+    monthData.balance = monthData.totalIncome + monthData.totalTransfers - monthData.totalExpenses;
+  });
+
+  return Object.values(grouped).sort((a, b) => b.month.localeCompare(a.month));
+}
+
+// ===== EXPORT FUNKCE =====
+
+function exportToCSV(transactions, filename = 'transactions.csv') {
+  const headers = ['Datum', 'Typ', 'Název', 'Částka', 'Účet/Kategorie'];
+  const rows = transactions.map((t) => [
+    t.month,
+    t.type === 'income' ? 'Příjem' : t.type === 'expense' ? 'Výdaj' : 'Převod',
+    t.name,
+    t.amount.toFixed(2),
+    t.account || t.category || t.transferCategory || ''
+  ]);
+
+  const csvContent = [
+    headers.join(','),
+    ...rows.map((row) => row.map((cell) => `"${cell}"`).join(','))
+  ].join('\n');
+
+  const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
+}
+
+function exportToXLSX(transactions, filename = 'transactions.xlsx') {
+  const headers = ['Datum', 'Typ', 'Název', 'Částka', 'Účet/Kategorie'];
+  const rows = transactions.map((t) => [
+    t.month,
+    t.type === 'income' ? 'Příjem' : t.type === 'expense' ? 'Výdaj' : 'Převod',
+    t.name,
+    t.amount.toFixed(2),
+    t.account || t.category || t.transferCategory || ''
+  ]);
+
+  const htmlTable = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head><meta charset="utf-8" /></head>
+      <body>
+        <table>
+          <tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr>
+          ${rows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join('')}</tr>`).join('')}
+        </table>
+      </body>
+    </html>
+  `;
+
+  const blob = new Blob([htmlTable], { type: 'application/vnd.ms-excel' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
+}
+
+// ===== DATA MANAGEMENT =====
+
+class FinanceApp {
+  constructor() {
+    this.transactions = [];
+    this.bankAccounts = [];
+    this.brokerAccounts = [];
+    this.budgetAllocation = {
+      necessities: 50,
+      investments: 20,
+      savings: 20,
+      whims: 10
+    };
+    this.portfolioSettings = {
+      annualReturn: 7,
+      currentAge: 30
+    };
+    this.isDarkMode = true;
+    
+    this.loadFromStorage();
+    this.applyTheme();
+    this.render();
+  }
+
+  loadFromStorage() {
+    const transactions = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
+    const bankAccounts = localStorage.getItem(STORAGE_KEYS.BANK_ACCOUNTS);
+    const brokerAccounts = localStorage.getItem(STORAGE_KEYS.BROKER_ACCOUNTS);
+    const budget = localStorage.getItem(STORAGE_KEYS.BUDGET);
+    const portfolio = localStorage.getItem(STORAGE_KEYS.PORTFOLIO);
+    const theme = localStorage.getItem(STORAGE_KEYS.THEME);
+
+    if (transactions) this.transactions = JSON.parse(transactions);
+    if (bankAccounts) this.bankAccounts = JSON.parse(bankAccounts);
+    if (brokerAccounts) this.brokerAccounts = JSON.parse(brokerAccounts);
+    if (budget) this.budgetAllocation = JSON.parse(budget);
+    if (portfolio) this.portfolioSettings = JSON.parse(portfolio);
+    if (theme) this.isDarkMode = theme === 'dark';
+  }
+
+  saveToStorage() {
+    localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(this.transactions));
+    localStorage.setItem(STORAGE_KEYS.BANK_ACCOUNTS, JSON.stringify(this.bankAccounts));
+    localStorage.setItem(STORAGE_KEYS.BROKER_ACCOUNTS, JSON.stringify(this.brokerAccounts));
+    localStorage.setItem(STORAGE_KEYS.BUDGET, JSON.stringify(this.budgetAllocation));
+    localStorage.setItem(STORAGE_KEYS.PORTFOLIO, JSON.stringify(this.portfolioSettings));
+    localStorage.setItem(STORAGE_KEYS.THEME, this.isDarkMode ? 'dark' : 'light');
+  }
+
+  applyTheme() {
+    if (this.isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }
+
+  toggleTheme() {
+    this.isDarkMode = !this.isDarkMode;
+    this.applyTheme();
+    this.saveToStorage();
+    this.render();
+  }
+
+  addTransaction(transaction) {
+    const newTransaction = {
+      ...transaction,
+      id: generateUUID(),
+      createdAt: new Date().toISOString()
+    };
+
+    this.transactions.push(newTransaction);
+
+    // Update account balances
+    if (transaction.type === 'income' && transaction.account) {
+      const account = this.bankAccounts.find(acc => acc.id === transaction.account);
+      if (account) {
+        account.currentBalance += transaction.amount;
+      }
+    } else if (transaction.type === 'expense') {
+      const firstAccount = this.bankAccounts[0];
+      if (firstAccount) {
+        firstAccount.currentBalance -= transaction.amount;
+      }
+    }
+
+    localStorage.setItem(STORAGE_KEYS.LAST_TRANSACTION, JSON.stringify(transaction));
+    this.saveToStorage();
+    this.render();
+  }
+
+  deleteTransaction(id) {
+    this.transactions = this.transactions.filter(t => t.id !== id);
+    this.saveToStorage();
+    this.render();
+  }
+
+  addBankAccount(name, initialBalance) {
+    const newAccount = {
+      id: generateUUID(),
+      name,
+      initialBalance,
+      currentBalance: initialBalance
+    };
+    this.bankAccounts.push(newAccount);
+    this.saveToStorage();
+    this.render();
+  }
+
+  addBrokerAccount(name, initialBalance) {
+    const newAccount = {
+      id: generateUUID(),
+      name,
+      initialBalance,
+      currentBalance: initialBalance
+    };
+    this.brokerAccounts.push(newAccount);
+    this.saveToStorage();
+    this.render();
+  }
+
+  getLastTransaction() {
+    const last = localStorage.getItem(STORAGE_KEYS.LAST_TRANSACTION);
+    return last ? JSON.parse(last) : null;
+  }
+
+  getTotalBankBalance() {
+    return this.bankAccounts.reduce((sum, acc) => sum + acc.currentBalance, 0);
+  }
+
+  getTotalBrokerBalance() {
+    return this.brokerAccounts.reduce((sum, acc) => sum + acc.currentBalance, 0);
+  }
+
+  // ===== RENDERING =====
+
+  render() {
+    const root = document.getElementById('root');
+    root.innerHTML = `
+      ${this.renderHeader()}
+      <div class="flex">
+        ${this.renderSidebar()}
+        <main class="flex-1 p-4 md:p-8">
+          ${this.renderTransactionList()}
+        </main>
+      </div>
+    `;
+    this.attachEventListeners();
+  }
+
+  renderHeader() {
+    const totalBank = formatCurrency(this.getTotalBankBalance());
+    const totalBroker = formatCurrency(this.getTotalBrokerBalance());
+    const hasAccounts = this.bankAccounts.length > 0 || this.brokerAccounts.length > 0;
+
+    return `
+      <header class="header">
+        <div class="container py-4">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-6">
+              <h1 class="text-2xl font-bold text-primary">Finance App</h1>
+              ${hasAccounts ? `
+                <div class="flex gap-4 text-sm">
+                  <div>
+                    <span class="text-muted-foreground">Bankovní účty</span>
+                    <div class="font-semibold text-success">${totalBank}</div>
+                  </div>
+                  <div>
+                    <span class="text-muted-foreground">Brokerské účty</span>
+                    <div class="font-semibold text-primary">${totalBroker}</div>
+                  </div>
+                </div>
+              ` : `
+                <button class="btn btn-outline btn-sm" id="btnSetupAccounts">Nastavit účty</button>
+              `}
+            </div>
+            <div class="flex items-center gap-2">
+              <button class="btn btn-primary btn-sm" id="btnNewTransaction">+ Nová transakce</button>
+              <button class="btn btn-ghost btn-icon" id="btnToggleTheme">
+                ${this.isDarkMode ? '☀️' : '🌙'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+    `;
+  }
+
+  renderSidebar() {
+    return `
+      <aside class="sidebar">
+        <nav class="space-y-2">
+          <button class="btn btn-ghost w-full" style="justify-content: flex-start;">🏠 Přehled</button>
+          <button class="btn btn-ghost w-full" id="btnReports" style="justify-content: flex-start;">📊 Reporty</button>
+          <button class="btn btn-ghost w-full" id="btnCharts" style="justify-content: flex-start;">📈 Grafy</button>
+          <div class="border-t border-border mt-4 pt-4">
+            <p class="text-xs text-muted-foreground mb-2 px-3">Export dat</p>
+            <button class="btn btn-ghost btn-sm w-full" id="btnExportCSV" style="justify-content: flex-start;">📄 Export CSV</button>
+            <button class="btn btn-ghost btn-sm w-full" id="btnExportXLSX" style="justify-content: flex-start;">📄 Export XLSX</button>
+          </div>
+        </nav>
+      </aside>
+    `;
+  }
+
+  renderTransactionList() {
+    if (this.transactions.length === 0) {
+      return `
+        <div class="text-center py-12">
+          <p class="text-muted-foreground">Zatím nemáte žádné transakce.</p>
+          <p class="text-sm text-muted-foreground mt-2">Klikněte na "Nová transakce" pro přidání první transakce.</p>
+        </div>
+      `;
+    }
+
+    const monthlyData = groupTransactionsByMonth(this.transactions);
+    
+    return `
+      <div class="space-y-8">
+        ${monthlyData.map(month => `
+          <div class="space-y-4">
+            <div class="flex items-center justify-between border-b-2 border-primary pb-2">
+              <h2 class="text-2xl font-bold">${formatMonth(month.month)}</h2>
+              <div class="text-right">
+                <p class="text-sm text-muted-foreground">Bilance</p>
+                <p class="text-xl font-bold ${month.balance >= 0 ? 'text-success' : 'text-destructive'}">
+                  ${formatCurrency(month.balance)}
+                </p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <!-- Příjmy -->
+              <div class="card">
+                <h3 class="font-semibold text-success mb-3 flex items-center justify-between">
+                  Příjmy
+                  <span class="text-sm">${formatCurrency(month.totalIncome)}</span>
+                </h3>
+                <div class="space-y-2">
+                  ${month.income.map(t => `
+                    <div class="flex items-center justify-between text-sm">
+                      <span class="text-muted-foreground">${t.name}</span>
+                      <div class="flex items-center gap-2">
+                        <span class="font-medium">${formatCurrency(t.amount)}</span>
+                        <button class="btn btn-ghost btn-sm delete-transaction" data-id="${t.id}">🗑️</button>
+                      </div>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+
+              <!-- Výdaje -->
+              <div class="card">
+                <h3 class="font-semibold text-destructive mb-3 flex items-center justify-between">
+                  Výdaje
+                  <span class="text-sm">${formatCurrency(month.totalExpenses)}</span>
+                </h3>
+                <div class="space-y-2">
+                  ${month.expenses.map(t => `
+                    <div class="flex items-center justify-between text-sm">
+                      <span class="text-muted-foreground">
+                        ${t.name}
+                        ${t.category ? `<span class="text-xs">(${CategoryLabels[t.category]})</span>` : ''}
+                      </span>
+                      <div class="flex items-center gap-2">
+                        <span class="font-medium">${formatCurrency(t.amount)}</span>
+                        <button class="btn btn-ghost btn-sm delete-transaction" data-id="${t.id}">🗑️</button>
+                      </div>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+
+              <!-- Převody -->
+              <div class="card">
+                <h3 class="font-semibold text-warning mb-3 flex items-center justify-between">
+                  Převody
+                  <span class="text-sm">${formatCurrency(month.totalTransfers)}</span>
+                </h3>
+                <div class="space-y-2">
+                  ${month.transfers.map(t => `
+                    <div class="flex items-center justify-between text-sm">
+                      <span class="text-muted-foreground">${t.name}</span>
+                      <div class="flex items-center gap-2">
+                        <span class="font-medium">${formatCurrency(t.amount)}</span>
+                        <button class="btn btn-ghost btn-sm delete-transaction" data-id="${t.id}">🗑️</button>
+                      </div>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            </div>
+
+            ${month.totalIncome > 0 ? `
+              <div class="card bg-muted">
+                <h4 class="font-semibold mb-3 text-sm">Rozdělení výdajů podle kategorií</h4>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  ${Object.entries(month.categoryBreakdown).map(([category, amount]) => `
+                    <div class="text-sm">
+                      <p class="text-muted-foreground">${CategoryLabels[category]}</p>
+                      <p class="font-semibold">${formatCurrency(amount)}</p>
+                      <p class="text-xs text-muted-foreground">${getCategoryPercentage(amount, month.totalIncome).toFixed(1)}% příjmů</p>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            ` : ''}
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  attachEventListeners() {
+    // Theme toggle
+    document.getElementById('btnToggleTheme')?.addEventListener('click', () => this.toggleTheme());
+    
+    // New transaction
+    document.getElementById('btnNewTransaction')?.addEventListener('click', () => this.showTransactionForm());
+    
+    // Setup accounts
+    document.getElementById('btnSetupAccounts')?.addEventListener('click', () => this.showAccountSetup());
+    
+    // Export
+    document.getElementById('btnExportCSV')?.addEventListener('click', () => exportToCSV(this.transactions));
+    document.getElementById('btnExportXLSX')?.addEventListener('click', () => exportToXLSX(this.transactions));
+    
+    // Charts
+    document.getElementById('btnCharts')?.addEventListener('click', () => this.showCharts());
+    
+    // Delete transactions
+    document.querySelectorAll('.delete-transaction').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = e.target.dataset.id;
+        if (confirm('Opravdu chcete smazat tuto transakci?')) {
+          this.deleteTransaction(id);
+        }
+      });
+    });
+  }
+
+  showTransactionForm() {
+    const lastTransaction = this.getLastTransaction();
+    const currentMonth = getCurrentMonth();
+    
+    const overlay = document.createElement('div');
+    overlay.className = 'slide-panel';
+    overlay.id = 'transactionFormOverlay';
+    overlay.innerHTML = `
+      <div class="slide-panel-content">
+        <div class="sticky top-0 bg-card border-b border-border px-6 py-4 flex items-center justify-between">
+          <h2 class="text-xl font-semibold">Nová transakce</h2>
+          <button class="btn btn-ghost btn-icon" id="closeTransactionForm">✕</button>
+        </div>
+        <form id="transactionForm" class="p-6 space-y-4">
+          <div class="space-y-2">
+            <label class="label">Měsíc *</label>
+            <input type="month" class="input" name="month" value="${currentMonth}" required />
+          </div>
+          <div class="space-y-2">
+            <label class="label">Typ *</label>
+            <select class="select" name="type" id="transactionType">
+              <option value="expense" ${lastTransaction?.type === 'expense' ? 'selected' : ''}>Výdaj</option>
+              <option value="income" ${lastTransaction?.type === 'income' ? 'selected' : ''}>Příjem</option>
+              <option value="transfer" ${lastTransaction?.type === 'transfer' ? 'selected' : ''}>Převod</option>
+            </select>
+          </div>
+          <div class="space-y-2">
+            <label class="label">Název transakce *</label>
+            <input type="text" class="input" name="name" placeholder="např. Mzda, Nákup, ..." required />
+          </div>
+          <div class="space-y-2">
+            <label class="label">Částka (Kč) *</label>
+            <input type="number" class="input" name="amount" step="0.01" placeholder="0.00" required />
+          </div>
+          <div id="incomeFields" style="display: none;" class="space-y-2">
+            <label class="label">Účet *</label>
+            <select class="select" name="account">
+              ${this.bankAccounts.map(acc => `<option value="${acc.id}">${acc.name}</option>`).join('')}
+            </select>
+          </div>
+          <div id="expenseFields" class="space-y-2">
+            <label class="label">Kategorie *</label>
+            <select class="select" name="category">
+              <option value="necessities">Nutnosti</option>
+              <option value="whims">Rozmary</option>
+              <option value="investments">Investice</option>
+              <option value="savings">Spoření</option>
+            </select>
+          </div>
+          <div id="transferFields" style="display: none;" class="space-y-4">
+            <div class="space-y-2">
+              <label class="label">Typ převodu *</label>
+              <select class="select" name="transferCategory">
+                <option value="savings">Spoření</option>
+                <option value="transfer">Převod mezi účty</option>
+              </select>
+            </div>
+            <div class="space-y-2">
+              <label class="label">Cílový účet</label>
+              <select class="select" name="transferAccount">
+                <option value="">Vyberte účet (volitelné)</option>
+                ${this.bankAccounts.map(acc => `<option value="${acc.id}">${acc.name}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary w-full">Přidat transakci</button>
+        </form>
+      </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    
+    // Type change handler
+    const typeSelect = document.getElementById('transactionType');
+    const incomeFields = document.getElementById('incomeFields');
+    const expenseFields = document.getElementById('expenseFields');
+    const transferFields = document.getElementById('transferFields');
+    
+    function updateFieldsVisibility() {
+      const type = typeSelect.value;
+      incomeFields.style.display = type === 'income' ? 'block' : 'none';
+      expenseFields.style.display = type === 'expense' ? 'block' : 'none';
+      transferFields.style.display = type === 'transfer' ? 'block' : 'none';
+    }
+    
+    typeSelect.addEventListener('change', updateFieldsVisibility);
+    updateFieldsVisibility();
+    
+    // Close handler
+    document.getElementById('closeTransactionForm').addEventListener('click', () => overlay.remove());
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
+    
+    // Form submit
+    document.getElementById('transactionForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const transaction = {
+        month: formData.get('month'),
+        type: formData.get('type'),
+        name: formData.get('name'),
+        amount: parseFloat(formData.get('amount'))
+      };
+      
+      if (transaction.type === 'income') {
+        transaction.account = formData.get('account');
+      } else if (transaction.type === 'expense') {
+        transaction.category = formData.get('category');
+      } else if (transaction.type === 'transfer') {
+        transaction.transferCategory = formData.get('transferCategory');
+        transaction.transferAccount = formData.get('transferAccount');
+      }
+      
+      this.addTransaction(transaction);
+      overlay.remove();
+      this.showToast('Transakce byla přidána');
+    });
+  }
+
+  showAccountSetup() {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'accountSetupOverlay';
+    overlay.innerHTML = `
+      <div class="modal-content" style="width: 100%; max-width: 40rem;">
+        <div class="sticky top-0 bg-card border-b border-border px-6 py-4 flex items-center justify-between rounded-t-lg">
+          <h2 class="text-xl font-semibold">Nastavení účtů</h2>
+          <button class="btn btn-ghost btn-icon" id="closeAccountSetup">✕</button>
+        </div>
+        <div class="p-6 space-y-6">
+          <div class="space-y-4">
+            <h3 class="text-lg font-semibold">Bankovní účty</h3>
+            <div class="flex gap-2">
+              <input type="text" class="input" id="bankName" placeholder="Název účtu" />
+              <input type="number" class="input" id="bankBalance" placeholder="Počáteční zůstatek" step="0.01" />
+              <button class="btn btn-primary btn-icon" id="addBankAccount">+</button>
+            </div>
+            <div id="bankAccountsList" class="space-y-2">
+              ${this.bankAccounts.map(acc => `
+                <div class="flex items-center justify-between p-3 rounded-lg bg-muted">
+                  <div>
+                    <p class="font-medium">${acc.name}</p>
+                    <p class="text-sm text-muted-foreground">Aktuální: ${formatCurrency(acc.currentBalance)}</p>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          <div class="space-y-4">
+            <h3 class="text-lg font-semibold">Brokerské účty</h3>
+            <div class="flex gap-2">
+              <input type="text" class="input" id="brokerName" placeholder="Název účtu" />
+              <input type="number" class="input" id="brokerBalance" placeholder="Počáteční zůstatek" step="0.01" />
+              <button class="btn btn-primary btn-icon" id="addBrokerAccount">+</button>
+            </div>
+            <div id="brokerAccountsList" class="space-y-2">
+              ${this.brokerAccounts.map(acc => `
+                <div class="flex items-center justify-between p-3 rounded-lg bg-muted">
+                  <div>
+                    <p class="font-medium">${acc.name}</p>
+                    <p class="text-sm text-muted-foreground">Aktuální: ${formatCurrency(acc.currentBalance)}</p>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+        <div class="border-t border-border px-6 py-4">
+          <button class="btn btn-primary w-full" id="closeAccountSetupBtn">Hotovo</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    
+    // Close handlers
+    const closeModal = () => overlay.remove();
+    document.getElementById('closeAccountSetup').addEventListener('click', closeModal);
+    document.getElementById('closeAccountSetupBtn').addEventListener('click', closeModal);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeModal();
+    });
+    
+    // Add bank account
+    document.getElementById('addBankAccount').addEventListener('click', () => {
+      const name = document.getElementById('bankName').value;
+      const balance = parseFloat(document.getElementById('bankBalance').value);
+      if (name && !isNaN(balance)) {
+        this.addBankAccount(name, balance);
+        closeModal();
+        this.showAccountSetup();
+      }
+    });
+    
+    // Add broker account
+    document.getElementById('addBrokerAccount').addEventListener('click', () => {
+      const name = document.getElementById('brokerName').value;
+      const balance = parseFloat(document.getElementById('brokerBalance').value);
+      if (name && !isNaN(balance)) {
+        this.addBrokerAccount(name, balance);
+        closeModal();
+        this.showAccountSetup();
+      }
+    });
+  }
+
+  showCharts() {
+    if (this.transactions.length === 0) {
+      this.showToast('Zatím nemáte žádné transakce pro zobrazení grafů.');
+      return;
+    }
+
+    const monthlyData = groupTransactionsByMonth(this.transactions);
+    
+    // Prepare data for charts
+    const barData = monthlyData.slice().reverse();
+    
+    // Calculate category totals
+    const categoryTotals = this.transactions
+      .filter(t => t.type === 'expense')
+      .reduce((acc, t) => {
+        if (t.category) {
+          acc[t.category] = (acc[t.category] || 0) + t.amount;
+        }
+        return acc;
+      }, {});
+    
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'chartsOverlay';
+    overlay.innerHTML = `
+      <div class="modal-content" style="width: 100%; max-width: 72rem;">
+        <div class="sticky top-0 bg-card border-b border-border px-6 py-4 flex items-center justify-between rounded-t-lg">
+          <h2 class="text-xl font-semibold">Grafy a vizualizace</h2>
+          <button class="btn btn-ghost btn-icon" id="closeCharts">✕</button>
+        </div>
+        <div class="p-6 space-y-8">
+          <div class="space-y-4">
+            <h3 class="text-lg font-semibold">Příjmy vs Výdaje po měsících</h3>
+            <div class="chart-container bg-muted rounded-lg p-4">
+              <div id="barChart" style="display: flex; align-items: flex-end; height: 100%; gap: 1rem; justify-content: center;">
+                ${barData.map(month => `
+                  <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
+                    <div style="display: flex; gap: 4px; align-items: flex-end; height: 200px;">
+                      <div style="width: 20px; background: hsl(142, 71%, 45%); height: ${month.totalIncome / Math.max(...barData.map(m => Math.max(m.totalIncome, m.totalExpenses))) * 180}px; border-radius: 2px 2px 0 0;" title="Příjmy: ${formatCurrency(month.totalIncome)}"></div>
+                      <div style="width: 20px; background: hsl(0, 84%, 60%); height: ${month.totalExpenses / Math.max(...barData.map(m => Math.max(m.totalIncome, m.totalExpenses))) * 180}px; border-radius: 2px 2px 0 0;" title="Výdaje: ${formatCurrency(month.totalExpenses)}"></div>
+                    </div>
+                    <span class="text-xs text-muted-foreground">${formatMonth(month.month).split(' ')[0]}</span>
+                  </div>
+                `).join('')}
+              </div>
+              <div class="flex justify-center gap-6 mt-4">
+                <div class="flex items-center gap-2"><div style="width: 12px; height: 12px; background: hsl(142, 71%, 45%); border-radius: 2px;"></div><span class="text-sm">Příjmy</span></div>
+                <div class="flex items-center gap-2"><div style="width: 12px; height: 12px; background: hsl(0, 84%, 60%); border-radius: 2px;"></div><span class="text-sm">Výdaje</span></div>
+              </div>
+            </div>
+          </div>
+          
+          ${Object.keys(categoryTotals).length > 0 ? `
+          <div class="space-y-4">
+            <h3 class="text-lg font-semibold">Rozdělení výdajů podle kategorií</h3>
+            <div class="chart-container bg-muted rounded-lg p-4">
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                ${Object.entries(categoryTotals).map(([category, amount]) => {
+                  const total = Object.values(categoryTotals).reduce((a, b) => a + b, 0);
+                  const percent = ((amount / total) * 100).toFixed(1);
+                  const colors = {
+                    necessities: 'hsl(217, 91%, 60%)',
+                    whims: 'hsl(0, 84%, 60%)',
+                    investments: 'hsl(142, 71%, 45%)',
+                    savings: 'hsl(38, 92%, 50%)'
+                  };
+                  return `
+                    <div class="text-center">
+                      <div style="width: 80px; height: 80px; border-radius: 50%; background: conic-gradient(${colors[category]} ${percent}%, hsl(var(--muted)) ${percent}%); margin: 0 auto;"></div>
+                      <p class="font-semibold mt-2">${CategoryLabels[category]}</p>
+                      <p class="text-sm text-muted-foreground">${formatCurrency(amount)}</p>
+                      <p class="text-xs text-muted-foreground">${percent}%</p>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          </div>
+          ` : ''}
+          
+          <div class="space-y-4">
+            <h3 class="text-lg font-semibold">Trend bilance</h3>
+            <div class="chart-container bg-muted rounded-lg p-4">
+              <div style="display: flex; align-items: center; height: 100%; gap: 0.5rem; justify-content: center;">
+                ${barData.map((month, i) => {
+                  const maxBalance = Math.max(...barData.map(m => Math.abs(m.balance)));
+                  const height = Math.abs(month.balance) / maxBalance * 150;
+                  const isPositive = month.balance >= 0;
+                  return `
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
+                      <div style="height: 200px; display: flex; flex-direction: column; justify-content: center;">
+                        <div style="width: 40px; background: ${isPositive ? 'hsl(217, 91%, 60%)' : 'hsl(0, 84%, 60%)'}; height: ${height}px; border-radius: 4px;" title="Bilance: ${formatCurrency(month.balance)}"></div>
+                      </div>
+                      <span class="text-xs text-muted-foreground">${formatMonth(month.month).split(' ')[0]}</span>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    
+    const closeModal = () => overlay.remove();
+    document.getElementById('closeCharts').addEventListener('click', closeModal);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeModal();
+    });
+  }
+
+  showToast(message) {
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+  }
+}
+
+// ===== SPUŠTĚNÍ APLIKACE =====
+
+document.addEventListener('DOMContentLoaded', () => {
+  window.app = new FinanceApp();
+});
+
+
+================================================================================
+                              KONEC SOUBORU
+================================================================================
+
+POZNÁMKA: Tento soubor obsahuje zjednodušenou vanilla JavaScript verzi aplikace.
+Originální aplikace používá React s TypeScript a knihovnu Recharts pro grafy.
+
+Pro plnou funkcionalitu doporučuji použít originální React verzi v Lovable.
