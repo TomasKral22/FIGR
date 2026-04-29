@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { isDesktopApp } from '@/lib/runtime';
 
 interface BackupReminderProps {
   onOpenBackups: () => void;
@@ -11,8 +12,11 @@ export const BackupReminder = ({ onOpenBackups }: BackupReminderProps) => {
 
   useEffect(() => {
     const load = async () => {
+      if (!isDesktopApp()) return;
+
       const api = window.desktopApp?.backup;
       if (!api) return;
+
       const backups = await api.list();
       const latest = backups[0];
       if (!latest) {
@@ -35,14 +39,14 @@ export const BackupReminder = ({ onOpenBackups }: BackupReminderProps) => {
         <div className="flex items-start gap-3">
           <ShieldAlert className="mt-0.5 h-5 w-5 text-amber-600" />
           <div>
-            <p className="font-medium text-amber-900 dark:text-amber-200">Pripominka zalohy</p>
+            <p className="font-medium text-amber-900 dark:text-amber-200">Připomínka zálohy</p>
             <p className="text-sm text-muted-foreground">
-              Posledni zaloha je starsi nebo zadna nevznikla. Doporucuji udelat novy snapshot databaze.
+              Poslední záloha je starší nebo zatím žádná nevznikla. Doporučuji udělat nový snapshot databáze.
             </p>
           </div>
         </div>
         <Button variant="outline" size="sm" onClick={onOpenBackups}>
-          Otevrit zalohy
+          Otevřít zálohy
         </Button>
       </div>
     </div>

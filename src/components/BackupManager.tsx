@@ -3,6 +3,7 @@ import { FolderOpen, HardDriveDownload, RefreshCw, RotateCcw, ShieldCheck } from
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { isDesktopApp } from '@/lib/runtime';
 
 interface BackupManagerProps {
   isOpen: boolean;
@@ -32,7 +33,7 @@ export const BackupManager = ({ isOpen, onClose }: BackupManagerProps) => {
   const [creating, setCreating] = useState(false);
   const [restoringFile, setRestoringFile] = useState<string | null>(null);
 
-  const isDesktop = Boolean(window.desktopApp?.backup);
+  const isDesktop = isDesktopApp();
 
   const loadBackupData = useCallback(async () => {
     if (!isDesktop) return;
@@ -50,7 +51,7 @@ export const BackupManager = ({ isOpen, onClose }: BackupManagerProps) => {
       console.error('Failed to load backups:', error);
       toast({
         title: 'Chyba',
-        description: 'Nepodarilo se nacist zalozni soubory.',
+        description: 'Nepodařilo se načíst záložní soubory.',
         variant: 'destructive',
       });
     } finally {
@@ -74,14 +75,14 @@ export const BackupManager = ({ isOpen, onClose }: BackupManagerProps) => {
       await window.desktopApp!.backup.create();
       await loadBackupData();
       toast({
-        title: 'Zaloha vytvorena',
-        description: 'Nova lokalni zaloha databaze je pripravena.',
+        title: 'Záloha vytvořena',
+        description: 'Nová lokální záloha databáze je připravena.',
       });
     } catch (error) {
       console.error('Failed to create backup:', error);
       toast({
         title: 'Chyba',
-        description: 'Nepodarilo se vytvorit zalohu.',
+        description: 'Nepodařilo se vytvořit zálohu.',
         variant: 'destructive',
       });
     } finally {
@@ -93,7 +94,7 @@ export const BackupManager = ({ isOpen, onClose }: BackupManagerProps) => {
     if (!isDesktop) return;
 
     const confirmed = window.confirm(
-      'Obnova prepise aktualni databazi a aplikace se restartuje. Chcete pokracovat?'
+      'Obnova přepíše aktuální databázi a aplikace se restartuje. Chcete pokračovat?'
     );
     if (!confirmed) return;
 
@@ -105,7 +106,7 @@ export const BackupManager = ({ isOpen, onClose }: BackupManagerProps) => {
       setRestoringFile(null);
       toast({
         title: 'Chyba',
-        description: 'Nepodarilo se obnovit zalohu.',
+        description: 'Nepodařilo se obnovit zálohu.',
         variant: 'destructive',
       });
     }
@@ -115,13 +116,13 @@ export const BackupManager = ({ isOpen, onClose }: BackupManagerProps) => {
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Sprava zaloh</DialogTitle>
+          <DialogTitle>Správa záloh</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-5">
           {!isDesktop && (
             <div className="rounded-lg border border-border p-4 text-sm text-muted-foreground">
-              Zalohy databaze jsou dostupne jen v desktop verzi aplikace.
+              Zálohy databáze jsou dostupné jen v desktopové verzi aplikace.
             </div>
           )}
 
@@ -131,7 +132,7 @@ export const BackupManager = ({ isOpen, onClose }: BackupManagerProps) => {
                 <div className="rounded-lg border border-border p-4">
                   <div className="flex items-center gap-2 text-sm font-medium">
                     <ShieldCheck className="h-4 w-4" />
-                    Databaze
+                    Databáze
                   </div>
                   <p className="mt-2 break-all text-xs text-muted-foreground">{dbPath}</p>
                 </div>
@@ -139,7 +140,7 @@ export const BackupManager = ({ isOpen, onClose }: BackupManagerProps) => {
                 <div className="rounded-lg border border-border p-4">
                   <div className="flex items-center gap-2 text-sm font-medium">
                     <HardDriveDownload className="h-4 w-4" />
-                    Slozka zaloh
+                    Složka záloh
                   </div>
                   <p className="mt-2 break-all text-xs text-muted-foreground">{backupDir}</p>
                 </div>
@@ -148,19 +149,19 @@ export const BackupManager = ({ isOpen, onClose }: BackupManagerProps) => {
               <div className="rounded-lg border border-border p-4">
                 <p className="text-sm font-medium">Jak to funguje</p>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Aplikace vytvari automatickou zalohu zhruba jednou za 24 hodin a muzete kdykoli
-                  vytvorit i rucni snapshot. Obnova prepise aktualni databazi a aplikaci restartuje.
+                  Aplikace vytváří automatickou zálohu zhruba jednou za 24 hodin a můžeš kdykoli
+                  vytvořit i ruční snapshot. Obnova přepíše aktuální databázi a aplikaci restartuje.
                 </p>
                 {lastBackup && (
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Posledni zaloha: {new Date(lastBackup.createdAt).toLocaleString('cs-CZ')}
+                    Poslední záloha: {new Date(lastBackup.createdAt).toLocaleString('cs-CZ')}
                   </p>
                 )}
               </div>
 
               <div className="flex flex-wrap gap-2">
                 <Button onClick={handleCreateBackup} disabled={creating}>
-                  {creating ? 'Vytvarim...' : 'Vytvorit zalohu'}
+                  {creating ? 'Vytvářím...' : 'Vytvořit zálohu'}
                 </Button>
                 <Button variant="outline" onClick={() => void loadBackupData()} disabled={loading}>
                   <RefreshCw className="mr-2 h-4 w-4" />
@@ -168,16 +169,16 @@ export const BackupManager = ({ isOpen, onClose }: BackupManagerProps) => {
                 </Button>
                 <Button variant="outline" onClick={() => void window.desktopApp!.backup.openFolder()}>
                   <FolderOpen className="mr-2 h-4 w-4" />
-                  Otevrit slozku zaloh
+                  Otevřít složku záloh
                 </Button>
               </div>
 
               <div className="rounded-lg border border-border">
-                <div className="border-b border-border px-4 py-3 text-sm font-medium">Dostupne zalohy</div>
+                <div className="border-b border-border px-4 py-3 text-sm font-medium">Dostupné zálohy</div>
                 <div className="max-h-80 overflow-y-auto">
                   {backups.length === 0 ? (
                     <div className="px-4 py-6 text-sm text-muted-foreground">
-                      Zatim tu nejsou zadne zalozni soubory.
+                      Zatím tu nejsou žádné záložní soubory.
                     </div>
                   ) : (
                     backups.map((backup) => (
@@ -189,7 +190,7 @@ export const BackupManager = ({ isOpen, onClose }: BackupManagerProps) => {
                           <p className="truncate text-sm font-medium">{backup.fileName}</p>
                           <p className="text-xs text-muted-foreground">
                             {new Date(backup.createdAt).toLocaleString('cs-CZ')} · {formatFileSize(backup.size)} ·{' '}
-                            {backup.kind === 'auto' ? 'automaticka' : 'rucni'}
+                            {backup.kind === 'auto' ? 'automatická' : 'ruční'}
                           </p>
                         </div>
                         <Button

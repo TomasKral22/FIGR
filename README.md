@@ -1,73 +1,69 @@
-# Welcome to your Lovable project
+# FIGR
 
-## Project info
+FIGR je aplikace pro osobní finance a investiční přehled. Běží ve dvou režimech:
 
-**URL**: https://lovable.dev/projects/07d056a3-4896-4632-95dd-63cb9c379c0f
+- `desktop` přes Electron a lokální SQLite databázi
+- `web demo` v prohlížeči pro prezentaci a rychlé testování UI
 
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/07d056a3-4896-4632-95dd-63cb9c379c0f) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+## Lokální spuštění
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+npm install
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Desktopová verze:
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```sh
+npm run desktop:dev
+```
 
-**Use GitHub Codespaces**
+## Demo web režim
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Pro ukázku z jiného počítače stačí nasadit webovou část. V tomto režimu:
 
-## What technologies are used for this project?
+- data běží lokálně v prohlížeči
+- funguje většina formulářů, přehledů a grafů
+- desktopové zálohy a systémové složky nejsou dostupné
 
-This project is built with:
+Build:
+
+```sh
+npm run build:demo
+```
+
+Lokální preview:
+
+```sh
+npm run preview:demo
+```
+
+## GitHub Pages odkaz
+
+Repo je připravené na automatické nasazení přes GitHub Pages workflow.
+Po pushi na `main` bude veřejná ukázka dostupná na:
+
+`https://tomaskral22.github.io/FIGR/`
+
+Pokud se odkaz hned neotevře, je potřeba v nastavení repozitáře na GitHubu povolit:
+
+`Settings -> Pages -> Source: GitHub Actions`
+
+## Nasazení na Vercel
+
+Repo už obsahuje `vercel.json`, takže stačí:
+
+1. importovat GitHub repozitář do Vercelu
+2. nechat framework autodetekci na `Vite`
+3. použít build command `npm run build:demo`
+4. output directory nechat `dist`
+
+## Technologie
 
 - Vite
 - TypeScript
 - React
-- shadcn-ui
 - Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/07d056a3-4896-4632-95dd-63cb9c379c0f) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- shadcn/ui
+- Electron
+- SQLite

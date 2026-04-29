@@ -73,7 +73,7 @@ export const CSVImport = ({ bankAccounts, brokerAccounts, onImport }: CSVImportP
     setIsOpen(false);
     toast({
       title: 'Šablona exportována',
-      description: 'Připravená XLSX šablona byla uložena do stažených souborů.',
+      description: 'Připravená XLSX šablona byla uložená do stažených souborů.',
     });
   };
 
@@ -94,7 +94,7 @@ export const CSVImport = ({ bankAccounts, brokerAccounts, onImport }: CSVImportP
         </Button>
       </DialogTrigger>
 
-      <DialogContent data-testid="import-dialog">
+      <DialogContent data-testid="import-dialog" className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Import dat</DialogTitle>
           <DialogDescription>
