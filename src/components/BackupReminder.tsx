@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { isDesktopApp } from '@/lib/runtime';
 
 interface BackupReminderProps {
   onOpenBackups: () => void;
@@ -12,8 +11,6 @@ export const BackupReminder = ({ onOpenBackups }: BackupReminderProps) => {
 
   useEffect(() => {
     const load = async () => {
-      if (!isDesktopApp()) return;
-
       const api = window.desktopApp?.backup;
       if (!api) return;
 

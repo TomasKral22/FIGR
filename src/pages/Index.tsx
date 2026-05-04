@@ -20,9 +20,7 @@ import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { VisualThemePanel } from '@/components/VisualThemePanel';
 import { SidebarItemId } from '@/components/Sidebar';
 import { GettingStartedPanel } from '@/components/GettingStartedPanel';
-import { DemoModeBanner } from '@/components/DemoModeBanner';
 import { Transaction } from '@/types/finance';
-import { isWebDemo } from '@/lib/runtime';
 
 const SIDEBAR_ITEMS_STORAGE_KEY = 'finance_sidebar_visible_items';
 const DEFAULT_VISIBLE_SIDEBAR_ITEMS: SidebarItemId[] = [
@@ -164,7 +162,6 @@ const Index = () => {
         )}
 
         <main className="flex-1 p-4 md:p-8 space-y-6 md:space-y-8">
-          {isWebDemo() && <DemoModeBanner />}
           <GettingStartedPanel
             hasAccounts={bankAccounts.length + brokerAccounts.length > 0}
             hasTransactions={transactions.length > 0}

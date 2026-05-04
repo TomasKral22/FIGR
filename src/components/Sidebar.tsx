@@ -17,7 +17,6 @@ import { Button } from '@/components/ui/button';
 import { exportToCSV, exportToXLSX } from '@/utils/export';
 import { BankAccount, Transaction } from '@/types/finance';
 import { CSVImport } from '@/components/CSVImport';
-import { isDesktopApp } from '@/lib/runtime';
 
 export type SidebarItemId =
   | 'overview'
@@ -68,9 +67,8 @@ export const Sidebar = ({
 }: SidebarProps) => {
   const [showDataTools, setShowDataTools] = useState(false);
   const [showCustomize, setShowCustomize] = useState(false);
-  const itemVisibility = useMemo(() => new Set(visibleItems), [visibleItems]);
-  const desktopRuntime = isDesktopApp();
 
+  const itemVisibility = useMemo(() => new Set(visibleItems), [visibleItems]);
   const toggleButtonClass = 'w-full justify-start gap-2';
 
   return (
@@ -206,13 +204,8 @@ export const Sidebar = ({
                 </Button>
                 <Button variant="ghost" size="sm" className={toggleButtonClass} onClick={onOpenBackups}>
                   <HardDriveDownload className="h-4 w-4" />
-                  {desktopRuntime ? 'Zálohy databáze' : 'Desktopové zálohy'}
+                  Zálohy databáze
                 </Button>
-                {!desktopRuntime && (
-                  <p className="px-3 pt-1 text-xs text-muted-foreground">
-                    V prohlížečové ukázce nejsou lokální zálohy a systémové složky dostupné.
-                  </p>
-                )}
               </div>
             )}
           </div>

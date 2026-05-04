@@ -1,9 +1,11 @@
 type StorageMap = Record<string, string | null>;
 
-const desktopStorage = typeof window !== 'undefined' ? window.desktopApp?.storage : undefined;
+const getDesktopStorage = () =>
+  typeof window !== 'undefined' ? window.desktopApp?.storage : undefined;
 
 export const appStorage = {
   async getMany(keys: string[]): Promise<StorageMap> {
+    const desktopStorage = getDesktopStorage();
     if (desktopStorage) {
       return desktopStorage.getMany(keys);
     }
@@ -12,6 +14,7 @@ export const appStorage = {
   },
 
   async setMany(entries: Record<string, string>): Promise<void> {
+    const desktopStorage = getDesktopStorage();
     if (desktopStorage) {
       await desktopStorage.setMany(entries);
       return;
@@ -23,6 +26,7 @@ export const appStorage = {
   },
 
   async getDbPath(): Promise<string | null> {
+    const desktopStorage = getDesktopStorage();
     if (!desktopStorage) return null;
     return desktopStorage.getDbPath();
   },

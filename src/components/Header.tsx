@@ -112,7 +112,7 @@ export const Header = ({
                       <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                         Účty banky
                       </span>
-                      <div className="flex min-h-10 items-center gap-2 overflow-x-auto pb-1">
+                      <div className="thin-scrollbar flex min-h-10 items-center gap-2 overflow-x-auto pb-1 pr-1">
                         {bankAccounts.length > 0 ? (
                           bankAccounts.map((account) => renderAccountChip(account, 'success'))
                         ) : (
@@ -137,7 +137,7 @@ export const Header = ({
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
                       </div>
-                      <div className="flex min-h-10 items-center gap-2 overflow-x-auto pb-1">
+                      <div className="thin-scrollbar flex min-h-10 items-center gap-2 overflow-x-auto pb-1 pr-1">
                         {brokerAccounts.length > 0 ? (
                           brokerAccounts.map((account) => renderAccountChip(account, 'primary'))
                         ) : (

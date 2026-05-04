@@ -3,7 +3,6 @@ import { FolderOpen, HardDriveDownload, RefreshCw, RotateCcw, ShieldCheck } from
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { isDesktopApp } from '@/lib/runtime';
 
 interface BackupManagerProps {
   isOpen: boolean;
@@ -33,7 +32,7 @@ export const BackupManager = ({ isOpen, onClose }: BackupManagerProps) => {
   const [creating, setCreating] = useState(false);
   const [restoringFile, setRestoringFile] = useState<string | null>(null);
 
-  const isDesktop = isDesktopApp();
+  const isDesktop = Boolean(window.desktopApp?.backup);
 
   const loadBackupData = useCallback(async () => {
     if (!isDesktop) return;
