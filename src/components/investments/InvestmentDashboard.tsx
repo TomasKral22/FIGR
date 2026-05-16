@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowRight, Link2, Plus, RefreshCw, Settings, Sparkles, Upload } from 'lucide-react';
+import { Link2, Plus, RefreshCw, Settings, Sparkles, Upload } from 'lucide-react';
 import { useInvestmentData } from '@/hooks/useInvestmentData';
 import { PortfolioOverview } from './PortfolioOverview';
 import { AssetTable } from './AssetTable';
@@ -89,7 +89,8 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
                   <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Krok 1</p>
                   <p className="font-medium">Načíst data z brokera</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Ideálně importem exportu brokera. Šablonu použij jen tehdy, když broker nemá vhodný export.
+                    Ideálně importem exportu brokera. Šablonu použij jen tehdy, když broker nemá
+                    vhodný export.
                   </p>
                 </div>
                 <div className="rounded-lg border border-border/60 bg-card p-3">
@@ -103,7 +104,8 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
                   <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Krok 3</p>
                   <p className="font-medium">Sledovat dividendy a výkon</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Jakmile jsou data nahraná, přehled se dopočítá automaticky a zůstává průběžně aktualizovaný.
+                    Jakmile jsou data nahraná, přehled se dopočítá automaticky a zůstává průběžně
+                    aktualizovaný.
                   </p>
                 </div>
               </CardContent>
@@ -117,7 +119,8 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
                 <div className="rounded-lg border border-border/60 bg-card p-3">
                   <p className="font-medium">Export brokera</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Preferovaná cesta pro Trading 212, IBKR a další brokery s dostupným exportem obchodů.
+                    Preferovaná cesta pro Trading 212, IBKR a další brokery s dostupným exportem
+                    obchodů.
                   </p>
                 </div>
                 <div className="rounded-lg border border-border/60 bg-card p-3">
@@ -132,7 +135,8 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
                     API synchronizace
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Připravujeme jen pro brokery s oficiálním a stabilním API. U ostatních zůstane doporučený import exportů.
+                    Připravujeme jen pro brokery s oficiálním a stabilním API. U ostatních zůstává
+                    doporučený import exportů.
                   </p>
                 </div>
               </CardContent>
@@ -186,6 +190,7 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
                 <AssetTable
                   assets={portfolioSummary?.assets || []}
                   assetsByType={portfolioSummary?.assetsByType || {}}
+                  assetsByProvider={portfolioSummary?.assetsByProvider || {}}
                   assetsByCurrency={portfolioSummary?.assetsByCurrency || {}}
                   assetsBySector={portfolioSummary?.assetsBySector || {}}
                   reportingCurrency={settings?.reporting_currency || 'CZK'}

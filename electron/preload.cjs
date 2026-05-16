@@ -15,4 +15,9 @@ contextBridge.exposeInMainWorld('desktopApp', {
     openFolder: () => ipcRenderer.invoke('backup:openFolder'),
     restore: (fileName) => ipcRenderer.invoke('backup:restore', fileName),
   },
+  attachments: {
+    saveMany: (files) => ipcRenderer.invoke('attachments:saveMany', files),
+    open: (storagePath) => ipcRenderer.invoke('attachments:open', storagePath),
+    remove: (storagePath) => ipcRenderer.invoke('attachments:remove', storagePath),
+  },
 });

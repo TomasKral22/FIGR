@@ -23,8 +23,8 @@ const formatPercent = (value: number) =>
     maximumFractionDigits: 2,
   }).format(value / 100);
 
-export const PortfolioOverview = ({ portfolioSummary }: PortfolioOverviewProps) => {
-  if (!portfolioSummary) {
+export const PortfolioOverview = ({ portfolioSummary, loading }: PortfolioOverviewProps) => {
+  if (loading || !portfolioSummary) {
     return (
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {[1, 2, 3, 4, 5].map((item) => (
@@ -56,73 +56,94 @@ export const PortfolioOverview = ({ portfolioSummary }: PortfolioOverviewProps) 
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Investovano</CardTitle>
-            <PiggyBank className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalInvested, reportingCurrency)}</div>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,0.65fr)]">
+        <Card className="overflow-hidden border-primary/20 bg-gradient-to-br from-card via-card to-primary/5">
+          <CardContent className="p-6">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+              <div className="space-y-3">
+                <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                  <Wallet className="h-3.5 w-3.5" />
+                  Hlavní přehled portfolia
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Aktuální hodnota portfolia</p>
+                  <p className="text-3xl font-bold tracking-tight sm:text-4xl">
+                    {currentValue !== null ? formatCurrency(currentValue, reportingCurrency) : 'Chybí ceny'}
+                  </p>
+                </div>
+                <p className="max-w-2xl text-sm text-muted-foreground">
+                  Jakmile jsou doplněné ceny a směnné kurzy, přehled se přepočítá do reportovací měny a ukáže skutečný výkon portfolia.
+                </p>
+              </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Aktualni hodnota</CardTitle>
-            <Wallet className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {currentValue !== null ? formatCurrency(currentValue, reportingCurrency) : 'Chybi ceny'}
+              <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[360px]">
+                <div className="rounded-xl border border-border/70 bg-background/70 p-4">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Investováno</p>
+                  <p className="mt-2 text-lg font-semibold">{formatCurrency(totalInvested, reportingCurrency)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Součet všech nákupů a vkladů do portfolia.</p>
+                </div>
+                <div className="rounded-xl border border-border/70 bg-background/70 p-4">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Zisk / ztráta</p>
+                  <p className={`mt-2 text-lg font-semibold ${isProfit ? 'text-success' : 'text-destructive'}`}>
+                    {profitLoss !== null ? formatCurrency(profitLoss, reportingCurrency) : '—'}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {profitLossPercent !== null ? formatPercent(profitLossPercent) : 'Výnos zatím nelze spočítat.'}
+                  </p>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Zisk/Ztrata</CardTitle>
-            {isProfit ? <TrendingUp className="h-4 w-4 text-success" /> : <TrendingDown className="h-4 w-4 text-destructive" />}
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${isProfit ? 'text-success' : 'text-destructive'}`}>
-              {profitLoss !== null ? formatCurrency(profitLoss, reportingCurrency) : '-'}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Vynos</CardTitle>
-            {isProfit ? <TrendingUp className="h-4 w-4 text-success" /> : <TrendingDown className="h-4 w-4 text-destructive" />}
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${isProfit ? 'text-success' : 'text-destructive'}`}>
-              {profitLossPercent !== null ? formatPercent(profitLossPercent) : '-'}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Dividendy / dan</CardTitle>
-            <Wallet className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {latestDividend ? formatCurrency(latestDividend.amount, latestDividend.currency) : '-'}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Odhad dane {formatCurrency(dividendTaxEstimate, reportingCurrency)}
-            </p>
-          </CardContent>
-        </Card>
+        <div className="grid gap-4 sm:grid-cols-3 xl:grid-cols-1">
+          <Card className="border-border/70 bg-card/80">
+            <CardContent className="flex items-center gap-4 p-5">
+              <div className="rounded-xl bg-primary/10 p-3 text-primary">
+                <PiggyBank className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Investováno</p>
+                <p className="text-xl font-semibold">{formatCurrency(totalInvested, reportingCurrency)}</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border/70 bg-card/80">
+            <CardContent className="flex items-center gap-4 p-5">
+              <div className={`rounded-xl p-3 ${isProfit ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                {isProfit ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Výkonnost</p>
+                <p className={`text-xl font-semibold ${isProfit ? 'text-success' : 'text-destructive'}`}>
+                  {profitLossPercent !== null ? formatPercent(profitLossPercent) : '—'}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border/70 bg-card/80">
+            <CardContent className="flex items-center gap-4 p-5">
+              <div className="rounded-xl bg-warning/10 p-3 text-warning">
+                <Wallet className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Poslední dividenda / daň</p>
+                <p className="text-lg font-semibold">
+                  {latestDividend ? formatCurrency(latestDividend.amount, latestDividend.currency) : '—'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Odhad daně {formatCurrency(dividendTaxEstimate, reportingCurrency)}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       {portfolioHistory && portfolioHistory.length > 1 && (
         <Card>
           <CardHeader>
-            <CardTitle>Vyvoj portfolia</CardTitle>
+            <CardTitle>Vývoj portfolia v čase</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
@@ -131,7 +152,9 @@ export const PortfolioOverview = ({ portfolioSummary }: PortfolioOverviewProps) 
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                   <XAxis
                     dataKey="date"
-                    tickFormatter={(date) => new Date(date).toLocaleDateString('cs-CZ', { month: 'short', year: '2-digit' })}
+                    tickFormatter={(date) =>
+                      new Date(date).toLocaleDateString('cs-CZ', { month: 'short', year: '2-digit' })
+                    }
                     className="text-muted-foreground"
                   />
                   <YAxis

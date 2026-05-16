@@ -7,8 +7,10 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   ASSET_TYPE_LABELS,
   COMMON_CURRENCIES,
+  INVESTMENT_PROVIDER_LABELS,
   InvestmentAsset,
   InvestmentAssetType,
+  InvestmentProvider,
   InvestmentTransactionType,
 } from '@/types/investment';
 
@@ -18,6 +20,7 @@ interface AddTransactionFormProps {
     ticker: string;
     name: string;
     asset_type: InvestmentAssetType;
+    provider: InvestmentProvider;
     sector?: string;
     currency: string;
   }) => Promise<InvestmentAsset | null>;
@@ -45,6 +48,7 @@ export const AddTransactionForm = ({
   const [ticker, setTicker] = useState('');
   const [name, setName] = useState('');
   const [assetType, setAssetType] = useState<InvestmentAssetType>('stock');
+  const [provider, setProvider] = useState<InvestmentProvider>('broker');
   const [sector, setSector] = useState('');
   const [assetCurrency, setAssetCurrency] = useState('USD');
   const [transactionType, setTransactionType] = useState<InvestmentTransactionType>('buy');
@@ -76,6 +80,7 @@ export const AddTransactionForm = ({
           ticker: ticker.toUpperCase(),
           name,
           asset_type: assetType,
+          provider,
           sector: sector || undefined,
           currency: assetCurrency,
         });
@@ -101,6 +106,7 @@ export const AddTransactionForm = ({
       setTicker('');
       setName('');
       setSector('');
+      setProvider('broker');
       setQuantity('');
       setPricePerUnit('');
       setExDividendDate('');
@@ -150,9 +156,9 @@ export const AddTransactionForm = ({
                 <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Apple Inc." required={isNewAsset} />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-sm">Typ</Label>
+                <Label className="text-sm">Typ aktiva</Label>
                 <Select value={assetType} onValueChange={(value) => setAssetType(value as InvestmentAssetType)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -162,6 +168,19 @@ export const AddTransactionForm = ({
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-1">
+                <Label className="text-sm">Poskytovatel</Label>
+                <Select value={provider} onValueChange={(value) => setProvider(value as InvestmentProvider)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(INVESTMENT_PROVIDER_LABELS).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-sm">Měna</Label>
                 <Select value={assetCurrency} onValueChange={setAssetCurrency}>
@@ -174,8 +193,8 @@ export const AddTransactionForm = ({
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label className="text-sm">Sektor</Label>
-                <Input value={sector} onChange={(event) => setSector(event.target.value)} placeholder="Technologie" />
+                <Label className="text-sm">Sektor / skupina</Label>
+                <Input value={sector} onChange={(event) => setSector(event.target.value)} placeholder="Technologie, P2P, Reality..." />
               </div>
             </div>
           </div>
@@ -196,13 +215,13 @@ export const AddTransactionForm = ({
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label>{transactionType === 'dividend' ? 'Počet akcií / podílů' : 'Množství'}</Label>
+          <Label>{transactionType === 'dividend' ? 'Počet kusů / podílů' : 'Množství'}</Label>
           <Input
             type="number"
             step="any"
             value={quantity}
             onChange={(event) => setQuantity(event.target.value)}
-            placeholder={transactionType === 'dividend' ? '10' : '10'}
+            placeholder="10"
             required
           />
         </div>
@@ -261,8 +280,8 @@ export const AddTransactionForm = ({
           </div>
 
           <div className="rounded-lg border border-border/60 bg-muted/40 p-3 text-sm text-muted-foreground">
-            Pokud je známá očekávaná výplata, FIGR ji zobrazí v dividendovém kalendáři. Když ji nevyplníš,
-            použije se vypočtená částka z počtu kusů a dividendy na kus.
+            Pokud je známá očekávaná výplata, FIGR ji zobrazí v dividendovém kalendáři.
+            Když ji nevyplníš, použije se vypočtená částka z počtu kusů a dividendy na kus.
           </div>
         </>
       )}

@@ -1,12 +1,18 @@
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PortfolioAsset, InvestmentTransaction, AssetPrice, ASSET_TYPE_LABELS } from '@/types/investment';
+import {
+  PortfolioAsset,
+  InvestmentTransaction,
+  AssetPrice,
+  ASSET_TYPE_LABELS,
+  INVESTMENT_PROVIDER_LABELS,
+} from '@/types/investment';
 import { ArrowLeft, Trash2, TrendingUp, TrendingDown, Plus } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 interface AssetDetailProps {
@@ -16,25 +22,23 @@ interface AssetDetailProps {
   reportingCurrency: string;
   onBack: () => void;
   onDeleteTransaction: (id: string) => Promise<void>;
-  onAddPrice: (price: { asset_id: string; price: number; currency: string; price_date: string }) => Promise<any>;
+  onAddPrice: (price: { asset_id: string; price: number; currency: string; price_date: string }) => Promise<void>;
 }
 
-const formatCurrency = (value: number, currency: string): string => {
-  return new Intl.NumberFormat('cs-CZ', {
+const formatCurrency = (value: number, currency: string): string =>
+  new Intl.NumberFormat('cs-CZ', {
     style: 'currency',
     currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
-};
 
-const formatPercent = (value: number): string => {
-  return new Intl.NumberFormat('cs-CZ', {
+const formatPercent = (value: number): string =>
+  new Intl.NumberFormat('cs-CZ', {
     style: 'percent',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value / 100);
-};
 
 const formatQuantity = (value: number): string => {
   if (value < 1) {
@@ -59,7 +63,7 @@ export const AssetDetail = ({
   const isProfit = (asset.profitLossInReportingCurrency ?? 0) >= 0;
 
   const sortedPrices = [...prices].sort((a, b) => a.price_date.localeCompare(b.price_date));
-  const priceChartData = sortedPrices.map(p => ({
+  const priceChartData = sortedPrices.map((p) => ({
     date: p.price_date,
     price: p.price,
   }));
@@ -81,7 +85,6 @@ export const AssetDetail = ({
 
   return (
     <div className="space-y-6">
-      {/* Back Button & Title */}
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="h-4 w-4 mr-2" />
@@ -93,15 +96,17 @@ export const AssetDetail = ({
         </div>
       </div>
 
-      {/* Asset Info Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Typ</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Typ a poskytovatel</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-lg font-bold">
               {ASSET_TYPE_LABELS[asset.asset_type as keyof typeof ASSET_TYPE_LABELS] || asset.asset_type}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {INVESTMENT_PROVIDER_LABELS[asset.provider as keyof typeof INVESTMENT_PROVIDER_LABELS] || asset.provider}
             </div>
             {asset.sector && <div className="text-sm text-muted-foreground">{asset.sector}</div>}
           </CardContent>
@@ -137,7 +142,7 @@ export const AssetDetail = ({
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Zisk/Ztráta</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Zisk / ztráta</CardTitle>
           </CardHeader>
           <CardContent>
             {asset.profitLossInReportingCurrency !== null ? (
@@ -157,7 +162,6 @@ export const AssetDetail = ({
         </Card>
       </div>
 
-      {/* Price Chart */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Vývoj ceny</CardTitle>
@@ -179,7 +183,7 @@ export const AssetDetail = ({
                     type="number"
                     step="any"
                     value={newPrice}
-                    onChange={e => setNewPrice(e.target.value)}
+                    onChange={(e) => setNewPrice(e.target.value)}
                     placeholder="0.00"
                   />
                 </div>
@@ -188,7 +192,7 @@ export const AssetDetail = ({
                   <Input
                     type="date"
                     value={newPriceDate}
-                    onChange={e => setNewPriceDate(e.target.value)}
+                    onChange={(e) => setNewPriceDate(e.target.value)}
                   />
                 </div>
                 <Button onClick={handleAddPrice} className="w-full">
@@ -206,7 +210,9 @@ export const AssetDetail = ({
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                   <XAxis
                     dataKey="date"
-                    tickFormatter={(date) => new Date(date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short' })}
+                    tickFormatter={(date) =>
+                      new Date(date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short' })
+                    }
                     className="text-muted-foreground"
                   />
                   <YAxis
@@ -234,7 +240,7 @@ export const AssetDetail = ({
                     dataKey="price"
                     stroke="hsl(var(--primary))"
                     strokeWidth={2}
-                    dot={true}
+                    dot
                     activeDot={{ r: 6, fill: 'hsl(var(--primary))' }}
                   />
                 </LineChart>
@@ -250,7 +256,6 @@ export const AssetDetail = ({
         </CardContent>
       </Card>
 
-      {/* Transactions Table */}
       <Card>
         <CardHeader>
           <CardTitle>Transakce</CardTitle>
@@ -263,21 +268,31 @@ export const AssetDetail = ({
                   <TableHead>Datum</TableHead>
                   <TableHead>Typ</TableHead>
                   <TableHead className="text-right">Množství</TableHead>
-                  <TableHead className="text-right">Cena/ks</TableHead>
+                  <TableHead className="text-right">Cena / ks</TableHead>
                   <TableHead className="text-right">Celkem</TableHead>
                   <TableHead>Poznámka</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {transactions.map(tx => (
+                {transactions.map((tx) => (
                   <TableRow key={tx.id}>
+                    <TableCell>{new Date(tx.transaction_date).toLocaleDateString('cs-CZ')}</TableCell>
                     <TableCell>
-                      {new Date(tx.transaction_date).toLocaleDateString('cs-CZ')}
-                    </TableCell>
-                    <TableCell>
-                      <span className={tx.transaction_type === 'buy' ? 'text-success' : 'text-destructive'}>
-                        {tx.transaction_type === 'buy' ? 'Nákup' : 'Prodej'}
+                      <span
+                        className={
+                          tx.transaction_type === 'buy'
+                            ? 'text-success'
+                            : tx.transaction_type === 'sell'
+                              ? 'text-destructive'
+                              : 'text-primary'
+                        }
+                      >
+                        {tx.transaction_type === 'buy'
+                          ? 'Nákup'
+                          : tx.transaction_type === 'sell'
+                            ? 'Prodej'
+                            : 'Dividenda'}
                       </span>
                     </TableCell>
                     <TableCell className="text-right">{formatQuantity(tx.quantity)}</TableCell>
@@ -289,11 +304,7 @@ export const AssetDetail = ({
                     </TableCell>
                     <TableCell className="text-muted-foreground">{tx.notes || '-'}</TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onDeleteTransaction(tx.id)}
-                      >
+                      <Button variant="ghost" size="sm" onClick={() => onDeleteTransaction(tx.id)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </TableCell>

@@ -160,7 +160,7 @@ export const BackupManager = ({ isOpen, onClose }: BackupManagerProps) => {
 
               <div className="flex flex-wrap gap-2">
                 <Button onClick={handleCreateBackup} disabled={creating}>
-                  {creating ? 'Vytvářím...' : 'Vytvořit zálohu'}
+                  {creating ? 'Vytvářím…' : 'Vytvořit zálohu'}
                 </Button>
                 <Button variant="outline" onClick={() => void loadBackupData()} disabled={loading}>
                   <RefreshCw className="mr-2 h-4 w-4" />
@@ -199,7 +199,7 @@ export const BackupManager = ({ isOpen, onClose }: BackupManagerProps) => {
                           disabled={restoringFile !== null}
                         >
                           <RotateCcw className="mr-2 h-4 w-4" />
-                          {restoringFile === backup.fileName ? 'Obnovuji...' : 'Obnovit'}
+                          {restoringFile === backup.fileName ? 'Obnovuji…' : 'Obnovit'}
                         </Button>
                       </div>
                     ))

@@ -85,8 +85,6 @@ serve(async (req) => {
     // Track positions: asset_id -> { quantity, totalCost }
     interface Position { quantity: number; totalCostReporting: number; }
     const positions: Record<string, Position> = {};
-    let cumulativeInvested = 0;
-
     // Helper: calculate portfolio value at a given date using latest available prices
     const getPortfolioValue = (asDate: string, positionsSnapshot: Record<string, Position>): number => {
       let total = 0;

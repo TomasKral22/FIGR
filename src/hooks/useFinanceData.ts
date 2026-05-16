@@ -6,6 +6,7 @@ import {
   AuditLogEntry,
   BankAccount,
   BudgetAllocation,
+  MonthClosure,
   PortfolioSettings,
   RecurringTransaction,
   Transaction,
@@ -29,6 +30,7 @@ const STORAGE_KEYS = {
   ACCOUNT_SNAPSHOTS: 'finance_account_snapshots',
   IMPORTED_ACCOUNT_BALANCES: 'finance_imported_account_balances',
   VISUAL_THEME: 'finance_visual_theme',
+  MONTH_CLOSURES: 'finance_month_closures',
 };
 const DEFAULT_BUDGET: BudgetAllocation = {
   necessities: 50,
@@ -81,6 +83,9 @@ const isSameTransactionPayload = (
   left.transferAccount === right.transferAccount &&
   left.investmentAccount === right.investmentAccount &&
   left.includeInInvestmentTotals === right.includeInInvestmentTotals &&
+  left.goalId === right.goalId &&
+  left.goalImpact === right.goalImpact &&
+  left.note === right.note &&
   left.folder === right.folder;
 
 export const useFinanceData = () => {
@@ -94,6 +99,7 @@ export const useFinanceData = () => {
   const [wealthSnapshots, setWealthSnapshots] = useState<WealthSnapshot[]>([]);
   const [accountSnapshots, setAccountSnapshots] = useState<AccountMonthlySnapshot[]>([]);
   const [importedAccountBalances, setImportedAccountBalances] = useState<ImportedAccountMonthBalance[]>([]);
+  const [monthClosures, setMonthClosures] = useState<MonthClosure[]>([]);
   const [budgetAllocation, setBudgetAllocation] = useState<BudgetAllocation>({
     ...DEFAULT_BUDGET,
   });
@@ -101,7 +107,7 @@ export const useFinanceData = () => {
     ...DEFAULT_PORTFOLIO_SETTINGS,
   });
   const [isDarkMode, setIsDarkMode] = useState(true);
-  const [visualTheme, setVisualTheme] = useState('classic');
+  const [visualTheme, setVisualTheme] = useState('dark-blue');
   const [lastTransaction, setLastTransaction] = useState<Omit<Transaction, 'id' | 'createdAt'> | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
 
@@ -164,16 +170,27 @@ export const useFinanceData = () => {
       setWealthSnapshots(parse<WealthSnapshot[]>(STORAGE_KEYS.SNAPSHOTS, []));
       setAccountSnapshots(parse<AccountMonthlySnapshot[]>(STORAGE_KEYS.ACCOUNT_SNAPSHOTS, []));
       setImportedAccountBalances(parse<ImportedAccountMonthBalance[]>(STORAGE_KEYS.IMPORTED_ACCOUNT_BALANCES, []));
+      setMonthClosures(parse<MonthClosure[]>(STORAGE_KEYS.MONTH_CLOSURES, []));
       setLastTransaction(parse<Omit<Transaction, 'id' | 'createdAt'> | null>(STORAGE_KEYS.LAST_TRANSACTION, null));
 
-      const loadedTheme = loaded[STORAGE_KEYS.THEME] ?? localStorage.getItem(STORAGE_KEYS.THEME);
-      const darkMode = loadedTheme ? loadedTheme === 'dark' : true;
-      const loadedVisualTheme =
-        loaded[STORAGE_KEYS.VISUAL_THEME] ?? localStorage.getItem(STORAGE_KEYS.VISUAL_THEME) ?? 'classic';
+      const legacyTheme = loaded[STORAGE_KEYS.THEME] ?? localStorage.getItem(STORAGE_KEYS.THEME);
+      const rawVisualTheme =
+        loaded[STORAGE_KEYS.VISUAL_THEME] ?? localStorage.getItem(STORAGE_KEYS.VISUAL_THEME) ?? 'dark-blue';
+      const normalizeVisualTheme = (value: string) => {
+        if (['light', 'dark-blue', 'warm-orange'].includes(value)) return value;
+        if (['classic', 'studio', 'metal'].includes(value)) return 'light';
+        if (value === 'sunset') return 'warm-orange';
+        if (value === 'neon') return 'dark-blue';
+        if (legacyTheme === 'light') return 'light';
+        return 'dark-blue';
+      };
+
+      const nextVisualTheme = normalizeVisualTheme(rawVisualTheme);
+      const darkMode = nextVisualTheme !== 'light';
       setIsDarkMode(darkMode);
-      setVisualTheme(loadedVisualTheme);
+      setVisualTheme(nextVisualTheme);
       document.documentElement.classList.toggle('dark', darkMode);
-      document.documentElement.dataset.surface = loadedVisualTheme;
+      document.documentElement.dataset.surface = nextVisualTheme;
       setIsHydrated(true);
     };
 
@@ -195,6 +212,7 @@ export const useFinanceData = () => {
       [STORAGE_KEYS.SNAPSHOTS]: JSON.stringify(wealthSnapshots),
       [STORAGE_KEYS.ACCOUNT_SNAPSHOTS]: JSON.stringify(accountSnapshots),
       [STORAGE_KEYS.IMPORTED_ACCOUNT_BALANCES]: JSON.stringify(importedAccountBalances),
+      [STORAGE_KEYS.MONTH_CLOSURES]: JSON.stringify(monthClosures),
       [STORAGE_KEYS.THEME]: isDarkMode ? 'dark' : 'light',
       [STORAGE_KEYS.VISUAL_THEME]: visualTheme,
       [STORAGE_KEYS.LAST_TRANSACTION]: JSON.stringify(lastTransaction),
@@ -212,6 +230,7 @@ export const useFinanceData = () => {
     wealthSnapshots,
     accountSnapshots,
     importedAccountBalances,
+    monthClosures,
     isDarkMode,
     visualTheme,
     lastTransaction,
@@ -395,16 +414,23 @@ export const useFinanceData = () => {
   }, [bankAccounts, brokerAccounts, transactions, importedAccountBalances, isHydrated]);
 
   const toggleTheme = useCallback(() => {
-    setIsDarkMode((prev) => {
-      const next = !prev;
-      document.documentElement.classList.toggle('dark', next);
+    setVisualTheme((prev) => {
+      const next = prev === 'light' ? 'dark-blue' : 'light';
+      const darkMode = next !== 'light';
+      setIsDarkMode(darkMode);
+      document.documentElement.classList.toggle('dark', darkMode);
+      document.documentElement.dataset.surface = next;
       return next;
     });
   }, []);
 
   const changeVisualTheme = useCallback((nextTheme: string) => {
-    setVisualTheme(nextTheme);
-    document.documentElement.dataset.surface = nextTheme;
+    const normalizedTheme = ['light', 'dark-blue', 'warm-orange'].includes(nextTheme) ? nextTheme : 'dark-blue';
+    const darkMode = normalizedTheme !== 'light';
+    setIsDarkMode(darkMode);
+    document.documentElement.classList.toggle('dark', darkMode);
+    document.documentElement.dataset.surface = normalizedTheme;
+    setVisualTheme(normalizedTheme);
   }, []);
 
   const updateAccountBalance = useCallback((
@@ -733,6 +759,9 @@ export const useFinanceData = () => {
         transferAccount: transaction.transferAccount,
         investmentAccount: transaction.investmentAccount,
         includeInInvestmentTotals: transaction.includeInInvestmentTotals,
+        goalId: transaction.goalId,
+        goalImpact: transaction.goalImpact,
+        note: transaction.note,
         folder: transaction.folder,
       }))
       .filter((candidate) => !existingPayloads.some((existing) => isSameTransactionPayload(existing, candidate)));
@@ -824,6 +853,42 @@ export const useFinanceData = () => {
     });
   }, [bankAccounts, brokerAccounts, pushAudit]);
 
+  const isMonthClosed = useCallback(
+    (month: string) => monthClosures.some((entry) => entry.month === month),
+    [monthClosures]
+  );
+
+  const toggleMonthClosure = useCallback(
+    (month: string) => {
+      setMonthClosures((prev) => {
+        const exists = prev.some((entry) => entry.month === month);
+        if (exists) {
+          pushAudit({
+            type: 'system',
+            action: 'month-reopen',
+            detail: `Měsíc ${month} byl znovu otevřen pro úpravy.`,
+          });
+          return prev.filter((entry) => entry.month !== month);
+        }
+
+        pushAudit({
+          type: 'system',
+          action: 'month-close',
+          detail: `Měsíc ${month} byl uzavřen jako zkontrolovaný.`,
+        });
+
+        return [
+          {
+            month,
+            closedAt: createTimestamp(),
+          },
+          ...prev,
+        ].sort((a, b) => b.month.localeCompare(a.month));
+      });
+    },
+    [pushAudit]
+  );
+
   const visibleGoals = useMemo(() => decorateGoals(goals, transactions), [decorateGoals, goals, transactions]);
 
   return {
@@ -840,6 +905,7 @@ export const useFinanceData = () => {
     auditLog,
     wealthSnapshots,
     accountSnapshots,
+    monthClosures,
     availableYears,
       addTransaction,
       updateTransaction,
@@ -867,5 +933,7 @@ export const useFinanceData = () => {
     addGoal,
     deleteGoal,
     updateAccountMonthBalance,
+    isMonthClosed,
+    toggleMonthClosure,
   };
 };

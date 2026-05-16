@@ -1,6 +1,25 @@
 export type InvestmentTransactionType = 'buy' | 'sell' | 'dividend';
 
-export type InvestmentAssetType = 'stock' | 'etf' | 'crypto' | 'bond' | 'commodity' | 'other';
+export type InvestmentAssetType =
+  | 'stock'
+  | 'etf'
+  | 'crypto'
+  | 'bond'
+  | 'commodity'
+  | 'p2p'
+  | 'private_credit'
+  | 'real_estate'
+  | 'managed_portfolio'
+  | 'fund'
+  | 'other';
+
+export type InvestmentProvider =
+  | 'broker'
+  | 'investown'
+  | 'fingood'
+  | 'edward'
+  | 'conseq'
+  | 'other';
 
 export type BrokerConnectorKind = 'manual_template' | 'broker_export' | 'api_sync';
 
@@ -11,6 +30,7 @@ export interface InvestmentAsset {
   ticker: string;
   name: string;
   asset_type: InvestmentAssetType;
+  provider: InvestmentProvider;
   sector: string | null;
   currency: string;
   created_at: string;
@@ -86,6 +106,7 @@ export interface PortfolioAsset {
   ticker: string;
   name: string;
   asset_type: string;
+  provider: InvestmentProvider;
   sector: string | null;
   currency: string;
   quantity: number;
@@ -128,6 +149,7 @@ export interface PortfolioSummary {
   reportingCurrency: string;
   assets: PortfolioAsset[];
   assetsByType: Record<string, { invested: number; value: number | null }>;
+  assetsByProvider: Record<string, { invested: number; value: number | null }>;
   assetsByCurrency: Record<string, { invested: number; value: number | null }>;
   assetsBySector: Record<string, { invested: number; value: number | null }>;
   portfolioHistory: { date: string; value: number }[];
@@ -142,7 +164,21 @@ export const ASSET_TYPE_LABELS: Record<InvestmentAssetType, string> = {
   crypto: 'Kryptoměny',
   bond: 'Dluhopisy',
   commodity: 'Komodity',
+  p2p: 'P2P půjčky',
+  private_credit: 'Soukromý úvěr',
+  real_estate: 'Nemovitostní podíl',
+  managed_portfolio: 'Řízené portfolio',
+  fund: 'Fond',
   other: 'Ostatní',
+};
+
+export const INVESTMENT_PROVIDER_LABELS: Record<InvestmentProvider, string> = {
+  broker: 'Broker',
+  investown: 'Investown',
+  fingood: 'Fingood',
+  edward: 'Edward',
+  conseq: 'Conseq',
+  other: 'Jiný poskytovatel',
 };
 
 export const COMMON_CURRENCIES = ['CZK', 'USD', 'EUR', 'GBP', 'CHF'];

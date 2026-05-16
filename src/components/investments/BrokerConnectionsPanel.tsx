@@ -14,6 +14,12 @@ const STATUS_LABELS: Record<BrokerConnector['status'], string> = {
   ready: 'Aktivní',
 };
 
+const SOURCE_LABELS: Record<BrokerConnector['source_kind'], string> = {
+  api_sync: 'API synchronizace',
+  broker_export: 'Export brokera',
+  manual_template: 'Ruční šablona',
+};
+
 export const BrokerConnectionsPanel = ({
   connectors,
   onMarkConfigured,
@@ -26,9 +32,9 @@ export const BrokerConnectionsPanel = ({
           Broker konektory
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="grid gap-3 md:grid-cols-2">
         {connectors.map((connector) => (
-          <div key={connector.id} className="rounded-lg border border-border/60 bg-card p-3">
+          <div key={connector.id} className="rounded-xl border border-border/60 bg-card p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="font-medium">{connector.name}</p>
@@ -40,7 +46,7 @@ export const BrokerConnectionsPanel = ({
             </div>
 
             <div className="mt-3 grid gap-2 text-sm text-muted-foreground">
-              <p>Typ zdroje: {connector.source_kind === 'api_sync' ? 'API synchronizace' : connector.source_kind}</p>
+              <p>Typ zdroje: {SOURCE_LABELS[connector.source_kind]}</p>
               <p>Autentizace: {connector.auth_type === 'api_key' ? 'API klíč' : 'Flex token'}</p>
               <p>{connector.config_hint}</p>
               {connector.last_sync_at ? (

@@ -9,7 +9,7 @@ import {
 } from '@/types/investment';
 
 const DEFAULT_REPORTING_CURRENCY = 'CZK';
-const UNCATEGORIZED_SECTOR = 'Nezarazeno';
+const UNCATEGORIZED_SECTOR = 'Nezařazeno';
 const estimateDividendTax = (amount: number) => amount * 0.15;
 
 const getExchangeRate = (
@@ -63,6 +63,7 @@ export const calculatePortfolioSummary = ({
 
   const portfolioAssets: PortfolioAsset[] = [];
   const assetsByType: PortfolioSummary['assetsByType'] = {};
+  const assetsByProvider: PortfolioSummary['assetsByProvider'] = {};
   const assetsByCurrency: PortfolioSummary['assetsByCurrency'] = {};
   const assetsBySector: PortfolioSummary['assetsBySector'] = {};
   const dividendCalendarMap = new Map<string, { month: string; amount: number; currency: string }>();
@@ -160,6 +161,7 @@ export const calculatePortfolioSummary = ({
       ticker: asset.ticker,
       name: asset.name,
       asset_type: asset.asset_type,
+      provider: asset.provider,
       sector: asset.sector,
       currency: asset.currency,
       quantity,
@@ -184,6 +186,15 @@ export const calculatePortfolioSummary = ({
     if (currentValueInReportingCurrency !== null) {
       assetsByType[asset.asset_type].value =
         (assetsByType[asset.asset_type].value ?? 0) + currentValueInReportingCurrency;
+    }
+
+    if (!assetsByProvider[asset.provider]) {
+      assetsByProvider[asset.provider] = { invested: 0, value: 0 };
+    }
+    assetsByProvider[asset.provider].invested += totalInvestedInReportingCurrency;
+    if (currentValueInReportingCurrency !== null) {
+      assetsByProvider[asset.provider].value =
+        (assetsByProvider[asset.provider].value ?? 0) + currentValueInReportingCurrency;
     }
 
     if (!assetsByCurrency[asset.currency]) {
@@ -262,6 +273,7 @@ export const calculatePortfolioSummary = ({
     reportingCurrency,
     assets: portfolioAssets,
     assetsByType,
+    assetsByProvider,
     assetsByCurrency,
     assetsBySector,
     portfolioHistory,

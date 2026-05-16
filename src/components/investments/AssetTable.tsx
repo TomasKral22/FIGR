@@ -1,37 +1,35 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PortfolioAsset, ASSET_TYPE_LABELS } from '@/types/investment';
-import { ChevronRight, TrendingUp, TrendingDown } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ASSET_TYPE_LABELS, INVESTMENT_PROVIDER_LABELS, PortfolioAsset } from '@/types/investment';
+import { ChevronRight, TrendingDown, TrendingUp } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
 interface AssetTableProps {
   assets: PortfolioAsset[];
   assetsByType: Record<string, { invested: number; value: number | null }>;
+  assetsByProvider: Record<string, { invested: number; value: number | null }>;
   assetsByCurrency: Record<string, { invested: number; value: number | null }>;
   assetsBySector: Record<string, { invested: number; value: number | null }>;
   reportingCurrency: string;
   onSelectAsset: (id: string) => void;
 }
 
-const formatCurrency = (value: number, currency: string): string => {
-  return new Intl.NumberFormat('cs-CZ', {
+const formatCurrency = (value: number, currency: string): string =>
+  new Intl.NumberFormat('cs-CZ', {
     style: 'currency',
     currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
-};
 
-const formatPercent = (value: number): string => {
-  return new Intl.NumberFormat('cs-CZ', {
+const formatPercent = (value: number): string =>
+  new Intl.NumberFormat('cs-CZ', {
     style: 'percent',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value / 100);
-};
 
 const formatQuantity = (value: number): string => {
   if (value < 1) {
@@ -54,17 +52,31 @@ const COLORS = [
 export const AssetTable = ({
   assets,
   assetsByType,
+  assetsByProvider,
   assetsByCurrency,
   assetsBySector,
   reportingCurrency,
   onSelectAsset,
 }: AssetTableProps) => {
-  const [breakdown, setBreakdown] = useState<'type' | 'currency' | 'sector'>('type');
+  const [breakdown, setBreakdown] = useState<'type' | 'provider' | 'currency' | 'sector'>('type');
 
   const getBreakdownData = () => {
-    const data = breakdown === 'type' ? assetsByType : breakdown === 'currency' ? assetsByCurrency : assetsBySector;
+    const data =
+      breakdown === 'type'
+        ? assetsByType
+        : breakdown === 'provider'
+          ? assetsByProvider
+          : breakdown === 'currency'
+            ? assetsByCurrency
+            : assetsBySector;
+
     return Object.entries(data).map(([name, { invested, value }]) => ({
-      name: breakdown === 'type' ? (ASSET_TYPE_LABELS[name as keyof typeof ASSET_TYPE_LABELS] || name) : name,
+      name:
+        breakdown === 'type'
+          ? ASSET_TYPE_LABELS[name as keyof typeof ASSET_TYPE_LABELS] || name
+          : breakdown === 'provider'
+            ? INVESTMENT_PROVIDER_LABELS[name as keyof typeof INVESTMENT_PROVIDER_LABELS] || name
+            : name,
       invested,
       value: value || invested,
     }));
@@ -74,7 +86,6 @@ export const AssetTable = ({
 
   return (
     <div className="space-y-6">
-      {/* Breakdown Charts */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -82,6 +93,7 @@ export const AssetTable = ({
             <Tabs value={breakdown} onValueChange={(v) => setBreakdown(v as typeof breakdown)}>
               <TabsList>
                 <TabsTrigger value="type">Typ</TabsTrigger>
+                <TabsTrigger value="provider">Poskytovatel</TabsTrigger>
                 <TabsTrigger value="currency">Měna</TabsTrigger>
                 <TabsTrigger value="sector">Sektor</TabsTrigger>
               </TabsList>
@@ -134,7 +146,6 @@ export const AssetTable = ({
         </CardContent>
       </Card>
 
-      {/* Assets Table */}
       <Card>
         <CardHeader>
           <CardTitle>Přehled aktiv</CardTitle>
@@ -146,17 +157,18 @@ export const AssetTable = ({
                 <TableRow>
                   <TableHead>Ticker</TableHead>
                   <TableHead>Název</TableHead>
+                  <TableHead>Poskytovatel</TableHead>
                   <TableHead>Typ</TableHead>
                   <TableHead className="text-right">Množství</TableHead>
                   <TableHead className="text-right">Akt. cena</TableHead>
                   <TableHead className="text-right">Hodnota</TableHead>
                   <TableHead className="text-right">Investováno</TableHead>
-                  <TableHead className="text-right">Zisk/Ztráta</TableHead>
+                  <TableHead className="text-right">Zisk / ztráta</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {assets.map(asset => {
+                {assets.map((asset) => {
                   const isProfit = (asset.profitLossInReportingCurrency ?? 0) >= 0;
                   return (
                     <TableRow
@@ -166,6 +178,9 @@ export const AssetTable = ({
                     >
                       <TableCell className="font-medium">{asset.ticker}</TableCell>
                       <TableCell>{asset.name}</TableCell>
+                      <TableCell>
+                        {INVESTMENT_PROVIDER_LABELS[asset.provider as keyof typeof INVESTMENT_PROVIDER_LABELS] || asset.provider}
+                      </TableCell>
                       <TableCell>{ASSET_TYPE_LABELS[asset.asset_type as keyof typeof ASSET_TYPE_LABELS] || asset.asset_type}</TableCell>
                       <TableCell className="text-right">{formatQuantity(asset.quantity)}</TableCell>
                       <TableCell className="text-right">
@@ -186,9 +201,7 @@ export const AssetTable = ({
                           <div className={`flex items-center justify-end gap-1 ${isProfit ? 'text-success' : 'text-destructive'}`}>
                             {isProfit ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
                             <span>{formatCurrency(asset.profitLossInReportingCurrency, reportingCurrency)}</span>
-                            <span className="text-xs">
-                              ({formatPercent(asset.profitLossPercent || 0)})
-                            </span>
+                            <span className="text-xs">({formatPercent(asset.profitLossPercent || 0)})</span>
                           </div>
                         ) : (
                           '-'

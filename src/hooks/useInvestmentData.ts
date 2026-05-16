@@ -7,6 +7,7 @@ import {
   ImportBatch,
   InvestmentAsset,
   InvestmentAssetType,
+  InvestmentProvider,
   InvestmentTransaction,
   InvestmentTransactionType,
   PortfolioSettings,
@@ -38,7 +39,7 @@ const DEFAULT_CONNECTORS: BrokerConnector[] = [
     description: 'Připravený konektor pro read-only synchronizaci účtu a historie z Trading 212 Public API.',
     auth_type: 'api_key',
     last_sync_at: null,
-    config_hint: 'Bude vyžadovat API key vygenerovaný přímo v účtu Trading 212.',
+    config_hint: 'Bude vyžadovat API klíč vygenerovaný přímo v účtu Trading 212.',
   },
   {
     id: 'connector-ibkr-flex',
@@ -104,7 +105,12 @@ export const useInvestmentData = () => {
 
       setAssets(
         storedAssets
-          ? (JSON.parse(storedAssets) as InvestmentAsset[]).sort((a, b) => a.ticker.localeCompare(b.ticker))
+          ? (JSON.parse(storedAssets) as InvestmentAsset[])
+              .map((asset) => ({
+                ...asset,
+                provider: asset.provider || 'broker',
+              }))
+              .sort((a, b) => a.ticker.localeCompare(b.ticker))
           : []
       );
       setTransactions(
@@ -186,6 +192,7 @@ export const useInvestmentData = () => {
     ticker: string;
     name: string;
     asset_type: InvestmentAssetType;
+    provider: InvestmentProvider;
     sector?: string;
     currency: string;
   }) => {
@@ -196,6 +203,7 @@ export const useInvestmentData = () => {
         ticker: asset.ticker.toUpperCase(),
         name: asset.name,
         asset_type: asset.asset_type,
+        provider: asset.provider,
         sector: asset.sector || null,
         currency: asset.currency,
         created_at: now,
@@ -386,6 +394,7 @@ export const useInvestmentData = () => {
       ticker: string;
       name: string;
       asset_type: InvestmentAssetType;
+      provider: InvestmentProvider;
       transaction_type: InvestmentTransactionType;
       quantity: number;
       price_per_unit: number;
@@ -425,6 +434,7 @@ export const useInvestmentData = () => {
             ticker: normalizedTicker,
             name: item.name,
             asset_type: item.asset_type,
+            provider: item.provider,
             sector: item.sector || null,
             currency: item.currency,
             created_at: now,
@@ -539,7 +549,10 @@ export const useInvestmentData = () => {
         connector.id === connectorId ? { ...connector, status: 'configured' } : connector
       )
     );
-    toast({ title: 'Konektor připraven', description: 'Konektor byl označen jako připravený pro další napojení.' });
+    toast({
+      title: 'Konektor připraven',
+      description: 'Konektor byl označen jako připravený pro další napojení.',
+    });
   };
 
   useEffect(() => {

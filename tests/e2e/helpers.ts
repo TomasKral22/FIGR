@@ -46,12 +46,13 @@ export async function seedFinanceStorage(page: Page, seed: StorageSeed = {}) {
     write('finance_account_snapshots', data.accountSnapshots ?? []);
     write('finance_imported_account_balances', data.importedAccountBalances ?? []);
     window.localStorage.setItem('finance_theme', data.theme ?? 'dark');
-    window.localStorage.setItem('finance_visual_theme', data.visualTheme ?? 'classic');
+    window.localStorage.setItem('finance_visual_theme', data.visualTheme ?? 'dark-blue');
+    window.localStorage.setItem('figr_auth_bypass', 'true');
     write('finance_last_transaction', data.lastTransaction ?? null);
   }, seed);
 }
 
 export async function openHome(page: Page) {
-  await page.goto('/#/');
+  await page.goto('/#/?testBypass=1');
   await page.getByTestId('app-header').waitFor();
 }

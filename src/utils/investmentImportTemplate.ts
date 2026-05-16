@@ -1,11 +1,16 @@
 import ExcelJS from 'exceljs';
 import * as XLSX from 'xlsx';
-import { InvestmentAssetType, InvestmentTransactionType } from '@/types/investment';
+import {
+  InvestmentAssetType,
+  InvestmentProvider,
+  InvestmentTransactionType,
+} from '@/types/investment';
 
 export interface InvestmentImportRow {
   ticker: string;
   name: string;
   asset_type: InvestmentAssetType;
+  provider: InvestmentProvider;
   transaction_type: InvestmentTransactionType;
   quantity: number;
   price_per_unit: number;
@@ -17,7 +22,20 @@ export interface InvestmentImportRow {
   expected_dividend_amount?: number;
 }
 
-const assetTypes: InvestmentAssetType[] = ['stock', 'etf', 'crypto', 'bond', 'commodity', 'other'];
+const assetTypes: InvestmentAssetType[] = [
+  'stock',
+  'etf',
+  'crypto',
+  'bond',
+  'commodity',
+  'p2p',
+  'private_credit',
+  'real_estate',
+  'managed_portfolio',
+  'fund',
+  'other',
+];
+const providers: InvestmentProvider[] = ['broker', 'investown', 'fingood', 'edward', 'conseq', 'other'];
 const transactionTypes: InvestmentTransactionType[] = ['buy', 'sell', 'dividend'];
 const currencies = ['CZK', 'USD', 'EUR', 'GBP', 'CHF'];
 
@@ -43,6 +61,7 @@ export const exportInvestmentImportTemplate = async (filename = 'figr-investice-
     'ticker',
     'name',
     'asset_type',
+    'provider',
     'transaction_type',
     'quantity',
     'price_per_unit',
@@ -59,7 +78,8 @@ export const exportInvestmentImportTemplate = async (filename = 'figr-investice-
   importSheet.columns = [
     { width: 14 },
     { width: 24 },
-    { width: 16 },
+    { width: 18 },
+    { width: 18 },
     { width: 18 },
     { width: 14 },
     { width: 16 },
@@ -73,8 +93,9 @@ export const exportInvestmentImportTemplate = async (filename = 'figr-investice-
 
   [
     ['A', ['AssetTypes', ...assetTypes]],
-    ['B', ['TransactionTypes', ...transactionTypes]],
-    ['C', ['Currencies', ...currencies]],
+    ['B', ['Providers', ...providers]],
+    ['C', ['TransactionTypes', ...transactionTypes]],
+    ['D', ['Currencies', ...currencies]],
   ].forEach(([column, values]) => {
     (values as string[]).forEach((value, index) => {
       listSheet.getCell(`${column}${index + 1}`).value = value;
@@ -82,40 +103,47 @@ export const exportInvestmentImportTemplate = async (filename = 'figr-investice-
   });
 
   [
-    ['CEZ', 'ČEZ', 'stock', 'buy', 10, 1080, 'CZK', '2026-04-02', 'Energie', '', '', ''],
-    ['VWCE', 'Vanguard FTSE All-World', 'etf', 'buy', 2, 121.5, 'EUR', '2026-04-03', 'Global ETF', '', '', ''],
-    ['AAPL', 'Apple', 'stock', 'dividend', 25, 0.26, 'USD', '2026-04-05', 'Technologie', '2026-05-10', '2026-05-16', 6.5],
+    ['CEZ', 'ČEZ', 'stock', 'broker', 'buy', 10, 1080, 'CZK', '2026-04-02', 'Energie', '', '', ''],
+    ['INVTOWN-01', 'Investown byty', 'real_estate', 'investown', 'buy', 1, 5000, 'CZK', '2026-04-03', 'Reality', '', '', ''],
+    ['FINGOOD-01', 'Fingood úvěr', 'private_credit', 'fingood', 'buy', 1, 10000, 'CZK', '2026-04-04', 'Soukromý úvěr', '', '', ''],
+    ['AAPL', 'Apple', 'stock', 'broker', 'dividend', 25, 0.26, 'USD', '2026-04-05', 'Technologie', '2026-05-10', '2026-05-16', 6.5],
   ].forEach((row) => importSheet.addRow(row));
 
   for (let row = 2; row <= 300; row += 1) {
     importSheet.getCell(`C${row}`).dataValidation = {
       type: 'list',
       allowBlank: false,
-      formulae: ['=Číselníky!$A$2:$A$7'],
+      formulae: ['=Číselníky!$A$2:$A$12'],
     };
     importSheet.getCell(`D${row}`).dataValidation = {
       type: 'list',
       allowBlank: false,
-      formulae: ['=Číselníky!$B$2:$B$4'],
+      formulae: ['=Číselníky!$B$2:$B$7'],
     };
-    importSheet.getCell(`G${row}`).dataValidation = {
+    importSheet.getCell(`E${row}`).dataValidation = {
       type: 'list',
       allowBlank: false,
-      formulae: ['=Číselníky!$C$2:$C$6'],
+      formulae: ['=Číselníky!$C$2:$C$4'],
+    };
+    importSheet.getCell(`H${row}`).dataValidation = {
+      type: 'list',
+      allowBlank: false,
+      formulae: ['=Číselníky!$D$2:$D$6'],
     };
   }
 
   [
     ['Sloupec', 'Popis', 'Příklad'],
-    ['ticker', 'Ticker nebo symbol aktiva', 'VWCE, AAPL, BTC'],
+    ['ticker', 'Ticker nebo interní označení aktiva', 'VWCE, AAPL, INVESTOWN-BYT-1'],
     ['name', 'Název aktiva', 'Vanguard FTSE All-World'],
-    ['asset_type', 'Typ aktiva', 'stock | etf | crypto | bond | commodity | other'],
+    ['asset_type', 'Typ aktiva', 'stock | etf | crypto | bond | commodity | p2p | private_credit | real_estate | managed_portfolio | fund | other'],
+    ['provider', 'Poskytovatel investice', 'broker | investown | fingood | edward | conseq | other'],
     ['transaction_type', 'Typ transakce', 'buy | sell | dividend'],
-    ['quantity', 'Množství kusů / nárokovaných akcií', 'u dividend počet kusů pro odhad'],
-    ['price_per_unit', 'Cena za kus nebo dividenda na kus', '121.5 nebo 0.26'],
+    ['quantity', 'Množství kusů / podílů / jednotek', 'u dividend počet kusů pro odhad'],
+    ['price_per_unit', 'Cena za jednotku nebo dividenda na kus', '121.5 nebo 0.26'],
     ['currency', 'Měna transakce', 'CZK | USD | EUR | GBP | CHF'],
     ['transaction_date', 'Datum transakce', 'YYYY-MM-DD'],
-    ['sector', 'Volitelný sektor', 'Technologie'],
+    ['sector', 'Volitelný sektor nebo skupina', 'Technologie, Reality, Soukromý úvěr'],
     ['ex_dividend_date', 'Ex-dividend date', 'YYYY-MM-DD'],
     ['pay_date', 'Dividend pay date', 'YYYY-MM-DD'],
     ['expected_dividend_amount', 'Předpokládaná výplata dividendy', 'Volitelné přepsání dopočtu'],
@@ -154,7 +182,9 @@ export const readInvestmentImportFile = async (file: File) => {
       defval: '',
       raw: false,
     });
-    return rows.map((row) => Object.fromEntries(Object.entries(row).map(([key, value]) => [key.toLowerCase(), value])));
+    return rows.map((row) =>
+      Object.fromEntries(Object.entries(row).map(([key, value]) => [key.toLowerCase(), value]))
+    );
   }
 
   const text = await file.text();

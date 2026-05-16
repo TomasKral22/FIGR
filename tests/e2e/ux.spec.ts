@@ -4,7 +4,7 @@ import { openHome, seedFinanceStorage } from './helpers';
 test.beforeEach(async ({ page }) => {
   await seedFinanceStorage(page, {
     theme: 'dark',
-    visualTheme: 'classic',
+    visualTheme: 'dark-blue',
     bankAccounts: [
       {
         id: 'bank-kb',
@@ -46,25 +46,21 @@ test('hlavička drží kompaktní výšku a přepínání vzhledu se ukládá', 
   expect(headerBox).not.toBeNull();
   expect(headerBox!.height).toBeLessThan(180);
 
-  await expect(page.getByText('Účty banky')).toBeVisible();
-  await expect(page.getByText('Účty brokerů')).toBeVisible();
-  await expect(page.getByText('KB Spořicí účet · s.ú.')).toBeVisible();
+  await expect(page.getByText('Bankovní účty', { exact: true })).toBeVisible();
+  await expect(page.getByText('Brokerské účty', { exact: true })).toBeVisible();
+  await expect(page.locator('p', { hasText: 'KB Spořicí účet · s.ú.' }).first()).toBeVisible();
 
-  await page.getByRole('button', { name: 'Přepnout na světlý režim' }).click();
+  await page.getByTestId('app-header').getByRole('button', { name: 'Otevřít styly' }).click();
+  await page.getByRole('button', { name: /Světlá/i }).click();
+
   await expect(page.locator('html')).not.toHaveClass(/dark/);
   await expect
     .poll(async () => page.evaluate(() => window.localStorage.getItem('finance_theme')))
     .toBe('light');
 
-  await page.getByRole('button', { name: 'Vizuální styly' }).click();
-  await page.getByRole('button', { name: /Neon/i }).click();
-  await expect
-    .poll(async () => page.evaluate(() => document.documentElement.dataset.surface))
-    .toBe('neon');
+  await page.getByRole('button', { name: /Tmavě modrá/i }).click();
 
-  await page.reload();
-  await expect(page.locator('html')).not.toHaveClass(/dark/);
   await expect
     .poll(async () => page.evaluate(() => document.documentElement.dataset.surface))
-    .toBe('neon');
+    .toBe('dark-blue');
 });

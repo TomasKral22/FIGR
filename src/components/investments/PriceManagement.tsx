@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 interface PriceManagementProps {
   assets: InvestmentAsset[];
   prices: AssetPrice[];
-  onAddPrice: (price: { asset_id: string; price: number; currency: string; price_date: string }) => Promise<any>;
+  onAddPrice: (price: { asset_id: string; price: number; currency: string; price_date: string }) => Promise<void>;
 }
 
 const formatCurrency = (value: number, currency: string): string => {

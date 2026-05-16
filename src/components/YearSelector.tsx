@@ -66,72 +66,76 @@ export const YearSelector = ({ transactions, selectedYear, onSelectYear }: YearS
 
   if (yearlyData.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-border bg-card/50 p-6 text-center text-sm text-muted-foreground">
-        Zatím nemáte žádná data pro roční přehled. Jakmile přidáte první transakce, objeví se tady vývoj po jednotlivých letech.
+      <div className="panel-card">
+        <p className="text-sm text-muted-foreground">
+          Roční přehled zatím není k dispozici. Jakmile přibudou transakce, objeví se tady souhrn po jednotlivých letech.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
+    <section className="panel-card">
+      <div className="section-header mb-5">
+        <h2 className="text-section">Pohled po letech</h2>
+        <p className="section-description">Přepínej roky bez opuštění hlavního workflow. Zvolený rok řídí měsíční přehled i návazné reporty.</p>
+      </div>
+
+      <div className="mb-5 flex flex-wrap gap-2">
         {yearlyData.map((yearData) => (
           <Button
             key={yearData.year}
-            variant={selectedYear === yearData.year ? 'default' : 'outline'}
+            variant={selectedYear === yearData.year ? 'default' : 'secondary'}
             onClick={() => onSelectYear(yearData.year)}
             className="gap-2"
           >
             {selectedYear === yearData.year ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             {yearData.year}
-            <span className={`hidden text-sm sm:inline ${yearData.balance >= 0 ? 'text-success' : 'text-destructive'}`}>
-              {formatCurrency(yearData.balance)}
-            </span>
           </Button>
         ))}
       </div>
 
       {selectedYearData && (
-        <div className="space-y-4 rounded-lg border border-border bg-card p-4 sm:p-5 md:p-6">
-          <h3 className="text-lg font-bold sm:text-xl">Roční přehled {selectedYearData.year}</h3>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-lg bg-success/10 p-3">
-              <p className="text-sm text-muted-foreground">Příjmy</p>
-              <p className="break-words text-base font-bold text-success sm:text-lg">{formatCurrency(selectedYearData.totalIncome)}</p>
+        <div className="space-y-5">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="metric-card">
+              <p className="text-caption uppercase tracking-[0.12em] text-muted-foreground">Příjmy</p>
+              <p className="mt-2 text-xl font-semibold text-success">{formatCurrency(selectedYearData.totalIncome)}</p>
             </div>
-            <div className="rounded-lg bg-destructive/10 p-3">
-              <p className="text-sm text-muted-foreground">Výdaje</p>
-              <p className="break-words text-base font-bold text-destructive sm:text-lg">{formatCurrency(selectedYearData.totalExpenses)}</p>
+            <div className="metric-card">
+              <p className="text-caption uppercase tracking-[0.12em] text-muted-foreground">Výdaje</p>
+              <p className="mt-2 text-xl font-semibold text-destructive">{formatCurrency(selectedYearData.totalExpenses)}</p>
             </div>
-            <div className="rounded-lg bg-warning/10 p-3">
-              <p className="text-sm text-muted-foreground">Převody</p>
-              <p className="break-words text-base font-bold text-warning sm:text-lg">{formatCurrency(selectedYearData.totalTransfers)}</p>
+            <div className="metric-card">
+              <p className="text-caption uppercase tracking-[0.12em] text-muted-foreground">Převody</p>
+              <p className="mt-2 text-xl font-semibold text-warning">{formatCurrency(selectedYearData.totalTransfers)}</p>
             </div>
-            <div className="rounded-lg bg-primary/10 p-3">
-              <p className="text-sm text-muted-foreground">Bilance</p>
-              <p className={`break-words text-base font-bold sm:text-lg ${selectedYearData.balance >= 0 ? 'text-success' : 'text-destructive'}`}>
+            <div className="metric-card">
+              <p className="text-caption uppercase tracking-[0.12em] text-muted-foreground">Bilance</p>
+              <p className={`mt-2 text-xl font-semibold ${selectedYearData.balance >= 0 ? 'text-success' : 'text-destructive'}`}>
                 {formatCurrency(selectedYearData.balance)}
               </p>
             </div>
           </div>
 
-          <div className="rounded-lg bg-muted/30 p-3 sm:p-4">
-            <h4 className="mb-3 text-sm font-semibold">Rozdělení výdajů podle kategorií</h4>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-              {(Object.entries(selectedYearData.categoryBreakdown) as [ExpenseCategory, number][]).map(([category, amount]) => (
-                <div key={category} className="text-sm">
-                  <p className="text-muted-foreground">{getCategoryName(category)}</p>
-                  <p className="font-semibold">{formatCurrency(amount)}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {getCategoryPercentage(amount, selectedYearData.totalIncome).toFixed(1)} % příjmů
-                  </p>
-                </div>
-              ))}
+          <div className="panel-card-muted">
+            <p className="mb-3 font-medium">Struktura výdajů</p>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              {(Object.entries(selectedYearData.categoryBreakdown) as [ExpenseCategory, number][])
+                .filter(([, amount]) => amount > 0)
+                .map(([category, amount]) => (
+                  <div key={category} className="rounded-[var(--radius-control)] bg-card/72 p-3">
+                    <p className="text-sm text-muted-foreground">{getCategoryName(category)}</p>
+                    <p className="mt-1 font-semibold">{formatCurrency(amount)}</p>
+                    <p className="mt-1 text-caption text-muted-foreground">
+                      {getCategoryPercentage(amount, selectedYearData.totalIncome).toFixed(1)} % příjmů
+                    </p>
+                  </div>
+                ))}
             </div>
           </div>
         </div>
       )}
-    </div>
+    </section>
   );
 };

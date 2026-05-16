@@ -4,6 +4,7 @@ import { openHome, seedFinanceStorage } from './helpers';
 test.beforeEach(async ({ page }) => {
   await seedFinanceStorage(page, {
     theme: 'dark',
+    visualTheme: 'dark-blue',
     bankAccounts: [
       {
         id: 'bank-kb',
@@ -19,7 +20,7 @@ test.beforeEach(async ({ page }) => {
 test('dialog importu drží obsah uvnitř a nabízí obě akce', async ({ page }) => {
   await openHome(page);
 
-  await page.getByRole('button', { name: 'Import dat' }).click();
+  await page.getByTestId('app-header').getByRole('button', { name: 'Import' }).click();
 
   const dialog = page.getByTestId('import-dialog');
   await expect(dialog).toBeVisible();

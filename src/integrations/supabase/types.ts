@@ -201,6 +201,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_app_state: {
+        Row: {
+          storage_key: string
+          storage_value: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          storage_key: string
+          storage_value: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          storage_key?: string
+          storage_value?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

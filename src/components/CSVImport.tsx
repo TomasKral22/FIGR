@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { Download, FileSpreadsheet, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -21,9 +22,21 @@ interface CSVImportProps {
     transactions: Omit<Transaction, 'id' | 'createdAt'>[];
     accountBalances?: { month: string; accountId: string; balance: number }[];
   }) => void;
+  triggerClassName?: string;
+  triggerVariant?: 'default' | 'secondary' | 'ghost' | 'outline';
+  triggerSize?: 'default' | 'sm' | 'lg' | 'icon';
+  triggerLabel?: string;
 }
 
-export const CSVImport = ({ bankAccounts, brokerAccounts, onImport }: CSVImportProps) => {
+export const CSVImport = ({
+  bankAccounts,
+  brokerAccounts,
+  onImport,
+  triggerClassName,
+  triggerVariant = 'ghost',
+  triggerSize = 'sm',
+  triggerLabel = 'Import dat',
+}: CSVImportProps) => {
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -53,7 +66,9 @@ export const CSVImport = ({ bankAccounts, brokerAccounts, onImport }: CSVImportP
 
       toast({
         title: 'Import dokončen',
-        description: `Načteno ${transactions.length} transakcí a ${accountBalances.length} měsíčních stavů účtů${errors.length ? `, ${errors.length} řádků přeskočeno.` : '.'}`,
+        description: `Načteno ${transactions.length} transakcí a ${accountBalances.length} měsíčních stavů účtů${
+          errors.length ? `, ${errors.length} řádků přeskočeno.` : '.'
+        }`,
       });
     } catch {
       toast({
@@ -73,7 +88,7 @@ export const CSVImport = ({ bankAccounts, brokerAccounts, onImport }: CSVImportP
     setIsOpen(false);
     toast({
       title: 'Šablona exportována',
-      description: 'Připravená XLSX šablona byla uložená do stažených souborů.',
+      description: 'Připravená XLSX šablona byla uložena do stažených souborů.',
     });
   };
 
@@ -88,9 +103,13 @@ export const CSVImport = ({ bankAccounts, brokerAccounts, onImport }: CSVImportP
       />
 
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="w-full justify-start gap-2">
+        <Button
+          variant={triggerVariant}
+          size={triggerSize}
+          className={cn('w-full justify-start gap-2', triggerClassName)}
+        >
           <Upload className="h-4 w-4" />
-          Import dat
+          {triggerLabel}
         </Button>
       </DialogTrigger>
 
@@ -98,7 +117,8 @@ export const CSVImport = ({ bankAccounts, brokerAccounts, onImport }: CSVImportP
         <DialogHeader>
           <DialogTitle>Import dat</DialogTitle>
           <DialogDescription>
-            Můžeš si stáhnout připravenou šablonu XLSX, vyplnit transakce i měsíční stavy účtů a potom ji nahrát zpět do aplikace.
+            Můžeš si stáhnout připravenou šablonu XLSX, vyplnit transakce i měsíční stavy účtů
+            a potom ji nahrát zpět do aplikace.
           </DialogDescription>
         </DialogHeader>
 
@@ -112,7 +132,8 @@ export const CSVImport = ({ bankAccounts, brokerAccounts, onImport }: CSVImportP
             <span className="min-w-0 flex-1">
               <span className="block font-medium">Export šablony</span>
               <span className="block break-words text-sm text-muted-foreground">
-                Stáhne se připravený XLSX soubor s listem pro transakce, listem pro měsíční stavy účtů, nápovědou a seznamem účtů.
+                Stáhne se připravený XLSX soubor s listem pro transakce, listem pro měsíční
+                stavy účtů, nápovědou a seznamem účtů.
               </span>
             </span>
           </Button>
@@ -126,7 +147,8 @@ export const CSVImport = ({ bankAccounts, brokerAccounts, onImport }: CSVImportP
             <span className="min-w-0 flex-1">
               <span className="block font-medium">Import dat</span>
               <span className="block break-words text-sm text-muted-foreground">
-                Nahraj vyplněnou XLSX šablonu nebo kompatibilní CSV soubor a data se propíšou do aplikace.
+                Nahraj vyplněnou XLSX šablonu nebo kompatibilní CSV soubor a data se propíšou
+                do aplikace.
               </span>
             </span>
           </Button>
