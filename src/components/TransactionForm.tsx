@@ -35,6 +35,7 @@ import { TransactionAutocomplete } from '@/components/transactions/TransactionAu
 import { BulkTransactionTable } from '@/components/transactions/BulkTransactionTable';
 import { QuickAddInput } from '@/components/transactions/QuickAddInput';
 import { TransactionAttachmentInput } from '@/components/transactions/TransactionAttachmentInput';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface TransactionFormProps {
   isOpen: boolean;
@@ -115,6 +116,7 @@ export const TransactionForm = ({
   isMonthClosed,
 }: TransactionFormProps) => {
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const isEditing = !!initialTransaction && !initialDraft;
   const allAccounts = useMemo(() => [...bankAccounts, ...brokerAccounts], [bankAccounts, brokerAccounts]);
   const accountOptions = useMemo(
@@ -414,8 +416,13 @@ export const TransactionForm = ({
     });
   };
 
-  const panelWidth =
-    panelSize === 'full' ? 'min(96vw, 1680px)' : panelSize === 'wide' ? 'min(90vw, 1360px)' : 'min(90vw, 920px)';
+  const panelWidth = isMobile
+    ? '100vw'
+    : panelSize === 'full'
+      ? 'min(96vw, 1680px)'
+      : panelSize === 'wide'
+        ? 'min(90vw, 1360px)'
+        : 'min(90vw, 920px)';
 
   if (!isOpen) return null;
 
@@ -423,10 +430,10 @@ export const TransactionForm = ({
     <div className="fixed inset-0 z-50 flex items-start justify-end bg-background/80 backdrop-blur-sm">
       <div
         data-testid="transaction-form-panel"
-        className="flex h-[92vh] min-h-[720px] min-w-[720px] max-w-[96vw] resize-x flex-col overflow-hidden rounded-l-2xl border-l border-border bg-card shadow-2xl"
+        className="flex h-[100dvh] w-full max-w-[100vw] flex-col overflow-hidden border-l border-border bg-card shadow-2xl md:h-[92vh] md:min-h-[720px] md:min-w-[720px] md:max-w-[96vw] md:resize-x md:rounded-l-2xl"
         style={{ width: panelWidth }}
       >
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card px-6 py-4">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card px-4 py-3 md:px-6 md:py-4">
           <div>
             <h2 className="text-xl font-semibold">
               {isEditing ? 'Upravit transakci' : initialDraft ? 'Duplikace transakce' : 'Přidat transakci'}
@@ -461,7 +468,7 @@ export const TransactionForm = ({
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          <div className="space-y-4 p-6">
+          <div className="space-y-4 p-4 md:p-6">
           {!isEditing && (
             <div className="rounded-xl border border-border bg-card/60 p-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -494,7 +501,7 @@ export const TransactionForm = ({
           )}
 
           <Tabs value={mode} onValueChange={(value) => setMode(value as typeof mode)}>
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-1 gap-1 sm:grid-cols-3">
               <TabsTrigger value="single">Jedna transakce</TabsTrigger>
               <TabsTrigger value="bulk">Hromadné zadání</TabsTrigger>
               <TabsTrigger value="quick">Rychlé přidání</TabsTrigger>

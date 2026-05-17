@@ -26,6 +26,9 @@ interface CSVImportProps {
   triggerVariant?: 'default' | 'secondary' | 'ghost' | 'outline';
   triggerSize?: 'default' | 'sm' | 'lg' | 'icon';
   triggerLabel?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
 }
 
 export const CSVImport = ({
@@ -36,10 +39,21 @@ export const CSVImport = ({
   triggerVariant = 'ghost',
   triggerSize = 'sm',
   triggerLabel = 'Import dat',
+  open,
+  onOpenChange,
+  hideTrigger = false,
 }: CSVImportProps) => {
   const { toast } = useToast();
-  const [isOpen, setIsOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isControlled = typeof open === 'boolean';
+  const isOpen = isControlled ? open : internalOpen;
+  const setIsOpen = (nextOpen: boolean) => {
+    if (!isControlled) {
+      setInternalOpen(nextOpen);
+    }
+    onOpenChange?.(nextOpen);
+  };
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -102,16 +116,18 @@ export const CSVImport = ({
         className="hidden"
       />
 
-      <DialogTrigger asChild>
-        <Button
-          variant={triggerVariant}
-          size={triggerSize}
-          className={cn('w-full justify-start gap-2', triggerClassName)}
-        >
-          <Upload className="h-4 w-4" />
-          {triggerLabel}
-        </Button>
-      </DialogTrigger>
+      {!hideTrigger && (
+        <DialogTrigger asChild>
+          <Button
+            variant={triggerVariant}
+            size={triggerSize}
+            className={cn('w-full justify-start gap-2', triggerClassName)}
+          >
+            <Upload className="h-4 w-4" />
+            {triggerLabel}
+          </Button>
+        </DialogTrigger>
+      )}
 
       <DialogContent data-testid="import-dialog" className="sm:max-w-xl">
         <DialogHeader>

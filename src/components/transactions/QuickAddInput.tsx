@@ -1,4 +1,4 @@
-import { KeyboardEvent, useMemo, useRef, useState } from 'react';
+import { KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Sparkles, WandSparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,12 +21,28 @@ interface QuickAddInputProps {
 }
 
 export const QuickAddInput = ({ month, transactions, resolveAccountLabel, onCreateDraft, onSaveDraft }: QuickAddInputProps) => {
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [value, setValue] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
+  const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
 
   const historyIndex = useMemo(() => buildTransactionHistoryIndex(transactions), [transactions]);
   const suggestions = useMemo(() => getTransactionSuggestions(value, historyIndex).slice(0, 5), [historyIndex, value]);
+
+  useEffect(() => {
+    if (!isAutocompleteOpen) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!(event.target instanceof Node)) return;
+      if (!containerRef.current?.contains(event.target)) {
+        setIsAutocompleteOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [isAutocompleteOpen]);
 
   const submitDraft = (forceSave: boolean) => {
     const baseDraft = parseQuickAdd(value, month);
@@ -42,27 +58,29 @@ export const QuickAddInput = ({ month, transactions, resolveAccountLabel, onCrea
     if (forceSave && Object.keys(errors).length === 0) {
       onSaveDraft(enrichedDraft);
       setValue('');
+      setIsAutocompleteOpen(false);
       inputRef.current?.focus();
       return;
     }
 
     onCreateDraft(enrichedDraft);
-    if (!forceSave) {
-      setValue('');
-      inputRef.current?.focus();
-    }
+    setValue('');
+    setIsAutocompleteOpen(false);
+    inputRef.current?.focus();
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'ArrowDown' && suggestions.length > 0) {
       event.preventDefault();
       setActiveIndex((current) => Math.min(current + 1, suggestions.length - 1));
+      setIsAutocompleteOpen(true);
       return;
     }
 
     if (event.key === 'ArrowUp' && suggestions.length > 0) {
       event.preventDefault();
       setActiveIndex((current) => Math.max(current - 1, 0));
+      setIsAutocompleteOpen(true);
       return;
     }
 
@@ -70,16 +88,18 @@ export const QuickAddInput = ({ month, transactions, resolveAccountLabel, onCrea
       event.preventDefault();
       setValue('');
       setActiveIndex(0);
+      setIsAutocompleteOpen(false);
       return;
     }
 
     if (event.key === 'Enter') {
       event.preventDefault();
-      if (suggestions.length > 0 && activeIndex >= 0 && !event.ctrlKey) {
+      if (suggestions.length > 0 && isAutocompleteOpen && activeIndex >= 0 && !event.ctrlKey) {
         const suggestion = suggestions[activeIndex];
         const draft = applySuggestionToDraft(parseQuickAdd(value, month), suggestion, { name: true });
         onCreateDraft(draft);
         setValue('');
+        setIsAutocompleteOpen(false);
         inputRef.current?.focus();
         return;
       }
@@ -89,7 +109,7 @@ export const QuickAddInput = ({ month, transactions, resolveAccountLabel, onCrea
   };
 
   return (
-    <div className="rounded-2xl border border-border bg-card/80 p-4">
+    <div ref={containerRef} className="rounded-2xl border border-border bg-card/80 p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold">Rychlé přidání</p>
@@ -111,13 +131,20 @@ export const QuickAddInput = ({ month, transactions, resolveAccountLabel, onCrea
           onChange={(event) => {
             setValue(event.target.value);
             setActiveIndex(0);
+            setIsAutocompleteOpen(event.target.value.trim().length > 0);
+          }}
+          onFocus={() => setIsAutocompleteOpen(value.trim().length > 0)}
+          onBlur={(event) => {
+            const nextTarget = event.relatedTarget as Node | null;
+            if (nextTarget && containerRef.current?.contains(nextTarget)) return;
+            setIsAutocompleteOpen(false);
           }}
           onKeyDown={handleKeyDown}
           placeholder="Rychle přidat: např. benzin 1500, lidl 820, xtb 5000"
         />
 
         <TransactionAutocomplete
-          isOpen={suggestions.length > 0 && value.trim().length > 0}
+          isOpen={isAutocompleteOpen && suggestions.length > 0 && value.trim().length > 0}
           suggestions={suggestions}
           activeIndex={activeIndex}
           resolveAccountLabel={resolveAccountLabel}
@@ -126,6 +153,7 @@ export const QuickAddInput = ({ month, transactions, resolveAccountLabel, onCrea
             const draft = applySuggestionToDraft(parseQuickAdd(value, month), suggestion, { name: true });
             onCreateDraft(draft);
             setValue('');
+            setIsAutocompleteOpen(false);
             inputRef.current?.focus();
           }}
         />
@@ -137,7 +165,7 @@ export const QuickAddInput = ({ month, transactions, resolveAccountLabel, onCrea
         <span>Esc = vyčistit vstup</span>
       </div>
 
-      <div className="mt-3 flex gap-2">
+      <div className="mt-3 flex flex-wrap gap-2">
         <Button type="button" variant="outline" onClick={() => submitDraft(false)} disabled={!value.trim()}>
           <WandSparkles className="h-4 w-4" />
           Vytvořit draft

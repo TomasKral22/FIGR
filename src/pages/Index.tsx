@@ -7,7 +7,6 @@ import { Sidebar } from '@/components/Sidebar';
 import { TransactionForm } from '@/components/TransactionForm';
 import { AccountSetup } from '@/components/AccountSetup';
 import { TransactionList } from '@/components/TransactionList';
-import { Charts } from '@/components/Charts';
 import { YearSelector } from '@/components/YearSelector';
 import { RecurringTransactions } from '@/components/RecurringTransactions';
 import { InvestmentDashboard } from '@/components/investments';
@@ -69,7 +68,6 @@ const Index = () => {
   const [isTransactionFormOpen, setIsTransactionFormOpen] = useState(false);
   const [isAccountSetupOpen, setIsAccountSetupOpen] = useState(false);
   const [isAnnualReportsOpen, setIsAnnualReportsOpen] = useState(false);
-  const [isChartsOpen, setIsChartsOpen] = useState(false);
   const [isRecurringOpen, setIsRecurringOpen] = useState(false);
   const [isInvestmentsOpen, setIsInvestmentsOpen] = useState(false);
   const [isBackupManagerOpen, setIsBackupManagerOpen] = useState(false);
@@ -149,8 +147,7 @@ const Index = () => {
       document.getElementById('month-workflow')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       setIsMobileMenuOpen(false);
     },
-    onOpenReports: () => { setIsAnnualReportsOpen(true); setIsMobileMenuOpen(false); },
-    onOpenCharts: () => { setIsChartsOpen(true); setIsMobileMenuOpen(false); },
+    onOpenAnalytics: () => { setIsAnnualReportsOpen(true); setIsMobileMenuOpen(false); },
     onOpenRecurring: () => { setIsRecurringOpen(true); setIsMobileMenuOpen(false); },
     onOpenInvestments: () => { setIsInvestmentsOpen(true); setIsMobileMenuOpen(false); },
     onOpenGoals: () => { setIsGoalsOpen(true); setIsMobileMenuOpen(false); },
@@ -327,12 +324,6 @@ const Index = () => {
         onAddBrokerAccount={addBrokerAccount}
         onUpdateBrokerAccount={updateBrokerAccount}
         onDeleteBrokerAccount={deleteBrokerAccount}
-      />
-
-      <Charts
-        isOpen={isChartsOpen}
-        onClose={() => setIsChartsOpen(false)}
-        transactions={transactions}
       />
 
       <RecurringTransactions

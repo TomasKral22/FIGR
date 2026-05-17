@@ -2,6 +2,7 @@ import { KeyboardEvent, useMemo, useRef, useState } from 'react';
 import { CopyPlus, Paperclip, Plus, Rows3, Save, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { BulkTransactionRow, ExpenseCategory, TransactionDraft, TransactionSuggestion, TransferCategory } from '@/types/finance';
 import {
   applySuggestionToDraft,
@@ -65,6 +66,7 @@ export const BulkTransactionTable = ({
   suggestionsMap,
   onSaveRows,
 }: BulkTransactionTableProps) => {
+  const isMobile = useIsMobile();
   const [copyPrevious, setCopyPrevious] = useState(true);
   const [pasteText, setPasteText] = useState('');
   const [activeCell, setActiveCell] = useState<{ row: number; col: number } | null>(null);
@@ -236,6 +238,17 @@ export const BulkTransactionTable = ({
     return draft.category || 'necessities';
   };
 
+  const renderActions = (rowIndex: number) => (
+    <div className="flex items-center gap-1 bg-card px-2">
+      <Button type="button" variant="ghost" size="icon" onClick={() => duplicateRow(rowIndex)} title="Duplikovat řádek">
+        <CopyPlus className="h-4 w-4" />
+      </Button>
+      <Button type="button" variant="ghost" size="icon" onClick={() => clearRow(rowIndex)} title="Vyčistit řádek">
+        <Trash2 className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-border bg-card/70 p-4">
@@ -272,115 +285,87 @@ export const BulkTransactionTable = ({
       </div>
 
       <div className="overflow-hidden rounded-xl border border-border bg-card/70">
-        <div className="thin-scrollbar overflow-x-auto">
-          <div ref={gridRef} className="min-w-[1560px]">
-            <div
-              data-testid="bulk-table-header"
-              className="grid gap-px bg-border/60 text-xs font-semibold text-muted-foreground"
-              style={{ gridTemplateColumns: GRID_TEMPLATE }}
-            >
-              {HEADER_LABELS.map((label) => (
-                <div key={label} className="bg-card px-3 py-2">
-                  {label}
-                </div>
-              ))}
-            </div>
+        {isMobile ? (
+          <div className="space-y-3 p-3">
+            {validatedRows.map((row, rowIndex) => {
+              const draft = row.draft;
+              const rowErrors = Object.values(row.errors).filter(Boolean);
 
-            <div className="divide-y divide-border/60">
-              {validatedRows.map((row, rowIndex) => {
-                const rowErrors = Object.values(row.errors).filter(Boolean);
-                const draft = row.draft;
+              return (
+                <div key={row.id} className={`rounded-xl border p-3 ${row.isValid ? 'border-border bg-card/80' : 'border-destructive/40 bg-destructive/10'}`}>
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold">Řádek {rowIndex + 1}</p>
+                      {!row.isValid && rowErrors[0] ? <p className="text-xs text-destructive">{rowErrors[0]}</p> : null}
+                    </div>
+                    {renderActions(rowIndex)}
+                  </div>
 
-                return (
-                  <div key={row.id} className="border-t border-border/60 first:border-t-0">
-                    <div className={`grid gap-px ${row.isValid ? 'bg-border/20' : 'bg-destructive/15'}`} style={{ gridTemplateColumns: GRID_TEMPLATE }}>
-                      <Input
-                        data-row={rowIndex}
-                        data-col={0}
-                        value={draft.name}
-                        onFocus={() => setActiveCell({ row: rowIndex, col: 0 })}
-                        onChange={(event) => updateRowDraft(row.id, { name: event.target.value })}
-                        onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 0)}
-                        className={cellClass(rowIndex, 0)}
-                      />
-                      <Input
-                        data-row={rowIndex}
-                        data-col={1}
-                        value={draft.amount ?? ''}
-                        onFocus={() => setActiveCell({ row: rowIndex, col: 1 })}
-                        onChange={(event) => updateRowDraft(row.id, { amount: normalizeAmount(event.target.value) })}
-                        onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 1)}
-                        className={cellClass(rowIndex, 1)}
-                      />
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Název transakce</label>
+                      <Input value={draft.name} onChange={(event) => updateRowDraft(row.id, { name: event.target.value })} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Částka</label>
+                      <Input value={draft.amount ?? ''} onChange={(event) => updateRowDraft(row.id, { amount: normalizeAmount(event.target.value) })} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Typ</label>
                       <select
-                        data-row={rowIndex}
-                        data-col={2}
                         value={draft.type}
-                        onFocus={() => setActiveCell({ row: rowIndex, col: 2 })}
                         onChange={(event) => updateRowDraft(row.id, { type: event.target.value as TransactionDraft['type'] })}
-                        onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 2)}
-                        className={`h-10 bg-card px-3 text-sm outline-none ${cellClass(rowIndex, 2)}`}
+                        className="h-10 w-full rounded-[var(--radius-control)] border border-input bg-card px-3 text-sm outline-none"
                       >
                         <option value="expense">Výdaj</option>
                         <option value="income">Příjem</option>
                         <option value="transfer">Převod</option>
                         <option value="investment">Investice</option>
                       </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Zdrojový účet</label>
                       <select
-                        data-row={rowIndex}
-                        data-col={3}
                         value={getSourceValue(draft)}
-                        onFocus={() => setActiveCell({ row: rowIndex, col: 3 })}
                         onChange={(event) => handleSourceChange(row, event.target.value)}
-                        onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 3)}
-                        className={`h-10 bg-card px-3 text-sm outline-none ${cellClass(rowIndex, 3)}`}
+                        className="h-10 w-full rounded-[var(--radius-control)] border border-input bg-card px-3 text-sm outline-none"
                       >
                         <option value="">—</option>
                         {accountOptions.map((option) => (
-                          <option key={option.id} value={option.id}>
-                            {option.label}
-                          </option>
+                          <option key={option.id} value={option.id}>{option.label}</option>
                         ))}
                       </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Cílový účet</label>
                       <select
-                        data-row={rowIndex}
-                        data-col={4}
                         value={getTargetValue(draft)}
-                        onFocus={() => setActiveCell({ row: rowIndex, col: 4 })}
                         onChange={(event) => handleTargetChange(row, event.target.value)}
-                        onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 4)}
-                        className={`h-10 bg-card px-3 text-sm outline-none ${cellClass(rowIndex, 4)}`}
+                        className="h-10 w-full rounded-[var(--radius-control)] border border-input bg-card px-3 text-sm outline-none"
                       >
                         <option value="">—</option>
                         {accountOptions.map((option) => (
-                          <option key={option.id} value={option.id}>
-                            {option.label}
-                          </option>
+                          <option key={option.id} value={option.id}>{option.label}</option>
                         ))}
                       </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Druh / Kategorie</label>
                       {draft.type === 'transfer' ? (
                         <select
-                          data-row={rowIndex}
-                          data-col={5}
                           value={categoryValue(draft)}
-                          onFocus={() => setActiveCell({ row: rowIndex, col: 5 })}
                           onChange={(event) => updateRowDraft(row.id, { transferCategory: event.target.value as TransferCategory })}
-                          onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 5)}
-                          className={`h-10 bg-card px-3 text-sm outline-none ${cellClass(rowIndex, 5)}`}
+                          className="h-10 w-full rounded-[var(--radius-control)] border border-input bg-card px-3 text-sm outline-none"
                         >
                           <option value="transfer">Převod mezi účty</option>
                           <option value="savings">Spoření</option>
                         </select>
                       ) : (
                         <select
-                          data-row={rowIndex}
-                          data-col={5}
                           value={categoryValue(draft)}
-                          onFocus={() => setActiveCell({ row: rowIndex, col: 5 })}
                           onChange={(event) => updateRowDraft(row.id, { category: event.target.value as ExpenseCategory })}
-                          onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 5)}
                           disabled={draft.type === 'investment'}
-                          className={`h-10 bg-card px-3 text-sm outline-none ${cellClass(rowIndex, 5)}`}
+                          className="h-10 w-full rounded-[var(--radius-control)] border border-input bg-card px-3 text-sm outline-none"
                         >
                           <option value="necessities">Nutnosti</option>
                           <option value="investments">Investice</option>
@@ -389,48 +374,97 @@ export const BulkTransactionTable = ({
                           <option value="selfInvestment">Investice do sebe</option>
                         </select>
                       )}
-                      <Input
-                        data-row={rowIndex}
-                        data-col={6}
-                        value={draft.month || month}
-                        onFocus={() => setActiveCell({ row: rowIndex, col: 6 })}
-                        onChange={(event) => updateRowDraft(row.id, { month: event.target.value })}
-                        onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 6)}
-                        className={cellClass(rowIndex, 6)}
-                      />
-                      <Input
-                        data-row={rowIndex}
-                        data-col={7}
-                        value={draft.note || ''}
-                        onFocus={() => setActiveCell({ row: rowIndex, col: 7 })}
-                        onChange={(event) => updateRowDraft(row.id, { note: event.target.value })}
-                        onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 7)}
-                        className={cellClass(rowIndex, 7)}
-                      />
-                      <div className={`flex items-center justify-center bg-card px-3 ${activeCell?.row === rowIndex && activeCell?.col === 8 ? 'bulk-cell-active' : 'bulk-cell'}`}>
-                        <Paperclip className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                      <div className="flex items-center gap-1 bg-card px-2">
-                        <Button type="button" variant="ghost" size="icon" onClick={() => duplicateRow(rowIndex)} title="Duplikovat řádek">
-                          <CopyPlus className="h-4 w-4" />
-                        </Button>
-                        <Button type="button" variant="ghost" size="icon" onClick={() => clearRow(rowIndex)} title="Vyčistit řádek">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
                     </div>
-
-                    {rowErrors.length > 0 && (
-                      <div className="border-t border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-                        {rowErrors[0]}
-                      </div>
-                    )}
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Datum / měsíc</label>
+                      <Input value={draft.month || month} onChange={(event) => updateRowDraft(row.id, { month: event.target.value })} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Poznámka</label>
+                      <Input value={draft.note || ''} onChange={(event) => updateRowDraft(row.id, { note: event.target.value })} />
+                    </div>
                   </div>
-                );
-              })}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="thin-scrollbar overflow-x-auto">
+            <div ref={gridRef} className="min-w-[1560px]">
+              <div
+                data-testid="bulk-table-header"
+                className="grid gap-px bg-border/60 text-xs font-semibold text-muted-foreground"
+                style={{ gridTemplateColumns: GRID_TEMPLATE }}
+              >
+                {HEADER_LABELS.map((label) => (
+                  <div key={label} className="bg-card px-3 py-2">
+                    {label}
+                  </div>
+                ))}
+              </div>
+
+              <div className="divide-y divide-border/60">
+                {validatedRows.map((row, rowIndex) => {
+                  const rowErrors = Object.values(row.errors).filter(Boolean);
+                  const draft = row.draft;
+
+                  return (
+                    <div key={row.id} className="border-t border-border/60 first:border-t-0">
+                      <div className={`grid gap-px ${row.isValid ? 'bg-border/20' : 'bg-destructive/15'}`} style={{ gridTemplateColumns: GRID_TEMPLATE }}>
+                        <Input data-row={rowIndex} data-col={0} value={draft.name} onFocus={() => setActiveCell({ row: rowIndex, col: 0 })} onChange={(event) => updateRowDraft(row.id, { name: event.target.value })} onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 0)} className={cellClass(rowIndex, 0)} />
+                        <Input data-row={rowIndex} data-col={1} value={draft.amount ?? ''} onFocus={() => setActiveCell({ row: rowIndex, col: 1 })} onChange={(event) => updateRowDraft(row.id, { amount: normalizeAmount(event.target.value) })} onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 1)} className={cellClass(rowIndex, 1)} />
+                        <select data-row={rowIndex} data-col={2} value={draft.type} onFocus={() => setActiveCell({ row: rowIndex, col: 2 })} onChange={(event) => updateRowDraft(row.id, { type: event.target.value as TransactionDraft['type'] })} onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 2)} className={`h-10 bg-card px-3 text-sm outline-none ${cellClass(rowIndex, 2)}`}>
+                          <option value="expense">Výdaj</option>
+                          <option value="income">Příjem</option>
+                          <option value="transfer">Převod</option>
+                          <option value="investment">Investice</option>
+                        </select>
+                        <select data-row={rowIndex} data-col={3} value={getSourceValue(draft)} onFocus={() => setActiveCell({ row: rowIndex, col: 3 })} onChange={(event) => handleSourceChange(row, event.target.value)} onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 3)} className={`h-10 bg-card px-3 text-sm outline-none ${cellClass(rowIndex, 3)}`}>
+                          <option value="">—</option>
+                          {accountOptions.map((option) => (
+                            <option key={option.id} value={option.id}>{option.label}</option>
+                          ))}
+                        </select>
+                        <select data-row={rowIndex} data-col={4} value={getTargetValue(draft)} onFocus={() => setActiveCell({ row: rowIndex, col: 4 })} onChange={(event) => handleTargetChange(row, event.target.value)} onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 4)} className={`h-10 bg-card px-3 text-sm outline-none ${cellClass(rowIndex, 4)}`}>
+                          <option value="">—</option>
+                          {accountOptions.map((option) => (
+                            <option key={option.id} value={option.id}>{option.label}</option>
+                          ))}
+                        </select>
+                        {draft.type === 'transfer' ? (
+                          <select data-row={rowIndex} data-col={5} value={categoryValue(draft)} onFocus={() => setActiveCell({ row: rowIndex, col: 5 })} onChange={(event) => updateRowDraft(row.id, { transferCategory: event.target.value as TransferCategory })} onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 5)} className={`h-10 bg-card px-3 text-sm outline-none ${cellClass(rowIndex, 5)}`}>
+                            <option value="transfer">Převod mezi účty</option>
+                            <option value="savings">Spoření</option>
+                          </select>
+                        ) : (
+                          <select data-row={rowIndex} data-col={5} value={categoryValue(draft)} onFocus={() => setActiveCell({ row: rowIndex, col: 5 })} onChange={(event) => updateRowDraft(row.id, { category: event.target.value as ExpenseCategory })} onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 5)} disabled={draft.type === 'investment'} className={`h-10 bg-card px-3 text-sm outline-none ${cellClass(rowIndex, 5)}`}>
+                            <option value="necessities">Nutnosti</option>
+                            <option value="investments">Investice</option>
+                            <option value="savings">Spoření</option>
+                            <option value="whims">Kraviny</option>
+                            <option value="selfInvestment">Investice do sebe</option>
+                          </select>
+                        )}
+                        <Input data-row={rowIndex} data-col={6} value={draft.month || month} onFocus={() => setActiveCell({ row: rowIndex, col: 6 })} onChange={(event) => updateRowDraft(row.id, { month: event.target.value })} onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 6)} className={cellClass(rowIndex, 6)} />
+                        <Input data-row={rowIndex} data-col={7} value={draft.note || ''} onFocus={() => setActiveCell({ row: rowIndex, col: 7 })} onChange={(event) => updateRowDraft(row.id, { note: event.target.value })} onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 7)} className={cellClass(rowIndex, 7)} />
+                        <div className={`flex items-center justify-center bg-card px-3 ${activeCell?.row === rowIndex && activeCell?.col === 8 ? 'bulk-cell-active' : 'bulk-cell'}`}>
+                          <Paperclip className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        {renderActions(rowIndex)}
+                      </div>
+
+                      {rowErrors.length > 0 && (
+                        <div className="border-t border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                          {rowErrors[0]}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {validatedRows.some((row) => !row.isValid) && (

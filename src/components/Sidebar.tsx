@@ -6,14 +6,12 @@ export type SidebarItemId =
   | 'recurring'
   | 'investments'
   | 'goals'
-  | 'reports'
-  | 'charts';
+  | 'analytics';
 
 interface SidebarProps {
   onOpenOverview: () => void;
   onOpenMonthWorkflow: () => void;
-  onOpenReports: () => void;
-  onOpenCharts: () => void;
+  onOpenAnalytics: () => void;
   onOpenRecurring: () => void;
   onOpenInvestments: () => void;
   onOpenGoals: () => void;
@@ -25,8 +23,7 @@ const navButtonClass = 'w-full justify-start gap-3 px-3 py-2.5 text-left';
 export const Sidebar = ({
   onOpenOverview,
   onOpenMonthWorkflow,
-  onOpenReports,
-  onOpenCharts,
+  onOpenAnalytics,
   onOpenRecurring,
   onOpenInvestments,
   onOpenGoals,
@@ -60,13 +57,9 @@ export const Sidebar = ({
             <RefreshCw className="h-4 w-4" />
             <span>Trvalé příkazy</span>
           </Button>
-          <Button variant="ghost" className={navButtonClass} onClick={onOpenReports}>
+          <Button variant="ghost" className={navButtonClass} onClick={onOpenAnalytics}>
             <BarChart3 className="h-4 w-4" />
-            <span>Reporty</span>
-          </Button>
-          <Button variant="ghost" className={navButtonClass} onClick={onOpenCharts}>
-            <BarChart3 className="h-4 w-4" />
-            <span>Grafy</span>
+            <span>Reporty a grafy</span>
           </Button>
           <Button variant="ghost" className={navButtonClass} onClick={onOpenAudit}>
             <ClipboardList className="h-4 w-4" />
