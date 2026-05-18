@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { LoaderCircle, LockKeyhole, Mail } from 'lucide-react';
+import { LoaderCircle, LockKeyhole, Mail, UserRound } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +27,7 @@ export const AuthScreen = ({ visualTheme, initialError = null }: AuthScreenProps
   const { signIn, signUp, resetPassword } = useAuth();
   const [activeTab, setActiveTab] = useState<'signin' | 'signup' | 'reset'>('signin');
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -55,7 +56,7 @@ export const AuthScreen = ({ visualTheme, initialError = null }: AuthScreenProps
         await signIn(email.trim(), password);
         setMessage('Přihlášení proběhlo úspěšně.');
       } else if (activeTab === 'signup') {
-        const result = await signUp(email.trim(), password);
+        const result = await signUp(email.trim(), password, username.trim());
         setMessage(
           result.needsEmailConfirmation
             ? 'Účet byl vytvořen. Potvrď e-mail a potom se přihlas.'
@@ -114,7 +115,7 @@ export const AuthScreen = ({ visualTheme, initialError = null }: AuthScreenProps
 
               <TabsContent value="signup" className="mt-0 space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Vytvoř nový účet. Pro běžný provoz je potřeba nakonfigurovat vlastní SMTP v Supabase.
+                  Vytvoř nový účet. Uživatelské jméno se bude zobrazovat v pravém horním rohu aplikace.
                 </p>
               </TabsContent>
 
@@ -135,6 +136,23 @@ export const AuthScreen = ({ visualTheme, initialError = null }: AuthScreenProps
                 </button>
               </TabsContent>
 
+              {activeTab === 'signup' ? (
+                <div className="space-y-2">
+                  <Label htmlFor="auth-username">Uživatelské jméno</Label>
+                  <div className="relative">
+                    <UserRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="auth-username"
+                      autoComplete="nickname"
+                      value={username}
+                      onChange={(event) => setUsername(event.target.value)}
+                      className="pl-9"
+                      required
+                    />
+                  </div>
+                </div>
+              ) : null}
+
               <div className="space-y-2">
                 <Label htmlFor="auth-email">E-mail</Label>
                 <div className="relative">
@@ -151,7 +169,7 @@ export const AuthScreen = ({ visualTheme, initialError = null }: AuthScreenProps
                 </div>
               </div>
 
-              {activeTab !== 'reset' && (
+              {activeTab !== 'reset' ? (
                 <div className="space-y-2">
                   <Label htmlFor="auth-password">Heslo</Label>
                   <div className="relative">
@@ -168,7 +186,7 @@ export const AuthScreen = ({ visualTheme, initialError = null }: AuthScreenProps
                     />
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {message ? <div className="rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">{message}</div> : null}
               {errorMessage ? (
@@ -179,7 +197,7 @@ export const AuthScreen = ({ visualTheme, initialError = null }: AuthScreenProps
 
               {activeTab === 'signup' ? (
                 <div className="rounded-lg border border-border/70 bg-card/60 px-3 py-2 text-xs text-muted-foreground">
-                  Pokud registrace skončí chybou při odesílání potvrzovacího e-mailu, problém je obvykle v SMTP nastavení Supabase. Výchozí Supabase SMTP má přísné limity a není vhodné pro běžný provoz.
+                  Pokud registrace skončí chybou při odesílání potvrzovacího e-mailu, problém je obvykle v SMTP nastavení Supabase.
                 </div>
               ) : null}
 

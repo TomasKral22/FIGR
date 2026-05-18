@@ -18,7 +18,7 @@ interface AuthContextValue {
   session: Session | null;
   user: User | null;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<{ needsEmailConfirmation: boolean }>;
+  signUp: (email: string, password: string, username: string) => Promise<{ needsEmailConfirmation: boolean }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
 }
@@ -84,13 +84,16 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     }
   }, []);
 
-  const signUp = useCallback(async (email: string, password: string) => {
+  const signUp = useCallback(async (email: string, password: string, username: string) => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           emailRedirectTo: window.location.href,
+          data: {
+            username: username.trim(),
+          },
         },
       });
       if (error) throw error;

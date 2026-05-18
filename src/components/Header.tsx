@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Download, FileSpreadsheet, Import, Menu, PaintBucket, Plus, Settings2, UserRound, LogOut } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Download, FileSpreadsheet, History, Import, LogOut, Menu, Plus, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { CSVImport } from '@/components/CSVImport';
@@ -27,10 +27,10 @@ interface HeaderProps {
     accountBalances?: { month: string; accountId: string; balance: number }[];
   }) => void;
   onOpenTransactionForm: () => void;
-  onOpenAccountSetup: () => void;
-  onOpenVisualThemes: () => void;
+  onOpenAudit: () => void;
   onOpenMobileMenu?: () => void;
   userEmail?: string | null;
+  userDisplayName?: string | null;
   onSignOut?: () => void;
 }
 
@@ -40,6 +40,11 @@ const resolveLogo = (visualTheme: string) => {
   return logoLight;
 };
 
+const getUserBadge = (displayName?: string | null, email?: string | null) => {
+  const seed = (displayName || email || 'fi').trim();
+  return seed.slice(0, 2).toUpperCase();
+};
+
 export const Header = ({
   transactions,
   bankAccounts,
@@ -47,16 +52,16 @@ export const Header = ({
   visualTheme,
   onImportTransactions,
   onOpenTransactionForm,
-  onOpenAccountSetup,
-  onOpenVisualThemes,
+  onOpenAudit,
   onOpenMobileMenu,
   userEmail,
+  userDisplayName,
   onSignOut,
 }: HeaderProps) => {
   const isMobile = useIsMobile();
   const logoSrc = resolveLogo(visualTheme);
   const [isImportOpen, setIsImportOpen] = useState(false);
-  const userBadge = (userEmail || 'fi').slice(0, 2).toUpperCase();
+  const userBadge = useMemo(() => getUserBadge(userDisplayName, userEmail), [userDisplayName, userEmail]);
 
   return (
     <header className="app-header" data-testid="app-header">
@@ -69,9 +74,9 @@ export const Header = ({
         hideTrigger
       />
 
-      <div className="flex items-center justify-between gap-3 px-3 py-3 sm:px-4 md:px-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-4 md:px-6">
         <div className="flex min-w-0 items-center gap-3">
-          {isMobile && onOpenMobileMenu && (
+          {isMobile && onOpenMobileMenu ? (
             <Button
               variant="ghost"
               size="icon"
@@ -81,26 +86,26 @@ export const Header = ({
             >
               <Menu className="h-5 w-5" />
             </Button>
-          )}
+          ) : null}
 
           <div className="w-[120px] shrink-0 sm:w-[148px]">
             <img src={logoSrc} alt="FIGR Finanční plánování" className="block h-auto w-full object-contain" />
           </div>
 
-          {!isMobile && (
+          {!isMobile ? (
             <div className="hidden min-w-0 lg:block">
               <p className="text-caption uppercase tracking-[0.14em] text-muted-foreground">Finanční dashboard</p>
               <p className="truncate text-sm text-muted-foreground">Transakce, majetek, investice, reporty</p>
             </div>
-          )}
+          ) : null}
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="secondary" size={isMobile ? 'icon' : 'sm'} aria-label="Import a export">
                 <Import className="h-4 w-4" />
-                {!isMobile && <span>Import / Export</span>}
+                {!isMobile ? <span>Import / Export</span> : null}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
@@ -129,7 +134,7 @@ export const Header = ({
             className="min-w-10"
           >
             <Plus className="h-4 w-4" />
-            {!isMobile && <span>Nová transakce</span>}
+            {!isMobile ? <span>Nová transakce</span> : null}
           </Button>
 
           <DropdownMenu>
@@ -138,20 +143,15 @@ export const Header = ({
                 {isMobile ? <UserRound className="h-4 w-4" /> : <span className="font-semibold">{userBadge}</span>}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-60">
-              {userEmail ? (
-                <>
-                  <DropdownMenuLabel className="truncate">{userEmail}</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                </>
-              ) : null}
-              <DropdownMenuItem onSelect={onOpenAccountSetup}>
-                <Settings2 className="h-4 w-4" />
-                Účty
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={onOpenVisualThemes}>
-                <PaintBucket className="h-4 w-4" />
-                Styly
+            <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuLabel className="space-y-1">
+                <div className="truncate text-sm font-semibold">{userDisplayName || 'Uživatel'}</div>
+                {userEmail ? <div className="truncate text-xs font-normal text-muted-foreground">{userEmail}</div> : null}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={onOpenAudit}>
+                <History className="h-4 w-4" />
+                Historie
               </DropdownMenuItem>
               {onSignOut ? (
                 <>

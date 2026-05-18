@@ -244,7 +244,7 @@ export const CategoryAutomationPanel = ({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[88vh] max-w-6xl overflow-y-auto rounded-[var(--radius-card)] border border-border bg-card/96">
         <DialogHeader>
-          <DialogTitle>Podkategorie a automatická kategorizace</DialogTitle>
+          <DialogTitle>Oblasti transakcí a automatická kategorizace</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6">
@@ -474,7 +474,7 @@ export const CategoryAutomationPanel = ({
             <div className="mb-4 flex items-center gap-2">
               <FolderTree className="h-4 w-4 text-primary" />
               <div>
-                <h3 className="font-semibold">Podkategorie</h3>
+                <h3 className="font-semibold">Oblasti transakcí</h3>
                 <p className="text-sm text-muted-foreground">
                   Systémové podkategorie zůstávají jako základ. Uživatelské lze přidávat, upravovat i archivovat.
                 </p>

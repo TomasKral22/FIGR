@@ -51,7 +51,7 @@ export const QuickActionsPanel = ({
       onClick: onOpenGoals,
     },
     {
-      label: 'Podkategorie',
+      label: 'Oblasti transakcí',
       description: 'Správa podkategorií a automatických pravidel.',
       icon: FolderTree,
       onClick: onOpenCategories,

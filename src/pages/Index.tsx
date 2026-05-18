@@ -17,14 +17,39 @@ import { AuditLogPanel } from '@/components/AuditLogPanel';
 import { WealthOverview } from '@/components/WealthOverview';
 import { BackupReminder } from '@/components/BackupReminder';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
-import { VisualThemePanel } from '@/components/VisualThemePanel';
 import { GettingStartedPanel } from '@/components/GettingStartedPanel';
 import { QuickActionsPanel } from '@/components/QuickActionsPanel';
 import { SmartInsightsPanel } from '@/components/SmartInsightsPanel';
 import { CategoryAutomationPanel } from '@/components/CategoryAutomationPanel';
+import { SettingsPanel } from '@/components/SettingsPanel';
 import { Transaction, TransactionDraft } from '@/types/finance';
 import { draftToTransactionInput, duplicateTransaction } from '@/utils/transactionWorkflow';
 import { useAuth } from '@/contexts/AuthContext';
+import { SidebarItemId } from '@/components/Sidebar';
+
+const DEFAULT_SIDEBAR_ORDER: SidebarItemId[] = [
+  'overview',
+  'accounts',
+  'monthWorkflow',
+  'investments',
+  'goals',
+  'transactionAreas',
+  'recurring',
+  'analytics',
+  'settings',
+];
+
+const normalizeSidebarOrder = (value: unknown): SidebarItemId[] => {
+  const source = Array.isArray(value) ? (value.filter((item): item is SidebarItemId => DEFAULT_SIDEBAR_ORDER.includes(item as SidebarItemId))) : [];
+  const seen = new Set<SidebarItemId>();
+  const ordered = source.filter((item) => {
+    if (seen.has(item)) return false;
+    seen.add(item);
+    return true;
+  });
+
+  return [...ordered, ...DEFAULT_SIDEBAR_ORDER.filter((item) => !seen.has(item))];
+};
 
 const Index = () => {
   const { user, signOut } = useAuth();
@@ -90,7 +115,7 @@ const Index = () => {
   const [isGoalsOpen, setIsGoalsOpen] = useState(false);
   const [isCategoryAutomationOpen, setIsCategoryAutomationOpen] = useState(false);
   const [isAuditOpen, setIsAuditOpen] = useState(false);
-  const [isVisualThemeOpen, setIsVisualThemeOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [draftTransaction, setDraftTransaction] = useState<TransactionDraft | null>(null);
   const [transactionFormMode, setTransactionFormMode] = useState<'single' | 'bulk' | 'quick'>('single');
@@ -101,6 +126,10 @@ const Index = () => {
   const [selectedYear, setSelectedYear] = useState(() => {
     const currentYear = new Date().getFullYear().toString();
     return currentYear;
+  });
+  const [sidebarOrder, setSidebarOrder] = useState<SidebarItemId[]>(() => {
+    if (typeof window === 'undefined') return DEFAULT_SIDEBAR_ORDER;
+    return normalizeSidebarOrder(JSON.parse(window.localStorage.getItem('finance_sidebar_order') || '[]'));
   });
 
   const effectiveSelectedYear = useMemo(() => {
@@ -166,11 +195,34 @@ const Index = () => {
     window.localStorage.setItem('finance_support_panels_open', String(isSupportPanelsOpen));
   }, [isSupportPanelsOpen]);
 
+  useEffect(() => {
+    window.localStorage.setItem('finance_sidebar_order', JSON.stringify(sidebarOrder));
+  }, [sidebarOrder]);
+
+  const userDisplayName =
+    typeof user?.user_metadata?.username === 'string' && user.user_metadata.username.trim().length > 0
+      ? user.user_metadata.username.trim()
+      : user?.email?.split('@')[0] || 'Uživatel';
+
+  const moveSidebarItem = (itemId: SidebarItemId, direction: 'up' | 'down') => {
+    setSidebarOrder((current) => {
+      const index = current.indexOf(itemId);
+      if (index === -1) return current;
+      const nextIndex = direction === 'up' ? index - 1 : index + 1;
+      if (nextIndex < 0 || nextIndex >= current.length) return current;
+      const next = [...current];
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      return next;
+    });
+  };
+
   const sidebarProps = {
+    itemOrder: sidebarOrder,
     onOpenOverview: () => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       setIsMobileMenuOpen(false);
     },
+    onOpenAccounts: () => { setIsAccountSetupOpen(true); setIsMobileMenuOpen(false); },
     onOpenMonthWorkflow: () => {
       document.getElementById('month-workflow')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       setIsMobileMenuOpen(false);
@@ -179,8 +231,8 @@ const Index = () => {
     onOpenRecurring: () => { setIsRecurringOpen(true); setIsMobileMenuOpen(false); },
     onOpenInvestments: () => { setIsInvestmentsOpen(true); setIsMobileMenuOpen(false); },
     onOpenGoals: () => { setIsGoalsOpen(true); setIsMobileMenuOpen(false); },
-    onOpenCategories: () => { setIsCategoryAutomationOpen(true); setIsMobileMenuOpen(false); },
-    onOpenAudit: () => { setIsAuditOpen(true); setIsMobileMenuOpen(false); },
+    onOpenTransactionAreas: () => { setIsCategoryAutomationOpen(true); setIsMobileMenuOpen(false); },
+    onOpenSettings: () => { setIsSettingsOpen(true); setIsMobileMenuOpen(false); },
   };
 
   return (
@@ -197,10 +249,10 @@ const Index = () => {
           setTransactionFormMode('single');
           setIsTransactionFormOpen(true);
         }}
-        onOpenAccountSetup={() => setIsAccountSetupOpen(true)}
-        onOpenVisualThemes={() => setIsVisualThemeOpen(true)}
+        onOpenAudit={() => setIsAuditOpen(true)}
         onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
         userEmail={user?.email ?? null}
+        userDisplayName={userDisplayName}
         onSignOut={() => void signOut()}
       />
 
@@ -432,11 +484,13 @@ const Index = () => {
         entries={auditLog}
       />
 
-      <VisualThemePanel
-        isOpen={isVisualThemeOpen}
-        onClose={() => setIsVisualThemeOpen(false)}
+      <SettingsPanel
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
         currentTheme={visualTheme}
         onSelectTheme={changeVisualTheme}
+        sidebarOrder={sidebarOrder}
+        onMoveSidebarItem={moveSidebarItem}
       />
     </div>
   );

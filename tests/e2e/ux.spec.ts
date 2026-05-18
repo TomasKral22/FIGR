@@ -50,8 +50,7 @@ test('hlavička drží kompaktní výšku a přepínání vzhledu se ukládá', 
   await expect(page.getByText('Brokerské účty', { exact: true })).toBeVisible();
   await expect(page.locator('p', { hasText: 'KB Spořicí účet · s.ú.' }).first()).toBeVisible();
 
-  await page.getByTestId('app-header').getByRole('button', { name: 'Uživatelské menu' }).click();
-  await page.getByRole('menuitem', { name: 'Styly' }).click();
+  await page.getByRole('button', { name: 'Nastavení' }).click();
   await page.getByRole('button', { name: /Světlá/i }).click();
 
   await expect(page.locator('html')).not.toHaveClass(/dark/);
