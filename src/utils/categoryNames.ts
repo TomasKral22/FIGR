@@ -1,4 +1,4 @@
-import { ExpenseCategory } from '@/types/finance';
+import { ExpenseCategory, Subcategory } from '@/types/finance';
 
 export const categoryNames: Record<ExpenseCategory, string> = {
   necessities: 'Nutnosti',
@@ -10,4 +10,8 @@ export const categoryNames: Record<ExpenseCategory, string> = {
 
 export const getCategoryName = (category: ExpenseCategory): string => {
   return categoryNames[category] || category;
+};
+
+export const getSubcategoryName = (subcategories: Subcategory[], subcategoryId?: string): string => {
+  return subcategories.find((subcategory) => subcategory.id === subcategoryId)?.name || '';
 };

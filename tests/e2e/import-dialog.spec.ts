@@ -20,7 +20,8 @@ test.beforeEach(async ({ page }) => {
 test('dialog importu drží obsah uvnitř a nabízí obě akce', async ({ page }) => {
   await openHome(page);
 
-  await page.getByTestId('app-header').getByRole('button', { name: 'Import' }).click();
+  await page.getByTestId('app-header').getByRole('button', { name: /Import a export/i }).click();
+  await page.getByRole('menuitem', { name: 'Import' }).click();
 
   const dialog = page.getByTestId('import-dialog');
   await expect(dialog).toBeVisible();

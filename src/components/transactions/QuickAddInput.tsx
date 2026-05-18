@@ -2,7 +2,7 @@ import { KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Sparkles, WandSparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Transaction, TransactionDraft } from '@/types/finance';
+import { TouchedFields, Transaction, TransactionDraft } from '@/types/finance';
 import {
   applySuggestionToDraft,
   buildTransactionHistoryIndex,
@@ -16,11 +16,12 @@ interface QuickAddInputProps {
   month: string;
   transactions: Transaction[];
   resolveAccountLabel: (accountId?: string) => string;
+  enrichDraft: (draft: TransactionDraft, touchedFields?: TouchedFields) => TransactionDraft;
   onCreateDraft: (draft: TransactionDraft) => void;
   onSaveDraft: (draft: TransactionDraft) => void;
 }
 
-export const QuickAddInput = ({ month, transactions, resolveAccountLabel, onCreateDraft, onSaveDraft }: QuickAddInputProps) => {
+export const QuickAddInput = ({ month, transactions, resolveAccountLabel, enrichDraft, onCreateDraft, onSaveDraft }: QuickAddInputProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [value, setValue] = useState('');
@@ -47,11 +48,12 @@ export const QuickAddInput = ({ month, transactions, resolveAccountLabel, onCrea
   const submitDraft = (forceSave: boolean) => {
     const baseDraft = parseQuickAdd(value, month);
     const topSuggestion = suggestions[0];
-    const enrichedDraft = topSuggestion
+    const suggestedDraft = topSuggestion
       ? applySuggestionToDraft(baseDraft, topSuggestion, {
           name: true,
         })
       : baseDraft;
+    const enrichedDraft = enrichDraft(suggestedDraft, { name: true, amount: !!suggestedDraft.amount });
 
     const errors = validateTransactionDraft(enrichedDraft);
 
@@ -96,7 +98,10 @@ export const QuickAddInput = ({ month, transactions, resolveAccountLabel, onCrea
       event.preventDefault();
       if (suggestions.length > 0 && isAutocompleteOpen && activeIndex >= 0 && !event.ctrlKey) {
         const suggestion = suggestions[activeIndex];
-        const draft = applySuggestionToDraft(parseQuickAdd(value, month), suggestion, { name: true });
+        const draft = enrichDraft(
+          applySuggestionToDraft(parseQuickAdd(value, month), suggestion, { name: true }),
+          { name: true }
+        );
         onCreateDraft(draft);
         setValue('');
         setIsAutocompleteOpen(false);
@@ -150,7 +155,10 @@ export const QuickAddInput = ({ month, transactions, resolveAccountLabel, onCrea
           resolveAccountLabel={resolveAccountLabel}
           onHover={setActiveIndex}
           onSelect={(suggestion) => {
-            const draft = applySuggestionToDraft(parseQuickAdd(value, month), suggestion, { name: true });
+            const draft = enrichDraft(
+              applySuggestionToDraft(parseQuickAdd(value, month), suggestion, { name: true }),
+              { name: true }
+            );
             onCreateDraft(draft);
             setValue('');
             setIsAutocompleteOpen(false);

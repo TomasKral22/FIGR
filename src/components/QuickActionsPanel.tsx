@@ -1,4 +1,4 @@
-import { CalendarCheck2, Goal, PlusCircle, RefreshCw, ScrollText, TrendingUp } from 'lucide-react';
+import { CalendarCheck2, FolderTree, Goal, PlusCircle, RefreshCw, ScrollText, TrendingUp } from 'lucide-react';
 
 interface QuickActionsPanelProps {
   onAddTransaction: () => void;
@@ -7,6 +7,7 @@ interface QuickActionsPanelProps {
   onOpenGoals: () => void;
   onOpenReports: () => void;
   onOpenMonthWorkflow: () => void;
+  onOpenCategories: () => void;
 }
 
 export const QuickActionsPanel = ({
@@ -16,6 +17,7 @@ export const QuickActionsPanel = ({
   onOpenGoals,
   onOpenReports,
   onOpenMonthWorkflow,
+  onOpenCategories,
 }: QuickActionsPanelProps) => {
   const actions = [
     {
@@ -49,6 +51,12 @@ export const QuickActionsPanel = ({
       onClick: onOpenGoals,
     },
     {
+      label: 'Podkategorie',
+      description: 'Správa podkategorií a automatických pravidel.',
+      icon: FolderTree,
+      onClick: onOpenCategories,
+    },
+    {
       label: 'Reporty',
       description: 'Roční i historická analýza.',
       icon: ScrollText,
@@ -60,7 +68,9 @@ export const QuickActionsPanel = ({
     <section className="panel-card">
       <div className="section-header mb-5">
         <h2 className="text-section">Rychlé akce</h2>
-        <p className="section-description">Hlavní kroky jsou soustředěné na jednom místě. Každá karta je přímo akce bez zbytečných sekundárních tlačítek.</p>
+        <p className="section-description">
+          Hlavní kroky jsou soustředěné na jednom místě. Každá karta je přímo akce bez zbytečných sekundárních tlačítek.
+        </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

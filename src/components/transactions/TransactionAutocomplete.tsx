@@ -1,12 +1,13 @@
+import { TransactionSuggestion } from '@/types/finance';
 import { cn } from '@/lib/utils';
 import { formatCurrencyCZK, getCategoryLabel, getTransactionTypeLabel } from '@/utils/transactionWorkflow';
-import { TransactionSuggestion } from '@/types/finance';
 
 interface TransactionAutocompleteProps {
   isOpen: boolean;
   suggestions: TransactionSuggestion[];
   activeIndex: number;
   resolveAccountLabel: (accountId?: string) => string;
+  resolveSubcategoryLabel?: (subcategoryId?: string) => string;
   onSelect: (suggestion: TransactionSuggestion) => void;
   onHover: (index: number) => void;
 }
@@ -16,6 +17,7 @@ export const TransactionAutocomplete = ({
   suggestions,
   activeIndex,
   resolveAccountLabel,
+  resolveSubcategoryLabel,
   onSelect,
   onHover,
 }: TransactionAutocompleteProps) => {
@@ -34,6 +36,7 @@ export const TransactionAutocomplete = ({
                   .filter(Boolean)
                   .join(' → ')
               : resolveAccountLabel(suggestion.account || suggestion.sourceAccount || suggestion.investmentAccount);
+          const subcategorySummary = resolveSubcategoryLabel?.(suggestion.subcategoryId);
 
           return (
             <button
@@ -51,6 +54,7 @@ export const TransactionAutocomplete = ({
               <span className="text-xs text-muted-foreground">
                 {getTransactionTypeLabel(suggestion.type || 'expense')}
                 {suggestion.category ? ` · ${getCategoryLabel(suggestion.category)}` : ''}
+                {subcategorySummary ? ` · ${subcategorySummary}` : ''}
                 {accountSummary ? ` · ${accountSummary}` : ''}
                 {suggestion.lastAmount ? ` · naposledy ${formatCurrencyCZK(suggestion.lastAmount)}` : ''}
               </span>

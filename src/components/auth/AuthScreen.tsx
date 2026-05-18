@@ -63,7 +63,7 @@ export const AuthScreen = ({ visualTheme, initialError = null }: AuthScreenProps
         );
       } else {
         await resetPassword(email.trim());
-        setMessage('Na e-mail byl odeslán odkaz pro obnovu hesla.');
+        setMessage('Na e-mail byl odeslán odkaz pro nastavení nového hesla.');
       }
     } catch (error: unknown) {
       setErrorMessage(getErrorMessage(error));
@@ -91,7 +91,7 @@ export const AuthScreen = ({ visualTheme, initialError = null }: AuthScreenProps
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="signin">Přihlášení</TabsTrigger>
               <TabsTrigger value="signup">Registrace</TabsTrigger>
-              <TabsTrigger value="reset">Obnova</TabsTrigger>
+              <TabsTrigger value="reset">Změna hesla</TabsTrigger>
             </TabsList>
 
             <form onSubmit={handleSubmit} className="mt-5 space-y-4">
@@ -99,11 +99,22 @@ export const AuthScreen = ({ visualTheme, initialError = null }: AuthScreenProps
                 <p className="text-sm text-muted-foreground">
                   Přihlas se e-mailem a heslem. Lokální data se při prvním přihlášení použijí jako základ pro cloudovou synchronizaci.
                 </p>
+                <button
+                  type="button"
+                  className="text-sm font-medium text-primary hover:underline"
+                  onClick={() => {
+                    setActiveTab('reset');
+                    setMessage(null);
+                    setErrorMessage(null);
+                  }}
+                >
+                  Zapomněl jsem heslo / změnit heslo
+                </button>
               </TabsContent>
 
               <TabsContent value="signup" className="mt-0 space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Vytvoř nový účet. Pro produkční provoz bude potřeba nakonfigurovat vlastní SMTP v Supabase.
+                  Vytvoř nový účet. Pro běžný provoz je potřeba nakonfigurovat vlastní SMTP v Supabase.
                 </p>
               </TabsContent>
 
@@ -111,6 +122,17 @@ export const AuthScreen = ({ visualTheme, initialError = null }: AuthScreenProps
                 <p className="text-sm text-muted-foreground">
                   Zadej e-mail a aplikace odešle odkaz pro nastavení nového hesla.
                 </p>
+                <button
+                  type="button"
+                  className="text-sm font-medium text-primary hover:underline"
+                  onClick={() => {
+                    setActiveTab('signin');
+                    setMessage(null);
+                    setErrorMessage(null);
+                  }}
+                >
+                  Zpět na přihlášení
+                </button>
               </TabsContent>
 
               <div className="space-y-2">
@@ -148,12 +170,18 @@ export const AuthScreen = ({ visualTheme, initialError = null }: AuthScreenProps
                 </div>
               )}
 
-              {message && <div className="rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">{message}</div>}
-              {errorMessage && (
+              {message ? <div className="rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">{message}</div> : null}
+              {errorMessage ? (
                 <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                   {errorMessage}
                 </div>
-              )}
+              ) : null}
+
+              {activeTab === 'signup' ? (
+                <div className="rounded-lg border border-border/70 bg-card/60 px-3 py-2 text-xs text-muted-foreground">
+                  Pokud registrace skončí chybou při odesílání potvrzovacího e-mailu, problém je obvykle v SMTP nastavení Supabase. Výchozí Supabase SMTP má přísné limity a není vhodné pro běžný provoz.
+                </div>
+              ) : null}
 
               <Button type="submit" className="w-full" disabled={submitting}>
                 {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}

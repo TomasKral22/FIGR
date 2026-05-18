@@ -3,7 +3,16 @@ import { CopyPlus, Paperclip, Plus, Rows3, Save, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { BulkTransactionRow, ExpenseCategory, TransactionDraft, TransactionSuggestion, TransferCategory } from '@/types/finance';
+import {
+  BulkTransactionRow,
+  ExpenseCategory,
+  Subcategory,
+  TouchedFields,
+  TransactionDraft,
+  TransactionSuggestion,
+  TransferCategory,
+} from '@/types/finance';
+import { getSubcategoriesForCategory } from '@/utils/categoryAutomation';
 import {
   applySuggestionToDraft,
   createBulkRow,
@@ -25,13 +34,27 @@ interface BulkTransactionTableProps {
   onRowsChange: (rows: BulkTransactionRow[]) => void;
   accountOptions: AccountOption[];
   suggestionsMap: Map<string, TransactionSuggestion>;
+  subcategories: Subcategory[];
+  enrichDraft: (draft: TransactionDraft, touchedFields?: TouchedFields) => TransactionDraft;
   onSaveRows: (rows: BulkTransactionRow[]) => void;
 }
 
 const GRID_TEMPLATE =
-  'minmax(220px,2.2fr) minmax(110px,1fr) minmax(130px,1fr) minmax(170px,1.2fr) minmax(170px,1.2fr) minmax(150px,1fr) minmax(120px,0.9fr) minmax(170px,1.2fr) minmax(110px,0.8fr) 96px';
+  'minmax(220px,2.2fr) minmax(110px,1fr) minmax(130px,1fr) minmax(170px,1.2fr) minmax(170px,1.2fr) minmax(150px,1fr) minmax(150px,1fr) minmax(120px,0.9fr) minmax(170px,1.2fr) minmax(110px,0.8fr) 96px';
 
-const HEADER_LABELS = ['Název transakce', 'Částka', 'Typ', 'Zdrojový účet', 'Cílový účet', 'Druh / Kategorie', 'Datum', 'Poznámka', 'Příloha', 'Akce'];
+const HEADER_LABELS = [
+  'Název transakce',
+  'Částka',
+  'Typ',
+  'Zdrojový účet',
+  'Cílový účet',
+  'Druh / Kategorie',
+  'Podkategorie',
+  'Datum',
+  'Poznámka',
+  'Příloha',
+  'Akce',
+];
 
 const normalizeAmount = (value: string) => {
   const amount = parseAmount(value);
@@ -58,12 +81,19 @@ const getTargetValue = (draft: TransactionDraft) => {
   return '';
 };
 
+const getEffectiveCategory = (draft: TransactionDraft): ExpenseCategory => {
+  if (draft.type === 'investment') return 'investments';
+  return draft.category || 'necessities';
+};
+
 export const BulkTransactionTable = ({
   month,
   rows,
   onRowsChange,
   accountOptions,
   suggestionsMap,
+  subcategories,
+  enrichDraft,
   onSaveRows,
 }: BulkTransactionTableProps) => {
   const isMobile = useIsMobile();
@@ -86,13 +116,24 @@ export const BulkTransactionTable = ({
     target?.focus();
   };
 
-  const updateRowDraft = (rowId: string, patch: Partial<TransactionDraft>) => {
+  const updateRowDraft = (
+    rowId: string,
+    patch: Partial<TransactionDraft>,
+    touchedFields: TouchedFields = {}
+  ) => {
     emitRows(
       visibleRows.map((row) => {
         if (row.id !== rowId) return row;
+        const nextDraft = enrichDraft(
+          {
+            ...row.draft,
+            ...patch,
+          },
+          touchedFields
+        );
         return {
           ...row,
-          draft: { ...row.draft, ...patch },
+          draft: nextDraft,
         };
       })
     );
@@ -138,9 +179,10 @@ export const BulkTransactionTable = ({
     emitRows(
       pastedDrafts.map((draft) => {
         const topSuggestion = getTransactionSuggestions(draft.name, suggestionsMap)[0];
-        const enrichedDraft = topSuggestion
+        const suggestedDraft = topSuggestion
           ? applySuggestionToDraft(draft, topSuggestion, { name: true, amount: !!draft.amount })
           : draft;
+        const enrichedDraft = enrichDraft(suggestedDraft, { name: true, amount: !!draft.amount });
 
         return {
           id: crypto.randomUUID(),
@@ -162,24 +204,24 @@ export const BulkTransactionTable = ({
   const handleSourceChange = (row: BulkTransactionRow, value: string) => {
     const nextValue = value || undefined;
     if (row.draft.type === 'expense') {
-      updateRowDraft(row.id, { account: nextValue });
+      updateRowDraft(row.id, { account: nextValue }, { account: true });
       return;
     }
-    updateRowDraft(row.id, { sourceAccount: nextValue });
+    updateRowDraft(row.id, { sourceAccount: nextValue }, { sourceAccount: true });
   };
 
   const handleTargetChange = (row: BulkTransactionRow, value: string) => {
     const nextValue = value || undefined;
     if (row.draft.type === 'income') {
-      updateRowDraft(row.id, { account: nextValue });
+      updateRowDraft(row.id, { account: nextValue }, { account: true });
       return;
     }
     if (row.draft.type === 'transfer') {
-      updateRowDraft(row.id, { transferAccount: nextValue });
+      updateRowDraft(row.id, { transferAccount: nextValue }, { transferAccount: true });
       return;
     }
     if (row.draft.type === 'investment') {
-      updateRowDraft(row.id, { investmentAccount: nextValue });
+      updateRowDraft(row.id, { investmentAccount: nextValue }, { investmentAccount: true });
     }
   };
 
@@ -290,6 +332,8 @@ export const BulkTransactionTable = ({
             {validatedRows.map((row, rowIndex) => {
               const draft = row.draft;
               const rowErrors = Object.values(row.errors).filter(Boolean);
+              const currentCategory = getEffectiveCategory(draft);
+              const currentSubcategories = getSubcategoriesForCategory(subcategories, currentCategory);
 
               return (
                 <div key={row.id} className={`rounded-xl border p-3 ${row.isValid ? 'border-border bg-card/80' : 'border-destructive/40 bg-destructive/10'}`}>
@@ -304,17 +348,17 @@ export const BulkTransactionTable = ({
                   <div className="space-y-3">
                     <div className="space-y-1">
                       <label className="text-xs text-muted-foreground">Název transakce</label>
-                      <Input value={draft.name} onChange={(event) => updateRowDraft(row.id, { name: event.target.value })} />
+                      <Input value={draft.name} onChange={(event) => updateRowDraft(row.id, { name: event.target.value }, { name: true })} />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs text-muted-foreground">Částka</label>
-                      <Input value={draft.amount ?? ''} onChange={(event) => updateRowDraft(row.id, { amount: normalizeAmount(event.target.value) })} />
+                      <Input value={draft.amount ?? ''} onChange={(event) => updateRowDraft(row.id, { amount: normalizeAmount(event.target.value) }, { amount: true })} />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs text-muted-foreground">Typ</label>
                       <select
                         value={draft.type}
-                        onChange={(event) => updateRowDraft(row.id, { type: event.target.value as TransactionDraft['type'] })}
+                        onChange={(event) => updateRowDraft(row.id, { type: event.target.value as TransactionDraft['type'] }, { type: true })}
                         className="h-10 w-full rounded-[var(--radius-control)] border border-input bg-card px-3 text-sm outline-none"
                       >
                         <option value="expense">Výdaj</option>
@@ -354,7 +398,7 @@ export const BulkTransactionTable = ({
                       {draft.type === 'transfer' ? (
                         <select
                           value={categoryValue(draft)}
-                          onChange={(event) => updateRowDraft(row.id, { transferCategory: event.target.value as TransferCategory })}
+                          onChange={(event) => updateRowDraft(row.id, { transferCategory: event.target.value as TransferCategory }, { transferCategory: true })}
                           className="h-10 w-full rounded-[var(--radius-control)] border border-input bg-card px-3 text-sm outline-none"
                         >
                           <option value="transfer">Převod mezi účty</option>
@@ -363,25 +407,63 @@ export const BulkTransactionTable = ({
                       ) : (
                         <select
                           value={categoryValue(draft)}
-                          onChange={(event) => updateRowDraft(row.id, { category: event.target.value as ExpenseCategory })}
+                          onChange={(event) =>
+                            updateRowDraft(
+                              row.id,
+                              {
+                                category: event.target.value as ExpenseCategory,
+                                subcategoryId: undefined,
+                                autoAssigned: false,
+                                ruleId: undefined,
+                              },
+                              { category: true }
+                            )
+                          }
                           disabled={draft.type === 'investment'}
                           className="h-10 w-full rounded-[var(--radius-control)] border border-input bg-card px-3 text-sm outline-none"
                         >
                           <option value="necessities">Nutnosti</option>
                           <option value="investments">Investice</option>
                           <option value="savings">Spoření</option>
-                          <option value="whims">Kraviny</option>
+                          <option value="whims">Rozmary</option>
                           <option value="selfInvestment">Investice do sebe</option>
                         </select>
                       )}
                     </div>
+                    {(draft.type === 'expense' || draft.type === 'investment') && (
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Podkategorie</label>
+                        <select
+                          value={draft.subcategoryId || ''}
+                          onChange={(event) =>
+                            updateRowDraft(
+                              row.id,
+                              {
+                                subcategoryId: event.target.value || undefined,
+                                autoAssigned: false,
+                                ruleId: undefined,
+                              },
+                              { subcategoryId: true }
+                            )
+                          }
+                          className="h-10 w-full rounded-[var(--radius-control)] border border-input bg-card px-3 text-sm outline-none"
+                        >
+                          <option value="">Bez podkategorie</option>
+                          {currentSubcategories.map((subcategory) => (
+                            <option key={subcategory.id} value={subcategory.id}>
+                              {subcategory.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                     <div className="space-y-1">
                       <label className="text-xs text-muted-foreground">Datum / měsíc</label>
-                      <Input value={draft.month || month} onChange={(event) => updateRowDraft(row.id, { month: event.target.value })} />
+                      <Input value={draft.month || month} onChange={(event) => updateRowDraft(row.id, { month: event.target.value }, { month: true })} />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs text-muted-foreground">Poznámka</label>
-                      <Input value={draft.note || ''} onChange={(event) => updateRowDraft(row.id, { note: event.target.value })} />
+                      <Input value={draft.note || ''} onChange={(event) => updateRowDraft(row.id, { note: event.target.value }, { note: true })} />
                     </div>
                   </div>
                 </div>
@@ -390,7 +472,7 @@ export const BulkTransactionTable = ({
           </div>
         ) : (
           <div className="thin-scrollbar overflow-x-auto">
-            <div ref={gridRef} className="min-w-[1560px]">
+            <div ref={gridRef} className="min-w-[1710px]">
               <div
                 data-testid="bulk-table-header"
                 className="grid gap-px bg-border/60 text-xs font-semibold text-muted-foreground"
@@ -407,13 +489,15 @@ export const BulkTransactionTable = ({
                 {validatedRows.map((row, rowIndex) => {
                   const rowErrors = Object.values(row.errors).filter(Boolean);
                   const draft = row.draft;
+                  const currentCategory = getEffectiveCategory(draft);
+                  const currentSubcategories = getSubcategoriesForCategory(subcategories, currentCategory);
 
                   return (
                     <div key={row.id} className="border-t border-border/60 first:border-t-0">
                       <div className={`grid gap-px ${row.isValid ? 'bg-border/20' : 'bg-destructive/15'}`} style={{ gridTemplateColumns: GRID_TEMPLATE }}>
-                        <Input data-row={rowIndex} data-col={0} value={draft.name} onFocus={() => setActiveCell({ row: rowIndex, col: 0 })} onChange={(event) => updateRowDraft(row.id, { name: event.target.value })} onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 0)} className={cellClass(rowIndex, 0)} />
-                        <Input data-row={rowIndex} data-col={1} value={draft.amount ?? ''} onFocus={() => setActiveCell({ row: rowIndex, col: 1 })} onChange={(event) => updateRowDraft(row.id, { amount: normalizeAmount(event.target.value) })} onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 1)} className={cellClass(rowIndex, 1)} />
-                        <select data-row={rowIndex} data-col={2} value={draft.type} onFocus={() => setActiveCell({ row: rowIndex, col: 2 })} onChange={(event) => updateRowDraft(row.id, { type: event.target.value as TransactionDraft['type'] })} onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 2)} className={`h-10 bg-card px-3 text-sm outline-none ${cellClass(rowIndex, 2)}`}>
+                        <Input data-row={rowIndex} data-col={0} value={draft.name} onFocus={() => setActiveCell({ row: rowIndex, col: 0 })} onChange={(event) => updateRowDraft(row.id, { name: event.target.value }, { name: true })} onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 0)} className={cellClass(rowIndex, 0)} />
+                        <Input data-row={rowIndex} data-col={1} value={draft.amount ?? ''} onFocus={() => setActiveCell({ row: rowIndex, col: 1 })} onChange={(event) => updateRowDraft(row.id, { amount: normalizeAmount(event.target.value) }, { amount: true })} onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 1)} className={cellClass(rowIndex, 1)} />
+                        <select data-row={rowIndex} data-col={2} value={draft.type} onFocus={() => setActiveCell({ row: rowIndex, col: 2 })} onChange={(event) => updateRowDraft(row.id, { type: event.target.value as TransactionDraft['type'] }, { type: true })} onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 2)} className={`h-10 bg-card px-3 text-sm outline-none ${cellClass(rowIndex, 2)}`}>
                           <option value="expense">Výdaj</option>
                           <option value="income">Příjem</option>
                           <option value="transfer">Převod</option>
@@ -432,22 +516,69 @@ export const BulkTransactionTable = ({
                           ))}
                         </select>
                         {draft.type === 'transfer' ? (
-                          <select data-row={rowIndex} data-col={5} value={categoryValue(draft)} onFocus={() => setActiveCell({ row: rowIndex, col: 5 })} onChange={(event) => updateRowDraft(row.id, { transferCategory: event.target.value as TransferCategory })} onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 5)} className={`h-10 bg-card px-3 text-sm outline-none ${cellClass(rowIndex, 5)}`}>
+                          <select data-row={rowIndex} data-col={5} value={categoryValue(draft)} onFocus={() => setActiveCell({ row: rowIndex, col: 5 })} onChange={(event) => updateRowDraft(row.id, { transferCategory: event.target.value as TransferCategory }, { transferCategory: true })} onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 5)} className={`h-10 bg-card px-3 text-sm outline-none ${cellClass(rowIndex, 5)}`}>
                             <option value="transfer">Převod mezi účty</option>
                             <option value="savings">Spoření</option>
                           </select>
                         ) : (
-                          <select data-row={rowIndex} data-col={5} value={categoryValue(draft)} onFocus={() => setActiveCell({ row: rowIndex, col: 5 })} onChange={(event) => updateRowDraft(row.id, { category: event.target.value as ExpenseCategory })} onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 5)} disabled={draft.type === 'investment'} className={`h-10 bg-card px-3 text-sm outline-none ${cellClass(rowIndex, 5)}`}>
+                          <select
+                            data-row={rowIndex}
+                            data-col={5}
+                            value={categoryValue(draft)}
+                            onFocus={() => setActiveCell({ row: rowIndex, col: 5 })}
+                            onChange={(event) =>
+                              updateRowDraft(
+                                row.id,
+                                {
+                                  category: event.target.value as ExpenseCategory,
+                                  subcategoryId: undefined,
+                                  autoAssigned: false,
+                                  ruleId: undefined,
+                                },
+                                { category: true }
+                              )
+                            }
+                            onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 5)}
+                            disabled={draft.type === 'investment'}
+                            className={`h-10 bg-card px-3 text-sm outline-none ${cellClass(rowIndex, 5)}`}
+                          >
                             <option value="necessities">Nutnosti</option>
                             <option value="investments">Investice</option>
                             <option value="savings">Spoření</option>
-                            <option value="whims">Kraviny</option>
+                            <option value="whims">Rozmary</option>
                             <option value="selfInvestment">Investice do sebe</option>
                           </select>
                         )}
-                        <Input data-row={rowIndex} data-col={6} value={draft.month || month} onFocus={() => setActiveCell({ row: rowIndex, col: 6 })} onChange={(event) => updateRowDraft(row.id, { month: event.target.value })} onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 6)} className={cellClass(rowIndex, 6)} />
-                        <Input data-row={rowIndex} data-col={7} value={draft.note || ''} onFocus={() => setActiveCell({ row: rowIndex, col: 7 })} onChange={(event) => updateRowDraft(row.id, { note: event.target.value })} onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 7)} className={cellClass(rowIndex, 7)} />
-                        <div className={`flex items-center justify-center bg-card px-3 ${activeCell?.row === rowIndex && activeCell?.col === 8 ? 'bulk-cell-active' : 'bulk-cell'}`}>
+                        <select
+                          data-row={rowIndex}
+                          data-col={6}
+                          value={draft.subcategoryId || ''}
+                          onFocus={() => setActiveCell({ row: rowIndex, col: 6 })}
+                          onChange={(event) =>
+                            updateRowDraft(
+                              row.id,
+                              {
+                                subcategoryId: event.target.value || undefined,
+                                autoAssigned: false,
+                                ruleId: undefined,
+                              },
+                              { subcategoryId: true }
+                            )
+                          }
+                          onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 6)}
+                          disabled={draft.type === 'income' || draft.type === 'transfer'}
+                          className={`h-10 bg-card px-3 text-sm outline-none ${cellClass(rowIndex, 6)}`}
+                        >
+                          <option value="">Bez podkategorie</option>
+                          {currentSubcategories.map((subcategory) => (
+                            <option key={subcategory.id} value={subcategory.id}>
+                              {subcategory.name}
+                            </option>
+                          ))}
+                        </select>
+                        <Input data-row={rowIndex} data-col={7} value={draft.month || month} onFocus={() => setActiveCell({ row: rowIndex, col: 7 })} onChange={(event) => updateRowDraft(row.id, { month: event.target.value }, { month: true })} onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 7)} className={cellClass(rowIndex, 7)} />
+                        <Input data-row={rowIndex} data-col={8} value={draft.note || ''} onFocus={() => setActiveCell({ row: rowIndex, col: 8 })} onChange={(event) => updateRowDraft(row.id, { note: event.target.value }, { note: true })} onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 8)} className={cellClass(rowIndex, 8)} />
+                        <div className={`flex items-center justify-center bg-card px-3 ${activeCell?.row === rowIndex && activeCell?.col === 9 ? 'bulk-cell-active' : 'bulk-cell'}`}>
                           <Paperclip className="h-4 w-4 text-muted-foreground" />
                         </div>
                         {renderActions(rowIndex)}

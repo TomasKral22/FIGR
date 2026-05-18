@@ -1,4 +1,4 @@
-import { BarChart3, ClipboardList, Goal, Home, RefreshCw, TrendingUp } from 'lucide-react';
+import { BarChart3, ClipboardList, FolderTree, Goal, Home, RefreshCw, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export type SidebarItemId =
@@ -6,6 +6,7 @@ export type SidebarItemId =
   | 'recurring'
   | 'investments'
   | 'goals'
+  | 'categories'
   | 'analytics';
 
 interface SidebarProps {
@@ -15,6 +16,7 @@ interface SidebarProps {
   onOpenRecurring: () => void;
   onOpenInvestments: () => void;
   onOpenGoals: () => void;
+  onOpenCategories: () => void;
   onOpenAudit: () => void;
 }
 
@@ -27,6 +29,7 @@ export const Sidebar = ({
   onOpenRecurring,
   onOpenInvestments,
   onOpenGoals,
+  onOpenCategories,
   onOpenAudit,
 }: SidebarProps) => {
   return (
@@ -52,6 +55,10 @@ export const Sidebar = ({
           <Button variant="ghost" className={navButtonClass} onClick={onOpenGoals}>
             <Goal className="h-4 w-4" />
             <span>Cíle</span>
+          </Button>
+          <Button variant="ghost" className={navButtonClass} onClick={onOpenCategories}>
+            <FolderTree className="h-4 w-4" />
+            <span>Podkategorie</span>
           </Button>
           <Button variant="ghost" className={navButtonClass} onClick={onOpenRecurring}>
             <RefreshCw className="h-4 w-4" />

@@ -6,9 +6,12 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   AccountGoal,
+  AutoCategorizationRule,
   BankAccount,
   BulkTransactionRow,
   ExpenseCategory,
+  FinanceFeatureToggles,
+  Subcategory,
   Transaction,
   TransactionDraft,
   TransactionSuggestion,
@@ -18,6 +21,12 @@ import {
 } from '@/types/finance';
 import { useToast } from '@/hooks/use-toast';
 import { getCategoryName } from '@/utils/categoryNames';
+import {
+  autoCategorizeDraft,
+  clearInvalidSubcategory,
+  createRuleFromDraftAssignment,
+  getSubcategoriesForCategory,
+} from '@/utils/categoryAutomation';
 import {
   applySuggestionToDraft,
   buildTransactionHistoryIndex,
@@ -56,10 +65,17 @@ interface TransactionFormProps {
     goalImpact?: 'deposit' | 'withdrawal';
     note?: string;
     attachments?: Transaction['attachments'];
+    subcategoryId?: string;
+    autoAssigned?: boolean;
+    ruleId?: string;
   }) => void;
   bankAccounts: BankAccount[];
   brokerAccounts: BankAccount[];
   goals: AccountGoal[];
+  subcategories: Subcategory[];
+  autoCategorizationRules: AutoCategorizationRule[];
+  featureToggles: FinanceFeatureToggles;
+  onCreateAutoCategorizationRule: (rule: Omit<AutoCategorizationRule, 'id' | 'isSystem'>) => AutoCategorizationRule;
   transactions: Transaction[];
   getLastTransaction: () => {
     month?: string;
@@ -70,9 +86,12 @@ interface TransactionFormProps {
     transferAccount?: string;
     transferCategory?: TransferCategory;
     investmentAccount?: string;
+    subcategoryId?: string;
     includeInInvestmentTotals?: boolean;
     goalId?: string;
     goalImpact?: 'deposit' | 'withdrawal';
+    autoAssigned?: boolean;
+    ruleId?: string;
     note?: string;
     attachments?: Transaction['attachments'];
   } | null;
@@ -107,6 +126,10 @@ export const TransactionForm = ({
   bankAccounts,
   brokerAccounts,
   goals,
+  subcategories,
+  autoCategorizationRules,
+  featureToggles,
+  onCreateAutoCategorizationRule,
   transactions,
   getLastTransaction,
   onFillRecurringForMonth,
@@ -145,10 +168,29 @@ export const TransactionForm = ({
     () => getTransactionSuggestions(draft.name, historyIndex).slice(0, 6),
     [draft.name, historyIndex]
   );
+  const effectiveCategory = draft.type === 'investment' ? 'investments' : draft.category;
+  const availableSubcategories = useMemo(
+    () => getSubcategoriesForCategory(subcategories, effectiveCategory),
+    [effectiveCategory, subcategories]
+  );
   const monthLocked = draft.month ? isMonthClosed(draft.month) : false;
+  const existingUserRuleForDraft = useMemo(() => {
+    const normalizedName = draft.name.trim().toLowerCase();
+    if (!normalizedName || !effectiveCategory) return null;
+
+    return autoCategorizationRules.find(
+      (rule) =>
+        !rule.isSystem &&
+        rule.matchValue.trim().toLowerCase() === normalizedName &&
+        rule.targetCategory === effectiveCategory &&
+        (rule.targetSubcategoryId || '') === (draft.subcategoryId || '')
+    );
+  }, [autoCategorizationRules, draft.name, draft.subcategoryId, effectiveCategory]);
 
   const resolveAccountLabel = (accountId?: string) =>
     accountOptions.find((option) => option.id === accountId)?.label || '';
+  const resolveSubcategoryLabel = (subcategoryId?: string) =>
+    subcategories.find((subcategory) => subcategory.id === subcategoryId)?.name || '';
 
   const createBaseDraft = useCallback(() => {
     if (initialDraft) {
@@ -213,8 +255,32 @@ export const TransactionForm = ({
 
   useEffect(() => {
     if (!isOpen || isEditing || draft.name.trim().length < 2 || suggestions.length === 0) return;
-    setDraft((current) => applySuggestionToDraft(current, suggestions[0], touchedFields));
-  }, [draft.name, isEditing, isOpen, suggestions, touchedFields]);
+    setDraft((current) => clearInvalidSubcategory(applySuggestionToDraft(current, suggestions[0], touchedFields), subcategories));
+  }, [draft.name, isEditing, isOpen, subcategories, suggestions, touchedFields]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    setDraft((current) => {
+      const withAutoCategory = autoCategorizeDraft(current, {
+        rules: autoCategorizationRules,
+        featureToggles,
+        touchedFields,
+      });
+      const sanitized = clearInvalidSubcategory(withAutoCategory, subcategories);
+
+      if (
+        sanitized.category === current.category &&
+        sanitized.subcategoryId === current.subcategoryId &&
+        sanitized.autoAssigned === current.autoAssigned &&
+        sanitized.ruleId === current.ruleId
+      ) {
+        return current;
+      }
+
+      return sanitized;
+    });
+  }, [autoCategorizationRules, draft.name, draft.note, draft.type, featureToggles, isOpen, subcategories, touchedFields]);
 
   useEffect(() => {
     if (mode === 'bulk' && panelSize === 'default') {
@@ -241,10 +307,37 @@ export const TransactionForm = ({
   };
 
   const updateDraft = (patch: Partial<TransactionDraft>, touchedField?: keyof TouchedFields) => {
-    setDraft((current) => ({ ...current, ...patch }));
+    setDraft((current) => clearInvalidSubcategory({ ...current, ...patch }, subcategories));
     setIsDirty(true);
     if (touchedField) markTouched(touchedField);
   };
+
+  const enrichDraft = useCallback(
+    (candidate: TransactionDraft, localTouchedFields: TouchedFields = {}) => {
+      const mergedTouchedFields = {
+        ...touchedFields,
+        ...localTouchedFields,
+      };
+
+      let nextDraft = candidate;
+
+      if (featureToggles.smartSuggestions && candidate.name.trim().length > 1) {
+        const topSuggestion = getTransactionSuggestions(candidate.name, historyIndex)[0];
+        if (topSuggestion) {
+          nextDraft = applySuggestionToDraft(nextDraft, topSuggestion, mergedTouchedFields);
+        }
+      }
+
+      nextDraft = autoCategorizeDraft(nextDraft, {
+        rules: autoCategorizationRules,
+        featureToggles,
+        touchedFields: mergedTouchedFields,
+      });
+
+      return clearInvalidSubcategory(nextDraft, subcategories);
+    },
+    [autoCategorizationRules, featureToggles, historyIndex, subcategories, touchedFields]
+  );
 
   const handleFillRecurring = () => {
     if (!draft.month) return;
@@ -391,20 +484,25 @@ export const TransactionForm = ({
 
   const openDraftFromQuickAdd = (nextDraft: TransactionDraft) => {
     setMode('single');
+    const mergedDraft = {
+      ...draft,
+      ...nextDraft,
+      month: nextDraft.month || draft.month || currentMonthValue(),
+    };
     setDraft((current) => ({
       ...current,
       ...nextDraft,
       month: nextDraft.month || current.month || currentMonthValue(),
     }));
     setTouchedFields({});
-    setErrors(validateTransactionDraft({ ...draft, ...nextDraft }));
+    setErrors(validateTransactionDraft(mergedDraft));
     setIsDirty(true);
     requestAnimationFrame(() => nameInputRef.current?.focus());
   };
 
   const applySuggestion = (suggestion: TransactionSuggestion) => {
     setDraft((current) => ({
-      ...applySuggestionToDraft(current, suggestion, touchedFields),
+      ...clearInvalidSubcategory(applySuggestionToDraft(current, suggestion, touchedFields), subcategories),
       name: suggestion.name,
     }));
     setTouchedFields((current) => ({ ...current, name: true }));
@@ -413,6 +511,40 @@ export const TransactionForm = ({
     requestAnimationFrame(() => {
       const amountInput = document.getElementById('transaction-amount') as HTMLInputElement | null;
       amountInput?.focus();
+    });
+  };
+
+  const handleCreateRuleFromCurrentAssignment = () => {
+    const nextRule = createRuleFromDraftAssignment(
+      {
+        ...draft,
+        category: effectiveCategory,
+      },
+      `${draft.name.trim()} → ${getCategoryName(effectiveCategory || 'necessities')}`
+    );
+
+    if (!nextRule) return;
+
+    const createdRule = onCreateAutoCategorizationRule({
+      userId: nextRule.userId,
+      name: nextRule.name,
+      matchType: nextRule.matchType,
+      matchValue: nextRule.matchValue,
+      targetCategory: nextRule.targetCategory,
+      targetSubcategoryId: nextRule.targetSubcategoryId,
+      priority: nextRule.priority,
+      isEnabled: nextRule.isEnabled,
+    });
+
+    setDraft((current) => ({
+      ...current,
+      autoAssigned: true,
+      ruleId: createdRule.id,
+    }));
+
+    toast({
+      title: 'Pravidlo uloženo',
+      description: 'Toto zařazení se použije i příště.',
     });
   };
 
@@ -595,6 +727,7 @@ export const TransactionForm = ({
                       suggestions={suggestions}
                       activeIndex={autocompleteIndex}
                       resolveAccountLabel={resolveAccountLabel}
+                      resolveSubcategoryLabel={resolveSubcategoryLabel}
                       onHover={setAutocompleteIndex}
                       onSelect={applySuggestion}
                     />
@@ -624,6 +757,29 @@ export const TransactionForm = ({
                       Poslední podobný záznam byl {suggestions[0].lastUsedAt?.slice(0, 10)} a systém podle něj
                       doplňuje typ, účty a kategorii jen do netouched polí.
                     </p>
+                  </div>
+                )}
+
+                {(draft.autoAssigned || draft.subcategoryId || existingUserRuleForDraft) && (
+                  <div className="rounded-xl border border-border/70 bg-card/60 p-3 text-sm">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="font-medium">Automatické zařazení</p>
+                        <p className="text-muted-foreground">
+                          {draft.autoAssigned
+                            ? 'Transakce byla předvyplněna podle pravidla nebo historie. Ruční změna se nepřepíše.'
+                            : 'Aktuální zařazení můžeš uložit jako nové pravidlo pro příště.'}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleCreateRuleFromCurrentAssignment}
+                        disabled={!draft.name.trim() || !effectiveCategory || !!existingUserRuleForDraft}
+                      >
+                        Používat toto zařazení příště
+                      </Button>
+                    </div>
                   </div>
                 )}
 
@@ -708,7 +864,17 @@ export const TransactionForm = ({
                       <select
                         id="transaction-category"
                         value={draft.type === 'investment' ? 'investments' : draft.category || 'necessities'}
-                        onChange={(event) => updateDraft({ category: event.target.value as ExpenseCategory }, 'category')}
+                        onChange={(event) =>
+                          updateDraft(
+                            {
+                              category: event.target.value as ExpenseCategory,
+                              subcategoryId: undefined,
+                              autoAssigned: false,
+                              ruleId: undefined,
+                            },
+                            'category'
+                          )
+                        }
                         className="h-10 w-full rounded-[var(--radius-control)] border border-input bg-card/70 px-3 text-sm"
                         disabled={draft.type === 'investment'}
                       >
@@ -719,6 +885,34 @@ export const TransactionForm = ({
                         <option value="selfInvestment">Investice do sebe</option>
                       </select>
                       {errors.category ? <p className="text-xs text-destructive">{errors.category}</p> : null}
+                    </div>
+                  )}
+
+                  {(draft.type === 'expense' || draft.type === 'investment') && (
+                    <div className="space-y-2">
+                      <Label htmlFor="transaction-subcategory">Podkategorie</Label>
+                      <select
+                        id="transaction-subcategory"
+                        value={draft.subcategoryId || ''}
+                        onChange={(event) =>
+                          updateDraft(
+                            {
+                              subcategoryId: event.target.value || undefined,
+                              autoAssigned: false,
+                              ruleId: undefined,
+                            },
+                            'subcategoryId'
+                          )
+                        }
+                        className="h-10 w-full rounded-[var(--radius-control)] border border-input bg-card/70 px-3 text-sm"
+                      >
+                        <option value="">Bez podkategorie</option>
+                        {availableSubcategories.map((subcategory) => (
+                          <option key={subcategory.id} value={subcategory.id}>
+                            {subcategory.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   )}
 
@@ -849,6 +1043,8 @@ export const TransactionForm = ({
                 }}
                 accountOptions={accountOptions}
                 suggestionsMap={historyIndex}
+                subcategories={subcategories}
+                enrichDraft={enrichDraft}
                 onSaveRows={submitBulkRows}
               />
             </TabsContent>
@@ -858,6 +1054,7 @@ export const TransactionForm = ({
                 month={draft.month || currentMonthValue()}
                 transactions={transactions}
                 resolveAccountLabel={resolveAccountLabel}
+                enrichDraft={enrichDraft}
                 onCreateDraft={openDraftFromQuickAdd}
                 onSaveDraft={(quickDraft) => {
                   if (persistDraft(quickDraft)) {

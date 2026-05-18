@@ -1,11 +1,14 @@
-import { AlertTriangle, BadgeCheck, Landmark, Sparkles, TrendingUp } from 'lucide-react';
-import { AccountMonthlySnapshot, MonthClosure, Transaction } from '@/types/finance';
+import { AlertTriangle, BadgeCheck, Landmark, TrendingUp } from 'lucide-react';
+import { AccountMonthlySnapshot, BudgetLimit, MonthClosure, Subcategory, Transaction } from '@/types/finance';
+import { getBudgetAlerts } from '@/utils/categoryAutomation';
 import { formatCurrency, formatMonth } from '@/utils/calculations';
 
 interface SmartInsightsPanelProps {
   transactions: Transaction[];
   accountSnapshots: AccountMonthlySnapshot[];
   monthClosures: MonthClosure[];
+  budgetLimits: BudgetLimit[];
+  subcategories: Subcategory[];
   selectedYear: string;
 }
 
@@ -13,6 +16,8 @@ export const SmartInsightsPanel = ({
   transactions,
   accountSnapshots,
   monthClosures,
+  budgetLimits,
+  subcategories,
   selectedYear,
 }: SmartInsightsPanelProps) => {
   const yearTransactions = transactions.filter((transaction) => transaction.month.startsWith(selectedYear));
@@ -28,17 +33,9 @@ export const SmartInsightsPanel = ({
       .map((transaction) => transaction.month)
   );
   const openMonths = months.filter((month) => !monthClosures.some((entry) => entry.month === month));
-  const duplicatedTransactions = yearTransactions.filter((candidate, index) => {
-    const normalizedName = candidate.name.trim().toLowerCase();
-    return yearTransactions.findIndex((transaction) =>
-      transaction.month === candidate.month &&
-      transaction.type === candidate.type &&
-      transaction.amount === candidate.amount &&
-      transaction.name.trim().toLowerCase() === normalizedName
-    ) !== index;
-  });
   const latestSnapshots = latestMonth ? accountSnapshots.filter((snapshot) => snapshot.month === latestMonth) : [];
   const richestAccount = latestSnapshots.slice().sort((a, b) => b.balance - a.balance)[0];
+  const budgetAlerts = latestMonth ? getBudgetAlerts(budgetLimits, yearTransactions, subcategories, latestMonth) : [];
 
   const insights = [
     latestMonth && latestMonthExpense
@@ -79,7 +76,19 @@ export const SmartInsightsPanel = ({
               : `${openMonths.length} měsíců ještě čeká na kontrolu.`,
         }
       : null,
-    
+    latestMonth && budgetAlerts[0]
+      ? {
+          icon: AlertTriangle,
+          tone:
+            budgetAlerts[0].level === 'critical'
+              ? 'text-destructive'
+              : budgetAlerts[0].level === 'exceeded'
+                ? 'text-warning'
+                : 'text-primary',
+          title: 'Rozpočtový limit',
+          description: `${budgetAlerts[0].subcategoryLabel ? `${budgetAlerts[0].categoryLabel} · ${budgetAlerts[0].subcategoryLabel}` : budgetAlerts[0].categoryLabel} je na ${Math.round(budgetAlerts[0].ratio * 100)} % limitu.`,
+        }
+      : null,
   ].filter(Boolean) as Array<{
     icon: typeof AlertTriangle;
     tone: string;
@@ -91,12 +100,16 @@ export const SmartInsightsPanel = ({
     <section className="panel-card">
       <div className="section-header mb-5">
         <h2 className="text-section">Chytré souvislosti</h2>
-        <p className="section-description">Sekundární signály nad daty. Tento panel zůstává vizuálně lehčí než hlavní finanční přehled.</p>
+        <p className="section-description">
+          Sekundární signály nad daty. Tento panel zůstává vizuálně lehčí než hlavní finanční přehled.
+        </p>
       </div>
 
       {insights.length === 0 ? (
         <div className="panel-card-muted">
-          <p className="text-sm text-muted-foreground">Další souvislosti se objeví, jakmile přibudou transakce, zůstatky a uzávěrky měsíců.</p>
+          <p className="text-sm text-muted-foreground">
+            Další souvislosti se objeví, jakmile přibudou transakce, zůstatky a uzávěrky měsíců.
+          </p>
         </div>
       ) : (
         <div className="insight-list">

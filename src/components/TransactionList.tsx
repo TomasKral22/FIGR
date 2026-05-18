@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AccountMonthlySnapshot, ExpenseCategory, MonthClosure, Transaction, TransactionDraft } from '@/types/finance';
+import { AccountMonthlySnapshot, ExpenseCategory, MonthClosure, Subcategory, Transaction, TransactionDraft } from '@/types/finance';
 import {
   formatCurrency,
   formatMonth,
@@ -35,6 +35,7 @@ interface TransactionListProps {
   transactions: Transaction[];
   accountSnapshots: AccountMonthlySnapshot[];
   selectedYear: string;
+  subcategories: Subcategory[];
   onDelete: (id: string) => void;
   onEdit: (transaction: Transaction) => void;
   onDuplicate: (transaction: Transaction) => void;
@@ -62,6 +63,7 @@ export const TransactionList = ({
   transactions,
   accountSnapshots,
   selectedYear,
+  subcategories,
   onDelete,
   onEdit,
   onDuplicate,
@@ -145,6 +147,7 @@ export const TransactionList = ({
     const haystack = [
       transaction.name,
       transaction.category ? getCategoryName(transaction.category) : '',
+      transaction.subcategoryId ? subcategories.find((subcategory) => subcategory.id === transaction.subcategoryId)?.name || '' : '',
       transaction.account ? accountLabelById.get(transaction.account) || '' : '',
       transaction.sourceAccount ? accountLabelById.get(transaction.sourceAccount) || '' : '',
       transaction.transferAccount ? accountLabelById.get(transaction.transferAccount) || '' : '',
@@ -153,7 +156,7 @@ export const TransactionList = ({
       .toLowerCase();
 
     return haystack.includes(normalizedSearch);
-  }, [accountFilter, accountLabelById, searchTerm, transactionFilter]);
+  }, [accountFilter, accountLabelById, searchTerm, subcategories, transactionFilter]);
 
   const visibleTransactions = useMemo(
     () => filteredTransactions.filter(transactionMatchesFilters),
@@ -277,6 +280,9 @@ export const TransactionList = ({
           <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             {accountLabel ? <span>{accountLabel}</span> : null}
             {transaction.category ? <span>{getCategoryName(transaction.category)}</span> : null}
+            {transaction.subcategoryId ? (
+              <span>{subcategories.find((subcategory) => subcategory.id === transaction.subcategoryId)?.name || ''}</span>
+            ) : null}
             {transaction.note ? <span>{transaction.note}</span> : null}
           </div>
         </div>

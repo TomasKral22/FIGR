@@ -21,6 +21,7 @@ import { VisualThemePanel } from '@/components/VisualThemePanel';
 import { GettingStartedPanel } from '@/components/GettingStartedPanel';
 import { QuickActionsPanel } from '@/components/QuickActionsPanel';
 import { SmartInsightsPanel } from '@/components/SmartInsightsPanel';
+import { CategoryAutomationPanel } from '@/components/CategoryAutomationPanel';
 import { Transaction, TransactionDraft } from '@/types/finance';
 import { draftToTransactionInput, duplicateTransaction } from '@/utils/transactionWorkflow';
 import { useAuth } from '@/contexts/AuthContext';
@@ -56,8 +57,23 @@ const Index = () => {
     wealthSnapshots,
     accountSnapshots,
     monthClosures,
+    subcategories,
+    autoCategorizationRules,
+    budgetLimits,
+    featureToggles,
     addGoal,
     deleteGoal,
+    addSubcategory,
+    updateSubcategory,
+    archiveSubcategory,
+    deleteSubcategory,
+    addAutoCategorizationRule,
+    updateAutoCategorizationRule,
+    deleteAutoCategorizationRule,
+    addBudgetLimit,
+    updateBudgetLimit,
+    deleteBudgetLimit,
+    updateFeatureToggles,
     updateAccountMonthBalance,
     isMonthClosed,
     toggleMonthClosure,
@@ -72,6 +88,7 @@ const Index = () => {
   const [isInvestmentsOpen, setIsInvestmentsOpen] = useState(false);
   const [isBackupManagerOpen, setIsBackupManagerOpen] = useState(false);
   const [isGoalsOpen, setIsGoalsOpen] = useState(false);
+  const [isCategoryAutomationOpen, setIsCategoryAutomationOpen] = useState(false);
   const [isAuditOpen, setIsAuditOpen] = useState(false);
   const [isVisualThemeOpen, setIsVisualThemeOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -91,6 +108,17 @@ const Index = () => {
     if (availableYears.includes(selectedYear)) return selectedYear;
     return availableYears[0];
   }, [availableYears, selectedYear]);
+
+  const activeBudgetMonth = useMemo(() => {
+    const currentMonth = `${effectiveSelectedYear}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+    const matchingMonths = transactions
+      .filter((transaction) => transaction.month.startsWith(effectiveSelectedYear))
+      .map((transaction) => transaction.month)
+      .sort();
+
+    if (matchingMonths.includes(currentMonth)) return currentMonth;
+    return matchingMonths[matchingMonths.length - 1] || `${effectiveSelectedYear}-01`;
+  }, [effectiveSelectedYear, transactions]);
 
   useEffect(() => {
     const isEditableElement = (target: EventTarget | null) => {
@@ -151,6 +179,7 @@ const Index = () => {
     onOpenRecurring: () => { setIsRecurringOpen(true); setIsMobileMenuOpen(false); },
     onOpenInvestments: () => { setIsInvestmentsOpen(true); setIsMobileMenuOpen(false); },
     onOpenGoals: () => { setIsGoalsOpen(true); setIsMobileMenuOpen(false); },
+    onOpenCategories: () => { setIsCategoryAutomationOpen(true); setIsMobileMenuOpen(false); },
     onOpenAudit: () => { setIsAuditOpen(true); setIsMobileMenuOpen(false); },
   };
 
@@ -229,6 +258,7 @@ const Index = () => {
                   onOpenRecurring={() => setIsRecurringOpen(true)}
                   onOpenInvestments={() => setIsInvestmentsOpen(true)}
                   onOpenGoals={() => setIsGoalsOpen(true)}
+                  onOpenCategories={() => setIsCategoryAutomationOpen(true)}
                   onOpenReports={() => setIsAnnualReportsOpen(true)}
                   onOpenMonthWorkflow={() => {
                     document.getElementById('month-workflow')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -238,6 +268,8 @@ const Index = () => {
                   transactions={transactions}
                   accountSnapshots={accountSnapshots}
                   monthClosures={monthClosures}
+                  budgetLimits={budgetLimits}
+                  subcategories={subcategories}
                   selectedYear={effectiveSelectedYear}
                 />
               </div>
@@ -257,6 +289,7 @@ const Index = () => {
             transactions={transactions} 
             accountSnapshots={accountSnapshots}
             selectedYear={effectiveSelectedYear}
+            subcategories={subcategories}
             onDelete={deleteTransaction}
             onEdit={(transaction) => {
               setEditingTransaction(transaction);
@@ -304,6 +337,10 @@ const Index = () => {
         bankAccounts={bankAccounts}
         brokerAccounts={brokerAccounts}
         goals={goals}
+        subcategories={subcategories}
+        autoCategorizationRules={autoCategorizationRules}
+        featureToggles={featureToggles}
+        onCreateAutoCategorizationRule={addAutoCategorizationRule}
         getLastTransaction={getLastTransaction}
         onFillRecurringForMonth={fillRecurringTransactions}
         initialTransaction={editingTransaction}
@@ -365,6 +402,28 @@ const Index = () => {
         bankAccounts={bankAccounts}
         onAddGoal={addGoal}
         onDeleteGoal={deleteGoal}
+      />
+
+      <CategoryAutomationPanel
+        isOpen={isCategoryAutomationOpen}
+        onClose={() => setIsCategoryAutomationOpen(false)}
+        subcategories={subcategories}
+        rules={autoCategorizationRules}
+        budgetLimits={budgetLimits}
+        featureToggles={featureToggles}
+        transactions={transactions}
+        activeMonth={activeBudgetMonth}
+        onAddSubcategory={addSubcategory}
+        onUpdateSubcategory={updateSubcategory}
+        onArchiveSubcategory={archiveSubcategory}
+        onDeleteSubcategory={deleteSubcategory}
+        onAddRule={addAutoCategorizationRule}
+        onUpdateRule={updateAutoCategorizationRule}
+        onDeleteRule={deleteAutoCategorizationRule}
+        onAddBudgetLimit={addBudgetLimit}
+        onUpdateBudgetLimit={updateBudgetLimit}
+        onDeleteBudgetLimit={deleteBudgetLimit}
+        onUpdateFeatureToggles={updateFeatureToggles}
       />
 
       <AuditLogPanel

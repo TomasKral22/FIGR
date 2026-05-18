@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   AccountGoal,
+  AutoCategorizationRule,
+  BudgetLimit,
+  FinanceFeatureToggles,
   ImportedAccountMonthBalance,
   AccountMonthlySnapshot,
   AuditLogEntry,
@@ -9,10 +12,16 @@ import {
   MonthClosure,
   PortfolioSettings,
   RecurringTransaction,
+  Subcategory,
   Transaction,
   WealthSnapshot,
 } from '@/types/finance';
 import { appStorage } from '@/lib/appStorage';
+import {
+  DEFAULT_FINANCE_FEATURE_TOGGLES,
+  mergeAutoCategorizationRules,
+  mergeSubcategories,
+} from '@/utils/categoryAutomation';
 
 const STORAGE_KEYS = {
   TRANSACTIONS: 'finance_transactions',
@@ -31,6 +40,10 @@ const STORAGE_KEYS = {
   IMPORTED_ACCOUNT_BALANCES: 'finance_imported_account_balances',
   VISUAL_THEME: 'finance_visual_theme',
   MONTH_CLOSURES: 'finance_month_closures',
+  SUBCATEGORIES: 'finance_subcategories',
+  AUTO_CATEGORIZATION_RULES: 'finance_auto_categorization_rules',
+  BUDGET_LIMITS: 'finance_budget_limits',
+  FEATURE_TOGGLES: 'finance_feature_toggles',
 };
 const DEFAULT_BUDGET: BudgetAllocation = {
   necessities: 50,
@@ -78,6 +91,7 @@ const isSameTransactionPayload = (
   left.amount === right.amount &&
   left.account === right.account &&
   left.category === right.category &&
+  left.subcategoryId === right.subcategoryId &&
   left.transferCategory === right.transferCategory &&
   left.sourceAccount === right.sourceAccount &&
   left.transferAccount === right.transferAccount &&
@@ -85,6 +99,8 @@ const isSameTransactionPayload = (
   left.includeInInvestmentTotals === right.includeInInvestmentTotals &&
   left.goalId === right.goalId &&
   left.goalImpact === right.goalImpact &&
+  left.autoAssigned === right.autoAssigned &&
+  left.ruleId === right.ruleId &&
   left.note === right.note &&
   left.folder === right.folder;
 
@@ -100,6 +116,12 @@ export const useFinanceData = () => {
   const [accountSnapshots, setAccountSnapshots] = useState<AccountMonthlySnapshot[]>([]);
   const [importedAccountBalances, setImportedAccountBalances] = useState<ImportedAccountMonthBalance[]>([]);
   const [monthClosures, setMonthClosures] = useState<MonthClosure[]>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
+  const [autoCategorizationRules, setAutoCategorizationRules] = useState<AutoCategorizationRule[]>([]);
+  const [budgetLimits, setBudgetLimits] = useState<BudgetLimit[]>([]);
+  const [featureToggles, setFeatureToggles] = useState<FinanceFeatureToggles>({
+    ...DEFAULT_FINANCE_FEATURE_TOGGLES,
+  });
   const [budgetAllocation, setBudgetAllocation] = useState<BudgetAllocation>({
     ...DEFAULT_BUDGET,
   });
@@ -171,6 +193,15 @@ export const useFinanceData = () => {
       setAccountSnapshots(parse<AccountMonthlySnapshot[]>(STORAGE_KEYS.ACCOUNT_SNAPSHOTS, []));
       setImportedAccountBalances(parse<ImportedAccountMonthBalance[]>(STORAGE_KEYS.IMPORTED_ACCOUNT_BALANCES, []));
       setMonthClosures(parse<MonthClosure[]>(STORAGE_KEYS.MONTH_CLOSURES, []));
+      setSubcategories(mergeSubcategories(parse<Subcategory[]>(STORAGE_KEYS.SUBCATEGORIES, [])));
+      setAutoCategorizationRules(
+        mergeAutoCategorizationRules(parse<AutoCategorizationRule[]>(STORAGE_KEYS.AUTO_CATEGORIZATION_RULES, []))
+      );
+      setBudgetLimits(parse<BudgetLimit[]>(STORAGE_KEYS.BUDGET_LIMITS, []));
+      setFeatureToggles({
+        ...DEFAULT_FINANCE_FEATURE_TOGGLES,
+        ...parse<FinanceFeatureToggles>(STORAGE_KEYS.FEATURE_TOGGLES, DEFAULT_FINANCE_FEATURE_TOGGLES),
+      });
       setLastTransaction(parse<Omit<Transaction, 'id' | 'createdAt'> | null>(STORAGE_KEYS.LAST_TRANSACTION, null));
 
       const legacyTheme = loaded[STORAGE_KEYS.THEME] ?? localStorage.getItem(STORAGE_KEYS.THEME);
@@ -213,6 +244,10 @@ export const useFinanceData = () => {
       [STORAGE_KEYS.ACCOUNT_SNAPSHOTS]: JSON.stringify(accountSnapshots),
       [STORAGE_KEYS.IMPORTED_ACCOUNT_BALANCES]: JSON.stringify(importedAccountBalances),
       [STORAGE_KEYS.MONTH_CLOSURES]: JSON.stringify(monthClosures),
+      [STORAGE_KEYS.SUBCATEGORIES]: JSON.stringify(subcategories),
+      [STORAGE_KEYS.AUTO_CATEGORIZATION_RULES]: JSON.stringify(autoCategorizationRules),
+      [STORAGE_KEYS.BUDGET_LIMITS]: JSON.stringify(budgetLimits),
+      [STORAGE_KEYS.FEATURE_TOGGLES]: JSON.stringify(featureToggles),
       [STORAGE_KEYS.THEME]: isDarkMode ? 'dark' : 'light',
       [STORAGE_KEYS.VISUAL_THEME]: visualTheme,
       [STORAGE_KEYS.LAST_TRANSACTION]: JSON.stringify(lastTransaction),
@@ -231,6 +266,10 @@ export const useFinanceData = () => {
     accountSnapshots,
     importedAccountBalances,
     monthClosures,
+    subcategories,
+    autoCategorizationRules,
+    budgetLimits,
+    featureToggles,
     isDarkMode,
     visualTheme,
     lastTransaction,
@@ -754,6 +793,7 @@ export const useFinanceData = () => {
         amount: transaction.amount,
         account: transaction.account,
         category: transaction.category,
+        subcategoryId: transaction.subcategoryId,
         transferCategory: transaction.transferCategory,
         sourceAccount: transaction.sourceAccount,
         transferAccount: transaction.transferAccount,
@@ -761,6 +801,8 @@ export const useFinanceData = () => {
         includeInInvestmentTotals: transaction.includeInInvestmentTotals,
         goalId: transaction.goalId,
         goalImpact: transaction.goalImpact,
+        autoAssigned: transaction.autoAssigned,
+        ruleId: transaction.ruleId,
         note: transaction.note,
         folder: transaction.folder,
       }))
@@ -817,6 +859,188 @@ export const useFinanceData = () => {
   const deleteGoal = useCallback((id: string) => {
     setGoals((prev) => prev.filter((goal) => goal.id !== id));
   }, []);
+
+  const addSubcategory = useCallback((subcategory: Omit<Subcategory, 'id' | 'isSystem' | 'isArchived'>) => {
+    const nextSubcategory: Subcategory = {
+      ...subcategory,
+      id: crypto.randomUUID(),
+      isSystem: false,
+      isArchived: false,
+    };
+
+    setSubcategories((prev) => mergeSubcategories([...prev, nextSubcategory]));
+    pushAudit({
+      type: 'system',
+      action: 'subcategory-create',
+      detail: `Podkategorie ${subcategory.name} byla přidána.`,
+    });
+  }, [pushAudit]);
+
+  const updateSubcategory = useCallback((id: string, updates: Partial<Pick<Subcategory, 'name' | 'parentCategory' | 'icon' | 'color'>>) => {
+    setSubcategories((prev) =>
+      mergeSubcategories(
+        prev.map((subcategory) =>
+          subcategory.id === id
+            ? {
+                ...subcategory,
+                ...updates,
+              }
+            : subcategory
+        )
+      )
+    );
+    pushAudit({
+      type: 'system',
+      action: 'subcategory-update',
+      detail: 'Podkategorie byla upravena.',
+    });
+  }, [pushAudit]);
+
+  const archiveSubcategory = useCallback((id: string, isArchived: boolean) => {
+    setSubcategories((prev) =>
+      mergeSubcategories(
+        prev.map((subcategory) =>
+          subcategory.id === id
+            ? {
+                ...subcategory,
+                isArchived,
+              }
+            : subcategory
+        )
+      )
+    );
+    pushAudit({
+      type: 'system',
+      action: isArchived ? 'subcategory-archive' : 'subcategory-restore',
+      detail: isArchived ? 'Podkategorie byla archivována.' : 'Podkategorie byla znovu obnovena.',
+    });
+  }, [pushAudit]);
+
+  const deleteSubcategory = useCallback((id: string) => {
+    setSubcategories((prev) => mergeSubcategories(prev.filter((subcategory) => subcategory.id !== id)));
+    setTransactions((prev) =>
+      prev.map((transaction) =>
+        transaction.subcategoryId === id
+          ? {
+              ...transaction,
+              subcategoryId: undefined,
+            }
+          : transaction
+      )
+    );
+    setRecurringTransactions((prev) =>
+      prev.map((transaction) =>
+        transaction.subcategoryId === id
+          ? {
+              ...transaction,
+              subcategoryId: undefined,
+            }
+          : transaction
+      )
+    );
+    pushAudit({
+      type: 'system',
+      action: 'subcategory-delete',
+      detail: 'Podkategorie byla odstraněna.',
+    });
+  }, [pushAudit]);
+
+  const addAutoCategorizationRule = useCallback((rule: Omit<AutoCategorizationRule, 'id' | 'isSystem'>) => {
+    const nextRule: AutoCategorizationRule = {
+      ...rule,
+      id: crypto.randomUUID(),
+      isSystem: false,
+    };
+    setAutoCategorizationRules((prev) => mergeAutoCategorizationRules([...prev, nextRule]));
+    pushAudit({
+      type: 'system',
+      action: 'auto-rule-create',
+      detail: `Pravidlo ${rule.name} bylo přidáno.`,
+    });
+    return nextRule;
+  }, [pushAudit]);
+
+  const updateAutoCategorizationRule = useCallback((id: string, updates: Partial<Omit<AutoCategorizationRule, 'id'>>) => {
+    setAutoCategorizationRules((prev) =>
+      mergeAutoCategorizationRules(
+        prev.map((rule) =>
+          rule.id === id
+            ? {
+                ...rule,
+                ...updates,
+              }
+            : rule
+        )
+      )
+    );
+    pushAudit({
+      type: 'system',
+      action: 'auto-rule-update',
+      detail: 'Pravidlo automatické kategorizace bylo upraveno.',
+    });
+  }, [pushAudit]);
+
+  const deleteAutoCategorizationRule = useCallback((id: string) => {
+    setAutoCategorizationRules((prev) => mergeAutoCategorizationRules(prev.filter((rule) => rule.id !== id)));
+    pushAudit({
+      type: 'system',
+      action: 'auto-rule-delete',
+      detail: 'Pravidlo automatické kategorizace bylo odstraněno.',
+    });
+  }, [pushAudit]);
+
+  const updateFeatureToggles = useCallback((updates: Partial<FinanceFeatureToggles>) => {
+    setFeatureToggles((prev) => ({
+      ...prev,
+      ...updates,
+    }));
+    pushAudit({
+      type: 'system',
+      action: 'feature-toggles-update',
+      detail: 'Nastavení chytrých funkcí bylo upraveno.',
+    });
+  }, [pushAudit]);
+
+  const addBudgetLimit = useCallback((limit: Omit<BudgetLimit, 'id'>) => {
+    const nextLimit: BudgetLimit = {
+      ...limit,
+      id: crypto.randomUUID(),
+    };
+    setBudgetLimits((prev) => [nextLimit, ...prev]);
+    pushAudit({
+      type: 'system',
+      action: 'budget-limit-create',
+      detail: 'Rozpočtový limit byl přidán.',
+    });
+    return nextLimit;
+  }, [pushAudit]);
+
+  const updateBudgetLimit = useCallback((id: string, updates: Partial<Omit<BudgetLimit, 'id'>>) => {
+    setBudgetLimits((prev) =>
+      prev.map((limit) =>
+        limit.id === id
+          ? {
+              ...limit,
+              ...updates,
+            }
+          : limit
+      )
+    );
+    pushAudit({
+      type: 'system',
+      action: 'budget-limit-update',
+      detail: 'Rozpočtový limit byl upraven.',
+    });
+  }, [pushAudit]);
+
+  const deleteBudgetLimit = useCallback((id: string) => {
+    setBudgetLimits((prev) => prev.filter((limit) => limit.id !== id));
+    pushAudit({
+      type: 'system',
+      action: 'budget-limit-delete',
+      detail: 'Rozpočtový limit byl odstraněn.',
+    });
+  }, [pushAudit]);
 
   const updateAccountMonthBalance = useCallback((month: string, accountId: string, balance: number) => {
     setImportedAccountBalances((prev) => {
@@ -906,6 +1130,10 @@ export const useFinanceData = () => {
     wealthSnapshots,
     accountSnapshots,
     monthClosures,
+    subcategories,
+    autoCategorizationRules,
+    budgetLimits,
+    featureToggles,
     availableYears,
       addTransaction,
       updateTransaction,
@@ -932,6 +1160,17 @@ export const useFinanceData = () => {
     applyMonthlyInterest,
     addGoal,
     deleteGoal,
+    addSubcategory,
+    updateSubcategory,
+    archiveSubcategory,
+    deleteSubcategory,
+    addAutoCategorizationRule,
+    updateAutoCategorizationRule,
+    deleteAutoCategorizationRule,
+    updateFeatureToggles,
+    addBudgetLimit,
+    updateBudgetLimit,
+    deleteBudgetLimit,
     updateAccountMonthBalance,
     isMonthClosed,
     toggleMonthClosure,

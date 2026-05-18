@@ -2,6 +2,7 @@ export type TransactionType = 'income' | 'expense' | 'transfer';
 export type TransactionDraftType = TransactionType | 'investment';
 
 export type ExpenseCategory = 'necessities' | 'whims' | 'investments' | 'savings' | 'selfInvestment';
+export type CategoryMatchType = 'contains' | 'equals' | 'startsWith';
 
 export type TransferCategory = 'savings' | 'transfer';
 
@@ -32,6 +33,7 @@ export interface TransactionDraft {
   amount: number | null;
   account?: string;
   category?: ExpenseCategory;
+  subcategoryId?: string;
   transferCategory?: TransferCategory;
   sourceAccount?: string;
   transferAccount?: string;
@@ -41,6 +43,8 @@ export interface TransactionDraft {
   goalImpact?: 'deposit' | 'withdrawal';
   note?: string;
   attachments?: TransactionAttachment[];
+  autoAssigned?: boolean;
+  ruleId?: string;
 }
 
 export interface TouchedFields {
@@ -50,6 +54,7 @@ export interface TouchedFields {
   amount?: boolean;
   account?: boolean;
   category?: boolean;
+  subcategoryId?: boolean;
   transferCategory?: boolean;
   sourceAccount?: boolean;
   transferAccount?: boolean;
@@ -66,6 +71,7 @@ export interface TransactionSuggestion {
   type?: TransactionDraftType;
   account?: string;
   category?: ExpenseCategory;
+  subcategoryId?: string;
   transferCategory?: TransferCategory;
   sourceAccount?: string;
   transferAccount?: string;
@@ -76,6 +82,7 @@ export interface TransactionSuggestion {
   lastAmount?: number;
   usageCount?: number;
   lastUsedAt?: string;
+  ruleId?: string;
 }
 
 export interface BulkTransactionRow {
@@ -103,6 +110,7 @@ export interface Transaction {
   amount: number;
   account?: string; // for income and expense
   category?: ExpenseCategory; // for expense
+  subcategoryId?: string;
   transferCategory?: TransferCategory; // for transfer
   sourceAccount?: string; // for transfer - source account
   transferAccount?: string; // for transfer - target account
@@ -112,6 +120,8 @@ export interface Transaction {
   goalImpact?: 'deposit' | 'withdrawal';
   note?: string;
   attachments?: TransactionAttachment[];
+  autoAssigned?: boolean;
+  ruleId?: string;
   folder?: string; // custom folder for organization
   createdAt: string;
 }
@@ -123,6 +133,7 @@ export interface RecurringTransaction {
   type: TransactionType;
   account?: string;
   category?: ExpenseCategory;
+  subcategoryId?: string;
   transferCategory?: TransferCategory;
   sourceAccount?: string;
   transferAccount?: string;
@@ -131,9 +142,53 @@ export interface RecurringTransaction {
   goalId?: string;
   goalImpact?: 'deposit' | 'withdrawal';
   note?: string;
+  autoAssigned?: boolean;
+  ruleId?: string;
   folder?: string;
   dayOfMonth: number; // 1-31
   isActive: boolean;
+}
+
+export interface Subcategory {
+  id: string;
+  name: string;
+  parentCategory: ExpenseCategory;
+  icon?: string;
+  color?: string;
+  isSystem: boolean;
+  isArchived: boolean;
+  createdBy?: string;
+}
+
+export interface AutoCategorizationRule {
+  id: string;
+  userId?: string;
+  name: string;
+  matchType: CategoryMatchType;
+  matchValue: string;
+  targetCategory: ExpenseCategory;
+  targetSubcategoryId?: string;
+  priority: number;
+  isEnabled: boolean;
+  isSystem?: boolean;
+}
+
+export interface BudgetLimit {
+  id: string;
+  userId?: string;
+  category?: ExpenseCategory;
+  subcategoryId?: string;
+  monthlyLimit: number;
+  warningThreshold: number;
+  isEnabled: boolean;
+}
+
+export interface FinanceFeatureToggles {
+  autoCategorization: boolean;
+  userRules: boolean;
+  budgetLimits: boolean;
+  pushNotifications: boolean;
+  smartSuggestions: boolean;
 }
 
 export interface AccountMonthlySnapshot {

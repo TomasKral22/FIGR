@@ -38,7 +38,7 @@ test('čeština s diakritikou je vidět v hlavních částech aplikace', async (
   await expect(page.getByRole('button', { name: 'Přehled', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Trvalé příkazy', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Cíle', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Reporty', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Reporty a grafy', exact: true })).toBeVisible();
   await expect(page.getByText('Bankovní účty')).toBeVisible();
 });
 

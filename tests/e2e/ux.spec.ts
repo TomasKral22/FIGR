@@ -50,12 +50,13 @@ test('hlavička drží kompaktní výšku a přepínání vzhledu se ukládá', 
   await expect(page.getByText('Brokerské účty', { exact: true })).toBeVisible();
   await expect(page.locator('p', { hasText: 'KB Spořicí účet · s.ú.' }).first()).toBeVisible();
 
-  await page.getByTestId('app-header').getByRole('button', { name: 'Otevřít styly' }).click();
+  await page.getByTestId('app-header').getByRole('button', { name: 'Uživatelské menu' }).click();
+  await page.getByRole('menuitem', { name: 'Styly' }).click();
   await page.getByRole('button', { name: /Světlá/i }).click();
 
   await expect(page.locator('html')).not.toHaveClass(/dark/);
   await expect
-    .poll(async () => page.evaluate(() => window.localStorage.getItem('finance_theme')))
+    .poll(async () => page.evaluate(() => document.documentElement.dataset.surface))
     .toBe('light');
 
   await page.getByRole('button', { name: /Tmavě modrá/i }).click();

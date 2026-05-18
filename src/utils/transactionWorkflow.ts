@@ -226,6 +226,9 @@ export function transactionToDraft(transaction?: Transaction | null): Transactio
     goalImpact: transaction.goalImpact,
     note: transaction.note,
     attachments: transaction.attachments || [],
+    subcategoryId: transaction.subcategoryId,
+    autoAssigned: transaction.autoAssigned,
+    ruleId: transaction.ruleId,
   };
 }
 
@@ -250,6 +253,8 @@ export function draftToTransactionInput(draft: TransactionDraft) {
       ...attachment,
       previewUrl: attachment.previewUrl,
     })),
+    autoAssigned: draft.autoAssigned,
+    ruleId: draft.ruleId || undefined,
   };
 
   if (draft.type === 'income') {
@@ -261,11 +266,13 @@ export function draftToTransactionInput(draft: TransactionDraft) {
   } else if (draft.type === 'investment') {
     payload.account = draft.sourceAccount;
     payload.category = 'investments';
+    payload.subcategoryId = draft.subcategoryId || undefined;
     payload.investmentAccount = draft.investmentAccount;
     payload.includeInInvestmentTotals = draft.includeInInvestmentTotals ?? true;
   } else {
     payload.account = draft.account;
     payload.category = draft.category;
+    payload.subcategoryId = draft.subcategoryId || undefined;
     if (draft.category === 'investments') {
       payload.investmentAccount = draft.investmentAccount;
       payload.includeInInvestmentTotals = draft.includeInInvestmentTotals ?? true;
@@ -296,6 +303,7 @@ export function buildTransactionHistoryIndex(transactions: Transaction[]) {
       sourceAccount: draft.sourceAccount,
       transferAccount: draft.transferAccount,
       category: draft.category,
+      subcategoryId: draft.subcategoryId,
       transferCategory: draft.transferCategory,
       investmentAccount: draft.investmentAccount,
       includeInInvestmentTotals: draft.includeInInvestmentTotals,
@@ -304,6 +312,7 @@ export function buildTransactionHistoryIndex(transactions: Transaction[]) {
       lastAmount: transaction.amount,
       usageCount,
       lastUsedAt,
+      ruleId: transaction.ruleId,
     });
   });
 
@@ -377,6 +386,9 @@ export function applySuggestionToDraft(
   if (!touchedFields.category && suggestion.category && !draft.category) {
     nextDraft.category = suggestion.category;
   }
+  if (!touchedFields.subcategoryId && suggestion.subcategoryId && !draft.subcategoryId) {
+    nextDraft.subcategoryId = suggestion.subcategoryId;
+  }
   if (!touchedFields.transferCategory && suggestion.transferCategory && !draft.transferCategory) {
     nextDraft.transferCategory = suggestion.transferCategory;
   }
@@ -391,6 +403,9 @@ export function applySuggestionToDraft(
   }
   if (!touchedFields.includeInInvestmentTotals && typeof suggestion.includeInInvestmentTotals === 'boolean') {
     nextDraft.includeInInvestmentTotals = suggestion.includeInInvestmentTotals;
+  }
+  if (suggestion.ruleId && !draft.ruleId) {
+    nextDraft.ruleId = suggestion.ruleId;
   }
 
   return nextDraft;
@@ -449,6 +464,7 @@ export function createBulkRow(
         sourceAccount: previousDraft.sourceAccount,
         transferAccount: previousDraft.transferAccount,
         category: previousDraft.category,
+        subcategoryId: previousDraft.subcategoryId,
         transferCategory: previousDraft.transferCategory,
         investmentAccount: previousDraft.investmentAccount,
         includeInInvestmentTotals: previousDraft.includeInInvestmentTotals,
