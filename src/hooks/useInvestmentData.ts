@@ -224,6 +224,22 @@ export const useInvestmentData = () => {
     }
   };
 
+  const deleteAsset = async (id: string) => {
+    try {
+      setAssets((prev) => prev.filter((asset) => asset.id !== id));
+      setTransactions((prev) => prev.filter((transaction) => transaction.asset_id !== id));
+      setPrices((prev) => prev.filter((price) => price.asset_id !== id));
+      toast({ title: 'Aktivum smazáno' });
+    } catch (error: unknown) {
+      console.error('Error deleting asset:', error);
+      toast({
+        title: 'Chyba',
+        description: getErrorMessage(error) || 'Nepodařilo se smazat aktivum.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const addTransaction = async (transaction: {
     asset_id: string;
     transaction_type: InvestmentTransactionType;
@@ -303,12 +319,15 @@ export const useInvestmentData = () => {
     }
   };
 
-  const addPrice = async (price: {
-    asset_id: string;
-    price: number;
-    currency: string;
-    price_date: string;
-  }) => {
+  const addPrice = async (
+    price: {
+      asset_id: string;
+      price: number;
+      currency: string;
+      price_date: string;
+    },
+    options?: { silent?: boolean }
+  ) => {
     try {
       const existingPrice = prices.find(
         (entry) => entry.asset_id === price.asset_id && entry.price_date === price.price_date
@@ -329,7 +348,9 @@ export const useInvestmentData = () => {
         );
         return [nextPrice, ...filtered].sort((a, b) => b.price_date.localeCompare(a.price_date));
       });
-      toast({ title: 'Cena aktualizována' });
+      if (!options?.silent) {
+        toast({ title: 'Cena aktualizována' });
+      }
       return nextPrice;
     } catch (error: unknown) {
       console.error('Error adding price:', error);
@@ -613,6 +634,7 @@ export const useInvestmentData = () => {
     fetchData,
     calculatePortfolio,
     addAsset,
+    deleteAsset,
     addTransaction,
     deleteTransaction,
     addPrice,

@@ -5,14 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  PortfolioAsset,
-  InvestmentTransaction,
   AssetPrice,
   ASSET_TYPE_LABELS,
   INVESTMENT_PROVIDER_LABELS,
+  InvestmentTransaction,
+  PortfolioAsset,
 } from '@/types/investment';
-import { ArrowLeft, Trash2, TrendingUp, TrendingDown, Plus } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { ArrowLeft, Plus, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
+import { Line, LineChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 interface AssetDetailProps {
@@ -21,6 +21,7 @@ interface AssetDetailProps {
   prices: AssetPrice[];
   reportingCurrency: string;
   onBack: () => void;
+  onDeleteAsset: (id: string) => Promise<void>;
   onDeleteTransaction: (id: string) => Promise<void>;
   onAddPrice: (price: { asset_id: string; price: number; currency: string; price_date: string }) => Promise<void>;
 }
@@ -53,6 +54,7 @@ export const AssetDetail = ({
   prices,
   reportingCurrency,
   onBack,
+  onDeleteAsset,
   onDeleteTransaction,
   onAddPrice,
 }: AssetDetailProps) => {
@@ -61,11 +63,10 @@ export const AssetDetail = ({
   const [newPriceDate, setNewPriceDate] = useState(new Date().toISOString().split('T')[0]);
 
   const isProfit = (asset.profitLossInReportingCurrency ?? 0) >= 0;
-
   const sortedPrices = [...prices].sort((a, b) => a.price_date.localeCompare(b.price_date));
-  const priceChartData = sortedPrices.map((p) => ({
-    date: p.price_date,
-    price: p.price,
+  const priceChartData = sortedPrices.map((price) => ({
+    date: price.price_date,
+    price: price.price,
   }));
 
   const handleAddPrice = async () => {
@@ -85,14 +86,27 @@ export const AssetDetail = ({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4">
         <Button variant="ghost" size="sm" onClick={onBack}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
+          <ArrowLeft className="mr-2 h-4 w-4" />
           Zpět
         </Button>
         <div>
           <h3 className="text-xl font-bold">{asset.ticker}</h3>
           <p className="text-muted-foreground">{asset.name}</p>
+        </div>
+        <div className="ml-auto">
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={async () => {
+              await onDeleteAsset(asset.id);
+              onBack();
+            }}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Smazat aktivum
+          </Button>
         </div>
       </div>
 
@@ -106,9 +120,9 @@ export const AssetDetail = ({
               {ASSET_TYPE_LABELS[asset.asset_type as keyof typeof ASSET_TYPE_LABELS] || asset.asset_type}
             </div>
             <div className="text-sm text-muted-foreground">
-              {INVESTMENT_PROVIDER_LABELS[asset.provider as keyof typeof INVESTMENT_PROVIDER_LABELS] || asset.provider}
+              {INVESTMENT_PROVIDER_LABELS[asset.provider] || asset.provider}
             </div>
-            {asset.sector && <div className="text-sm text-muted-foreground">{asset.sector}</div>}
+            {asset.sector ? <div className="text-sm text-muted-foreground">{asset.sector}</div> : null}
           </CardContent>
         </Card>
 
@@ -147,7 +161,11 @@ export const AssetDetail = ({
           <CardContent>
             {asset.profitLossInReportingCurrency !== null ? (
               <>
-                <div className={`text-lg font-bold flex items-center gap-2 ${isProfit ? 'text-success' : 'text-destructive'}`}>
+                <div
+                  className={`flex items-center gap-2 text-lg font-bold ${
+                    isProfit ? 'text-success' : 'text-destructive'
+                  }`}
+                >
                   {isProfit ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
                   {formatCurrency(asset.profitLossInReportingCurrency, reportingCurrency)}
                 </div>
@@ -168,7 +186,7 @@ export const AssetDetail = ({
           <Dialog open={addingPrice} onOpenChange={setAddingPrice}>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm">
-                <Plus className="h-4 w-4 mr-2" />
+                <Plus className="mr-2 h-4 w-4" />
                 Přidat cenu
               </Button>
             </DialogTrigger>
@@ -183,7 +201,7 @@ export const AssetDetail = ({
                     type="number"
                     step="any"
                     value={newPrice}
-                    onChange={(e) => setNewPrice(e.target.value)}
+                    onChange={(event) => setNewPrice(event.target.value)}
                     placeholder="0.00"
                   />
                 </div>
@@ -192,7 +210,7 @@ export const AssetDetail = ({
                   <Input
                     type="date"
                     value={newPriceDate}
-                    onChange={(e) => setNewPriceDate(e.target.value)}
+                    onChange={(event) => setNewPriceDate(event.target.value)}
                   />
                 </div>
                 <Button onClick={handleAddPrice} className="w-full">
@@ -224,7 +242,7 @@ export const AssetDetail = ({
                     content={({ active, payload, label }) => {
                       if (!active || !payload?.length) return null;
                       return (
-                        <div className="bg-popover border border-border rounded-lg p-3 shadow-lg">
+                        <div className="rounded-lg border border-border bg-popover p-3 shadow-lg">
                           <p className="text-sm text-muted-foreground">
                             {new Date(label).toLocaleDateString('cs-CZ')}
                           </p>
@@ -247,10 +265,10 @@ export const AssetDetail = ({
               </ResponsiveContainer>
             </div>
           ) : (
-            <p className="text-center text-muted-foreground py-8">
+            <p className="py-8 text-center text-muted-foreground">
               {priceChartData.length === 1
                 ? 'Pro zobrazení grafu je potřeba alespoň 2 ceny.'
-                : 'Zatím žádné ceny. Přidejte aktuální cenu pro výpočet hodnoty.'}
+                : 'Zatím žádné ceny. Přidej aktuální cenu pro výpočet hodnoty.'}
             </p>
           )}
         </CardContent>
@@ -271,40 +289,40 @@ export const AssetDetail = ({
                   <TableHead className="text-right">Cena / ks</TableHead>
                   <TableHead className="text-right">Celkem</TableHead>
                   <TableHead>Poznámka</TableHead>
-                  <TableHead></TableHead>
+                  <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {transactions.map((tx) => (
-                  <TableRow key={tx.id}>
-                    <TableCell>{new Date(tx.transaction_date).toLocaleDateString('cs-CZ')}</TableCell>
+                {transactions.map((transaction) => (
+                  <TableRow key={transaction.id}>
+                    <TableCell>{new Date(transaction.transaction_date).toLocaleDateString('cs-CZ')}</TableCell>
                     <TableCell>
                       <span
                         className={
-                          tx.transaction_type === 'buy'
+                          transaction.transaction_type === 'buy'
                             ? 'text-success'
-                            : tx.transaction_type === 'sell'
+                            : transaction.transaction_type === 'sell'
                               ? 'text-destructive'
                               : 'text-primary'
                         }
                       >
-                        {tx.transaction_type === 'buy'
+                        {transaction.transaction_type === 'buy'
                           ? 'Nákup'
-                          : tx.transaction_type === 'sell'
+                          : transaction.transaction_type === 'sell'
                             ? 'Prodej'
                             : 'Dividenda'}
                       </span>
                     </TableCell>
-                    <TableCell className="text-right">{formatQuantity(tx.quantity)}</TableCell>
+                    <TableCell className="text-right">{formatQuantity(transaction.quantity)}</TableCell>
                     <TableCell className="text-right">
-                      {formatCurrency(tx.price_per_unit, tx.currency)}
+                      {formatCurrency(transaction.price_per_unit, transaction.currency)}
                     </TableCell>
                     <TableCell className="text-right">
-                      {formatCurrency(tx.total_value, tx.currency)}
+                      {formatCurrency(transaction.total_value, transaction.currency)}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{tx.notes || '-'}</TableCell>
+                    <TableCell className="text-muted-foreground">{transaction.notes || '-'}</TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="sm" onClick={() => onDeleteTransaction(tx.id)}>
+                      <Button variant="ghost" size="sm" onClick={() => onDeleteTransaction(transaction.id)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </TableCell>
@@ -313,7 +331,7 @@ export const AssetDetail = ({
               </TableBody>
             </Table>
           ) : (
-            <p className="text-center text-muted-foreground py-8">Žádné transakce</p>
+            <p className="py-8 text-center text-muted-foreground">Žádné transakce</p>
           )}
         </CardContent>
       </Card>

@@ -158,6 +158,27 @@ export interface PortfolioSummary {
   dividendTaxEstimate: number;
 }
 
+export type TickerAnalysisStatus = 'idle' | 'loading' | 'success' | 'error';
+
+export interface TickerAnalysisResult {
+  ticker: string;
+  generatedAt: string;
+  analysis: string;
+  provider: 'mock' | 'backend';
+  promptVersion: string;
+}
+
+export interface MarketSnapshot {
+  ticker: string;
+  shortName: string | null;
+  currency: string | null;
+  exchange: string | null;
+  regularMarketPrice: number | null;
+  regularMarketChangePercent: number | null;
+  marketTime: string | null;
+  summary?: Record<string, unknown> | null;
+}
+
 export const ASSET_TYPE_LABELS: Record<InvestmentAssetType, string> = {
   stock: 'Akcie',
   etf: 'ETF',

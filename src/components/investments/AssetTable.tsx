@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import { ASSET_TYPE_LABELS, INVESTMENT_PROVIDER_LABELS, PortfolioAsset } from '@/types/investment';
-import { ChevronRight, TrendingDown, TrendingUp } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+import { CheckCircle2, ChevronRight, Circle, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
+import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 
 interface AssetTableProps {
   assets: PortfolioAsset[];
@@ -14,6 +15,9 @@ interface AssetTableProps {
   assetsBySector: Record<string, { invested: number; value: number | null }>;
   reportingCurrency: string;
   onSelectAsset: (id: string) => void;
+  selectedAnalysisAssetId: string | null;
+  onSelectAnalysisAsset: (id: string) => void;
+  onDeleteAsset: (id: string) => Promise<void>;
 }
 
 const formatCurrency = (value: number, currency: string): string =>
@@ -57,6 +61,9 @@ export const AssetTable = ({
   assetsBySector,
   reportingCurrency,
   onSelectAsset,
+  selectedAnalysisAssetId,
+  onSelectAnalysisAsset,
+  onDeleteAsset,
 }: AssetTableProps) => {
   const [breakdown, setBreakdown] = useState<'type' | 'provider' | 'currency' | 'sector'>('type');
 
@@ -88,9 +95,9 @@ export const AssetTable = ({
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <CardTitle>Rozdělení portfolia</CardTitle>
-            <Tabs value={breakdown} onValueChange={(v) => setBreakdown(v as typeof breakdown)}>
+            <Tabs value={breakdown} onValueChange={(value) => setBreakdown(value as typeof breakdown)}>
               <TabsList>
                 <TabsTrigger value="type">Typ</TabsTrigger>
                 <TabsTrigger value="provider">Poskytovatel</TabsTrigger>
@@ -124,7 +131,7 @@ export const AssetTable = ({
                       if (!active || !payload?.length) return null;
                       const data = payload[0].payload;
                       return (
-                        <div className="bg-popover border border-border rounded-lg p-3 shadow-lg">
+                        <div className="rounded-lg border border-border bg-popover p-3 shadow-lg">
                           <p className="font-medium">{data.name}</p>
                           <p className="text-sm text-muted-foreground">
                             Investováno: {formatCurrency(data.invested, reportingCurrency)}
@@ -141,20 +148,26 @@ export const AssetTable = ({
               </ResponsiveContainer>
             </div>
           ) : (
-            <p className="text-center text-muted-foreground py-8">Zatím žádná aktiva</p>
+            <p className="py-8 text-center text-muted-foreground">Zatím žádná aktiva</p>
           )}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Přehled aktiv</CardTitle>
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+            <CardTitle>Přehled aktiv</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Vyber jeden ticker pro AI analýzu a kliknutím na řádek otevři detail aktiva.
+            </p>
+          </div>
         </CardHeader>
         <CardContent>
           {assets.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12">AI</TableHead>
                   <TableHead>Ticker</TableHead>
                   <TableHead>Název</TableHead>
                   <TableHead>Poskytovatel</TableHead>
@@ -164,24 +177,45 @@ export const AssetTable = ({
                   <TableHead className="text-right">Hodnota</TableHead>
                   <TableHead className="text-right">Investováno</TableHead>
                   <TableHead className="text-right">Zisk / ztráta</TableHead>
-                  <TableHead></TableHead>
+                  <TableHead className="w-20" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {assets.map((asset) => {
                   const isProfit = (asset.profitLossInReportingCurrency ?? 0) >= 0;
+                  const isSelected = selectedAnalysisAssetId === asset.id;
+
                   return (
                     <TableRow
                       key={asset.id}
-                      className="cursor-pointer hover:bg-muted/50"
+                      className={`cursor-pointer hover:bg-muted/50 ${
+                        isSelected ? 'bg-primary/5 ring-1 ring-inset ring-primary/30' : ''
+                      }`}
                       onClick={() => onSelectAsset(asset.id)}
                     >
+                      <TableCell onClick={(event) => event.stopPropagation()}>
+                        <button
+                          type="button"
+                          className={`flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${
+                            isSelected
+                              ? 'border-primary bg-primary/10 text-primary'
+                              : 'border-border bg-background/60 text-muted-foreground hover:border-primary/50'
+                          }`}
+                          aria-label={`Vybrat ${asset.ticker} pro AI analýzu`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onSelectAnalysisAsset(asset.id);
+                          }}
+                        >
+                          {isSelected ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
+                        </button>
+                      </TableCell>
                       <TableCell className="font-medium">{asset.ticker}</TableCell>
                       <TableCell>{asset.name}</TableCell>
+                      <TableCell>{INVESTMENT_PROVIDER_LABELS[asset.provider] || asset.provider}</TableCell>
                       <TableCell>
-                        {INVESTMENT_PROVIDER_LABELS[asset.provider as keyof typeof INVESTMENT_PROVIDER_LABELS] || asset.provider}
+                        {ASSET_TYPE_LABELS[asset.asset_type as keyof typeof ASSET_TYPE_LABELS] || asset.asset_type}
                       </TableCell>
-                      <TableCell>{ASSET_TYPE_LABELS[asset.asset_type as keyof typeof ASSET_TYPE_LABELS] || asset.asset_type}</TableCell>
                       <TableCell className="text-right">{formatQuantity(asset.quantity)}</TableCell>
                       <TableCell className="text-right">
                         {asset.currentPriceInReportingCurrency !== null
@@ -198,7 +232,11 @@ export const AssetTable = ({
                       </TableCell>
                       <TableCell className="text-right">
                         {asset.profitLossInReportingCurrency !== null ? (
-                          <div className={`flex items-center justify-end gap-1 ${isProfit ? 'text-success' : 'text-destructive'}`}>
+                          <div
+                            className={`flex items-center justify-end gap-1 ${
+                              isProfit ? 'text-success' : 'text-destructive'
+                            }`}
+                          >
                             {isProfit ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
                             <span>{formatCurrency(asset.profitLossInReportingCurrency, reportingCurrency)}</span>
                             <span className="text-xs">({formatPercent(asset.profitLossPercent || 0)})</span>
@@ -207,8 +245,22 @@ export const AssetTable = ({
                           '-'
                         )}
                       </TableCell>
-                      <TableCell>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      <TableCell onClick={(event) => event.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            aria-label={`Smazat aktivum ${asset.ticker}`}
+                            onClick={async () => {
+                              await onDeleteAsset(asset.id);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -216,9 +268,7 @@ export const AssetTable = ({
               </TableBody>
             </Table>
           ) : (
-            <p className="text-center text-muted-foreground py-8">
-              Zatím žádná aktiva. Přidejte transakci pro začátek.
-            </p>
+            <p className="py-8 text-center text-muted-foreground">Zatím žádná aktiva. Přidej transakci pro začátek.</p>
           )}
         </CardContent>
       </Card>
