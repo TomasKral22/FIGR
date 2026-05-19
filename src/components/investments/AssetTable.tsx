@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
 import { ASSET_TYPE_LABELS, INVESTMENT_PROVIDER_LABELS, PortfolioAsset } from '@/types/investment';
-import { CheckCircle2, ChevronRight, Circle, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ChevronRight, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 
 interface AssetTableProps {
@@ -163,6 +163,15 @@ export const AssetTable = ({
           </div>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-sm">
+            {selectedAnalysisAssetId ? (
+              <span>
+                Vybraný ticker pro AI: <span className="font-semibold text-primary">{assets.find((asset) => asset.id === selectedAnalysisAssetId)?.ticker || 'N/A'}</span>
+              </span>
+            ) : (
+              <span className="text-muted-foreground">Zatím není vybraný žádný ticker pro AI analýzu.</span>
+            )}
+          </div>
           {assets.length > 0 ? (
             <Table>
               <TableHeader>
@@ -194,21 +203,23 @@ export const AssetTable = ({
                       onClick={() => onSelectAsset(asset.id)}
                     >
                       <TableCell onClick={(event) => event.stopPropagation()}>
-                        <button
-                          type="button"
-                          className={`flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${
+                        <label
+                          className={`flex cursor-pointer items-center gap-2 rounded-md border px-2 py-1 text-xs transition-colors ${
                             isSelected
                               ? 'border-primary bg-primary/10 text-primary'
                               : 'border-border bg-background/60 text-muted-foreground hover:border-primary/50'
                           }`}
-                          aria-label={`Vybrat ${asset.ticker} pro AI analýzu`}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onSelectAnalysisAsset(asset.id);
-                          }}
+                          onClick={(event) => event.stopPropagation()}
                         >
-                          {isSelected ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
-                        </button>
+                          <input
+                            type="radio"
+                            name="investment-ai-selection"
+                            checked={isSelected}
+                            className="h-4 w-4 accent-[hsl(var(--primary))]"
+                            onChange={() => onSelectAnalysisAsset(asset.id)}
+                          />
+                          <span>{isSelected ? 'Vybráno' : 'Vybrat'}</span>
+                        </label>
                       </TableCell>
                       <TableCell className="font-medium">{asset.ticker}</TableCell>
                       <TableCell>{asset.name}</TableCell>

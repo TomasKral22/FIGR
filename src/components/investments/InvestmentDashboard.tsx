@@ -101,6 +101,7 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
   const [isConnectorsCollapsed, setIsConnectorsCollapsed] = useState(true);
   const [isAnalysisCollapsed, setIsAnalysisCollapsed] = useState(false);
   const autoRefreshGuardRef = useRef<string | null>(null);
+  const analysisPanelRef = useRef<HTMLDivElement | null>(null);
 
   const selectedAsset = selectedAssetId
     ? portfolioSummary?.assets.find((asset) => asset.id === selectedAssetId) || null
@@ -140,6 +141,25 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
       setAnalysisError(null);
       setAnalysisMarketSnapshot(null);
     }
+  };
+
+  const handleSelectAnalysisAsset = (id: string) => {
+    if (id !== selectedAnalysisAssetId) {
+      setAnalysisStatus('idle');
+      setAnalysisResult(null);
+      setAnalysisMarketSnapshot(null);
+    }
+
+    setSelectedAnalysisAssetId(id);
+    setAnalysisError(null);
+    setIsAnalysisCollapsed(false);
+
+    requestAnimationFrame(() => {
+      analysisPanelRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
   };
 
   const handleGenerateAnalysis = async () => {
@@ -429,16 +449,9 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
                     onSelectAsset={setSelectedAssetId}
                     selectedAnalysisAssetId={selectedAnalysisAssetId}
                     onDeleteAsset={handleDeleteAsset}
-                    onSelectAnalysisAsset={(id) => {
-                        if (id !== selectedAnalysisAssetId) {
-                          setAnalysisStatus('idle');
-                          setAnalysisResult(null);
-                          setAnalysisMarketSnapshot(null);
-                        }
-                        setSelectedAnalysisAssetId(id);
-                        setAnalysisError(null);
-                      }}
-                    />
+                    onSelectAnalysisAsset={handleSelectAnalysisAsset}
+                  />
+                  <div ref={analysisPanelRef}>
                     <TickerAnalysisPanel
                       selectedAsset={selectedAnalysisAsset}
                       status={analysisStatus}
@@ -449,6 +462,7 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
                       collapsed={isAnalysisCollapsed}
                       onToggleCollapsed={() => setIsAnalysisCollapsed((value) => !value)}
                     />
+                  </div>
                   </div>
                 </>
               )}
