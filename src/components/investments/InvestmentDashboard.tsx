@@ -107,9 +107,40 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
     ? portfolioSummary?.assets.find((asset) => asset.id === selectedAssetId) || null
     : null;
 
-  const selectedAnalysisAsset = selectedAnalysisAssetId
-    ? portfolioSummary?.assets.find((asset) => asset.id === selectedAnalysisAssetId) || null
-    : null;
+  const selectedAnalysisAsset = useMemo(() => {
+    if (!selectedAnalysisAssetId) return null;
+
+    const summarizedAsset = portfolioSummary?.assets.find((asset) => asset.id === selectedAnalysisAssetId);
+    if (summarizedAsset) {
+      return summarizedAsset;
+    }
+
+    const baseAsset = assets.find((asset) => asset.id === selectedAnalysisAssetId);
+    if (!baseAsset) {
+      return null;
+    }
+
+    return {
+      id: baseAsset.id,
+      ticker: baseAsset.ticker,
+      name: baseAsset.name,
+      asset_type: baseAsset.asset_type,
+      provider: baseAsset.provider,
+      sector: baseAsset.sector,
+      currency: baseAsset.currency,
+      quantity: 0,
+      avgBuyPrice: 0,
+      totalInvested: 0,
+      currentPrice: null,
+      currentValue: null,
+      profitLoss: null,
+      profitLossPercent: null,
+      currentPriceInReportingCurrency: null,
+      currentValueInReportingCurrency: null,
+      totalInvestedInReportingCurrency: 0,
+      profitLossInReportingCurrency: null,
+    };
+  }, [assets, portfolioSummary?.assets, selectedAnalysisAssetId]);
 
   const assetTransactions = selectedAssetId
     ? transactions.filter((transaction) => transaction.asset_id === selectedAssetId)
