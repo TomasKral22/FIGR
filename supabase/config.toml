@@ -1,1 +1,4 @@
 project_id = "cbedhmgethohrtxinsod"
+
+[functions.investment-intelligence]
+verify_jwt = false
