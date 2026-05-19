@@ -201,15 +201,9 @@ export const AssetTable = ({
                   return (
                     <TableRow
                       key={asset.id}
-                      className={`cursor-pointer hover:bg-muted/50 ${
-                        isSelected ? 'bg-primary/5 ring-1 ring-inset ring-primary/30' : ''
-                      }`}
-                      onClick={() => onSelectAsset(asset.id)}
+                      className={isSelected ? 'bg-primary/5 ring-1 ring-inset ring-primary/30' : ''}
                     >
-                      <TableCell
-                        onClick={(event) => event.stopPropagation()}
-                        onMouseDown={(event) => event.stopPropagation()}
-                      >
+                      <TableCell>
                         <button
                           type="button"
                           aria-pressed={isSelected}
@@ -220,12 +214,7 @@ export const AssetTable = ({
                           }`}
                           onClick={(event) => {
                             event.preventDefault();
-                            event.stopPropagation();
                             onSelectAnalysisAsset(asset.id);
-                          }}
-                          onMouseDown={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
                           }}
                         >
                           <span
@@ -271,8 +260,18 @@ export const AssetTable = ({
                           '-'
                         )}
                       </TableCell>
-                      <TableCell onClick={(event) => event.stopPropagation()}>
+                      <TableCell>
                         <div className="flex items-center justify-end gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            aria-label={`Otevřít detail aktiva ${asset.ticker}`}
+                            onClick={() => onSelectAsset(asset.id)}
+                          >
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          </Button>
                           <Button
                             type="button"
                             variant="ghost"
@@ -285,7 +284,6 @@ export const AssetTable = ({
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
                         </div>
                       </TableCell>
                     </TableRow>
