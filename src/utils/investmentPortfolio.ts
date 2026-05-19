@@ -221,15 +221,23 @@ export const calculatePortfolioSummary = ({
     (sum, asset) => sum + asset.totalInvestedInReportingCurrency,
     0
   );
-  const hasAllPrices = portfolioAssets.every(
+  const pricedAssets = portfolioAssets.filter(
     (asset) => asset.currentValueInReportingCurrency !== null
   );
-  const currentValue = hasAllPrices
-    ? portfolioAssets.reduce((sum, asset) => sum + (asset.currentValueInReportingCurrency ?? 0), 0)
-    : null;
-  const profitLoss = currentValue !== null ? currentValue - totalInvested : null;
+  const currentValue =
+    pricedAssets.length > 0
+      ? pricedAssets.reduce((sum, asset) => sum + (asset.currentValueInReportingCurrency ?? 0), 0)
+      : null;
+  const investedForPricedAssets =
+    pricedAssets.length > 0
+      ? pricedAssets.reduce((sum, asset) => sum + asset.totalInvestedInReportingCurrency, 0)
+      : 0;
+  const profitLoss =
+    currentValue !== null ? currentValue - investedForPricedAssets : null;
   const profitLossPercent =
-    profitLoss !== null && totalInvested > 0 ? (profitLoss / totalInvested) * 100 : null;
+    profitLoss !== null && investedForPricedAssets > 0
+      ? (profitLoss / investedForPricedAssets) * 100
+      : null;
 
   const portfolioHistoryMap: Record<string, number> = {};
   let runningValue = 0;

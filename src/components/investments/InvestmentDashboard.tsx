@@ -144,6 +144,8 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
   };
 
   const handleSelectAnalysisAsset = (id: string) => {
+    setSelectedAssetId(null);
+
     if (id !== selectedAnalysisAssetId) {
       setAnalysisStatus('idle');
       setAnalysisResult(null);

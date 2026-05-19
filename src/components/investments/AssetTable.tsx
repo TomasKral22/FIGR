@@ -202,7 +202,11 @@ export const AssetTable = ({
                       }`}
                       onClick={() => onSelectAsset(asset.id)}
                     >
-                      <TableCell onClick={(event) => event.stopPropagation()}>
+                      <TableCell
+                        onClick={(event) => event.stopPropagation()}
+                        onClickCapture={(event) => event.stopPropagation()}
+                        onMouseDownCapture={(event) => event.stopPropagation()}
+                      >
                         <label
                           className={`flex cursor-pointer items-center gap-2 rounded-md border px-2 py-1 text-xs transition-colors ${
                             isSelected
@@ -210,12 +214,17 @@ export const AssetTable = ({
                               : 'border-border bg-background/60 text-muted-foreground hover:border-primary/50'
                           }`}
                           onClick={(event) => event.stopPropagation()}
+                          onClickCapture={(event) => event.stopPropagation()}
+                          onMouseDownCapture={(event) => event.stopPropagation()}
                         >
                           <input
                             type="radio"
                             name="investment-ai-selection"
                             checked={isSelected}
                             className="h-4 w-4 accent-[hsl(var(--primary))]"
+                            onClick={(event) => event.stopPropagation()}
+                            onClickCapture={(event) => event.stopPropagation()}
+                            onMouseDownCapture={(event) => event.stopPropagation()}
                             onChange={() => onSelectAnalysisAsset(asset.id)}
                           />
                           <span>{isSelected ? 'Vybráno' : 'Vybrat'}</span>
