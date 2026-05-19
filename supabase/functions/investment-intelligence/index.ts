@@ -1,153 +1,16 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
-type Mode = "quote" | "analysis";
-
-interface AnalysisRequestBody {
-  mode: Mode;
-  ticker?: string;
-  portfolioItem?: Record<string, unknown>;
-  prompt?: string;
-}
-
-interface MarketSnapshot {
-  ticker: string;
-  shortName: string | null;
-  currency: string | null;
-  exchange: string | null;
-  regularMarketPrice: number | null;
-  regularMarketChangePercent: number | null;
-  marketTime: string | null;
-  summary?: Record<string, unknown> | null;
-}
-
-const safeNumber = (value: unknown): number | null =>
-  typeof value === "number" && Number.isFinite(value) ? value : null;
-
-const safeString = (value: unknown): string | null =>
-  typeof value === "string" && value.trim().length > 0 ? value : null;
-
-const fetchYahooData = async (ticker: string): Promise<MarketSnapshot> => {
-  const normalizedTicker = ticker.trim().toUpperCase();
-  if (!normalizedTicker) {
-    throw new Error("Ticker symbol je povinný.");
-  }
-
-  const quoteUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(normalizedTicker)}`;
-  const summaryUrl =
-    `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(normalizedTicker)}` +
-    "?modules=price,summaryDetail,financialData,defaultKeyStatistics,assetProfile";
-
-  const [quoteResponse, summaryResponse] = await Promise.all([
-    fetch(quoteUrl, {
-      headers: {
-        "User-Agent": "FIGR/1.0",
-      },
-    }),
-    fetch(summaryUrl, {
-      headers: {
-        "User-Agent": "FIGR/1.0",
-      },
-    }),
-  ]);
-
-  if (!quoteResponse.ok) {
-    throw new Error(`Yahoo Finance nevrátilo cenu pro ticker ${normalizedTicker}.`);
-  }
-
-  const quoteJson = await quoteResponse.json();
-  const quote = quoteJson?.quoteResponse?.result?.[0];
-  if (!quote) {
-    throw new Error(`Ticker ${normalizedTicker} nebyl v Yahoo Finance nalezen.`);
-  }
-
-  let summary: Record<string, unknown> | null = null;
-  if (summaryResponse.ok) {
-    const summaryJson = await summaryResponse.json();
-    summary = summaryJson?.quoteSummary?.result?.[0] ?? null;
-  }
-
-  return {
-    ticker: normalizedTicker,
-    shortName: safeString(quote.shortName) ?? safeString(quote.longName),
-    currency: safeString(quote.currency),
-    exchange: safeString(quote.fullExchangeName) ?? safeString(quote.exchange),
-    regularMarketPrice: safeNumber(quote.regularMarketPrice),
-    regularMarketChangePercent: safeNumber(quote.regularMarketChangePercent),
-    marketTime:
-      typeof quote.regularMarketTime === "number"
-        ? new Date(quote.regularMarketTime * 1000).toISOString()
-        : null,
-    summary,
-  };
-};
-
-const stringifyContext = (value: unknown) => JSON.stringify(value, null, 2);
-
-const callOpenAI = async (prompt: string, snapshot: MarketSnapshot, portfolioItem?: Record<string, unknown>) => {
-  const apiKey = Deno.env.get("OPENAI_API_KEY");
-  if (!apiKey) {
-    throw new Error("Chybí OPENAI_API_KEY pro AI analýzu.");
-  }
-
-  const model = Deno.env.get("OPENAI_MODEL") || "gpt-4.1-mini";
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      input: [
-        {
-          role: "system",
-          content: [
-            {
-              type: "input_text",
-              text:
-                "Jsi zkušený investiční analytik. Piš česky. Nepoužívej smyšlená čísla. Pokud data chybí, výslovně to řekni.",
-            },
-          ],
-        },
-        {
-          role: "user",
-          content: [
-            {
-              type: "input_text",
-              text:
-                `${prompt}\n\nYahoo Finance snapshot:\n${stringifyContext(snapshot)}\n\n` +
-                `Portfolio context:\n${stringifyContext(portfolioItem ?? null)}`,
-            },
-          ],
-        },
-      ],
-      temperature: 0.3,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`OpenAI analýza selhala: ${errorText}`);
-  }
-
-  const json = await response.json();
-  const text = json?.output_text;
-  if (typeof text !== "string" || !text.trim()) {
-    throw new Error("OpenAI vrátil prázdnou odpověď.");
   }
 
   return text.trim();
 };
 
-const callAnthropic = async (prompt: string, snapshot: MarketSnapshot, portfolioItem?: Record<string, unknown>) => {
+const callAnthropic = async (
+  prompt: string,
+  snapshot: MarketSnapshot,
+  portfolioItem?: Record<string, unknown>
+) => {
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) {
-    throw new Error("Chybí ANTHROPIC_API_KEY pro AI analýzu.");
+    throw new Error("Chybi ANTHROPIC_API_KEY pro AI analyzu.");
   }
 
   const model = Deno.env.get("ANTHROPIC_MODEL") || "claude-3-5-sonnet-latest";
@@ -160,10 +23,10 @@ const callAnthropic = async (prompt: string, snapshot: MarketSnapshot, portfolio
     },
     body: JSON.stringify({
       model,
-      max_tokens: 1800,
-      temperature: 0.3,
+      max_tokens: 2200,
+      temperature: 0.2,
       system:
-        "Jsi zkušený investiční analytik. Piš česky. Nepoužívej smyšlená čísla. Pokud data chybí, výslovně to řekni.",
+        "Jsi zkuseny investicni analytik. Pis cesky. Nepouzivej smyslena cisla. Pokud data chybi, vyslovne to rekni. Cituj zdroje, pokud jsou v kontextu dostupne.",
       messages: [
         {
           role: "user",
@@ -177,13 +40,16 @@ const callAnthropic = async (prompt: string, snapshot: MarketSnapshot, portfolio
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Claude analýza selhala: ${errorText}`);
+    throw new Error(`Claude analyza selhala: ${errorText}`);
   }
 
   const json = await response.json();
-  const text = json?.content?.map((item: { type?: string; text?: string }) => item?.text || "").join("\n").trim();
+  const text = json?.content
+    ?.map((item: { type?: string; text?: string }) => item?.text || "")
+    .join("\n")
+    .trim();
   if (!text) {
-    throw new Error("Claude vrátil prázdnou odpověď.");
+    throw new Error("Claude vratil prazdnou odpoved.");
   }
 
   return text;
@@ -214,7 +80,7 @@ const generateAnalysis = async ({
       generatedAt: new Date().toISOString(),
       analysis,
       provider: "backend",
-      promptVersion: "ticker-analysis-v1",
+      promptVersion: "ticker-analysis-v2",
     },
     marketSnapshot: snapshot,
   };
@@ -231,10 +97,10 @@ serve(async (req) => {
     const ticker = body.ticker?.trim().toUpperCase();
 
     if (!mode) {
-      throw new Error("Chybí režim požadavku.");
+      throw new Error("Chybi rezim pozadavku.");
     }
     if (!ticker) {
-      throw new Error("Chybí ticker symbol.");
+      throw new Error("Chybi ticker symbol.");
     }
 
     if (mode === "quote") {
@@ -247,7 +113,7 @@ serve(async (req) => {
 
     if (mode === "analysis") {
       if (!body.prompt?.trim()) {
-        throw new Error("Chybí prompt pro AI analýzu.");
+        throw new Error("Chybi prompt pro AI analyzu.");
       }
 
       const payload = await generateAnalysis({
@@ -262,10 +128,10 @@ serve(async (req) => {
       });
     }
 
-    throw new Error("Neplatný režim požadavku.");
+    throw new Error("Neplatny rezim pozadavku.");
   } catch (error: unknown) {
     console.error("investment-intelligence error:", error);
-    const message = error instanceof Error ? error.message : "Neznámá chyba.";
+    const message = error instanceof Error ? error.message : "Neznama chyba.";
     return new Response(JSON.stringify({ message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
