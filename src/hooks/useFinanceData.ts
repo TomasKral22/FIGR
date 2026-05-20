@@ -17,6 +17,7 @@ import {
   WealthSnapshot,
 } from '@/types/finance';
 import { appStorage } from '@/lib/appStorage';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   DEFAULT_FINANCE_FEATURE_TOGGLES,
   mergeAutoCategorizationRules,
@@ -105,6 +106,7 @@ const isSameTransactionPayload = (
   left.folder === right.folder;
 
 export const useFinanceData = () => {
+  const { session } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [brokerAccounts, setBrokerAccounts] = useState<BankAccount[]>([]);
@@ -173,10 +175,11 @@ export const useFinanceData = () => {
 
   useEffect(() => {
     const hydrate = async () => {
+      setIsHydrated(false);
       const loaded = await appStorage.getMany(Object.values(STORAGE_KEYS));
 
       const parse = <T,>(key: string, fallback: T): T => {
-        const value = loaded[key] ?? localStorage.getItem(key);
+        const value = loaded[key];
         return value ? (JSON.parse(value) as T) : fallback;
       };
 
@@ -226,7 +229,7 @@ export const useFinanceData = () => {
     };
 
     void hydrate();
-  }, []);
+  }, [session?.user.id]);
 
   useEffect(() => {
     if (!isHydrated) return;

@@ -15,6 +15,7 @@ import {
 } from '@/types/investment';
 import { calculatePortfolioSummary } from '@/utils/investmentPortfolio';
 import { appStorage } from '@/lib/appStorage';
+import { useAuth } from '@/contexts/AuthContext';
 
 const STORAGE_KEYS = {
   ASSETS: 'investment_assets',
@@ -78,6 +79,7 @@ const isDuplicateInvestmentTransaction = (
 
 export const useInvestmentData = () => {
   const { toast } = useToast();
+  const { session } = useAuth();
   const [loading, setLoading] = useState(true);
   const [assets, setAssets] = useState<InvestmentAsset[]>([]);
   const [transactions, setTransactions] = useState<InvestmentTransaction[]>([]);
@@ -92,15 +94,16 @@ export const useInvestmentData = () => {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setIsHydrated(false);
     try {
       const loaded = await appStorage.getMany(Object.values(STORAGE_KEYS));
-      const storedAssets = loaded[STORAGE_KEYS.ASSETS] ?? localStorage.getItem(STORAGE_KEYS.ASSETS);
-      const storedTransactions = loaded[STORAGE_KEYS.TRANSACTIONS] ?? localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
-      const storedPrices = loaded[STORAGE_KEYS.PRICES] ?? localStorage.getItem(STORAGE_KEYS.PRICES);
-      const storedExchangeRates = loaded[STORAGE_KEYS.EXCHANGE_RATES] ?? localStorage.getItem(STORAGE_KEYS.EXCHANGE_RATES);
-      const storedImportBatches = loaded[STORAGE_KEYS.IMPORT_BATCHES] ?? localStorage.getItem(STORAGE_KEYS.IMPORT_BATCHES);
-      const storedSettings = loaded[STORAGE_KEYS.SETTINGS] ?? localStorage.getItem(STORAGE_KEYS.SETTINGS);
-      const storedConnectors = loaded[STORAGE_KEYS.CONNECTORS] ?? localStorage.getItem(STORAGE_KEYS.CONNECTORS);
+      const storedAssets = loaded[STORAGE_KEYS.ASSETS];
+      const storedTransactions = loaded[STORAGE_KEYS.TRANSACTIONS];
+      const storedPrices = loaded[STORAGE_KEYS.PRICES];
+      const storedExchangeRates = loaded[STORAGE_KEYS.EXCHANGE_RATES];
+      const storedImportBatches = loaded[STORAGE_KEYS.IMPORT_BATCHES];
+      const storedSettings = loaded[STORAGE_KEYS.SETTINGS];
+      const storedConnectors = loaded[STORAGE_KEYS.CONNECTORS];
       const now = createTimestamp();
 
       setAssets(
@@ -578,7 +581,7 @@ export const useInvestmentData = () => {
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+  }, [fetchData, session?.user.id]);
 
   useEffect(() => {
     if (!isHydrated) return;

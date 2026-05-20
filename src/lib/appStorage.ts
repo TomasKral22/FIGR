@@ -1,4 +1,4 @@
-import { getCloudStateMany, setCloudStateMany, StorageMap } from '@/lib/cloudStorage';
+import { getAuthenticatedUserId, getCloudStateMany, setCloudStateMany, StorageMap } from '@/lib/cloudStorage';
 
 const getDesktopStorage = () =>
   typeof window !== 'undefined' ? window.desktopApp?.storage : undefined;
@@ -26,20 +26,25 @@ const setLocalMany = async (entries: Record<string, string>) => {
 
 export const appStorage = {
   async getMany(keys: string[]): Promise<StorageMap> {
-    const localEntries = await getLocalMany(keys);
+    const authenticatedUserId = await getAuthenticatedUserId();
+    const localEntries = authenticatedUserId ? null : await getLocalMany(keys);
     const cloudEntries = await getCloudStateMany(keys);
 
     if (cloudEntries) {
-      return Object.fromEntries(
-        keys.map((key) => [key, cloudEntries[key] ?? localEntries[key] ?? null])
-      );
+      return Object.fromEntries(keys.map((key) => [key, cloudEntries[key] ?? null]));
     }
 
-    return localEntries;
+    return localEntries ?? Object.fromEntries(keys.map((key) => [key, null]));
   },
 
   async setMany(entries: Record<string, string>): Promise<void> {
-    await setLocalMany(entries);
+    const authenticatedUserId = await getAuthenticatedUserId();
+
+    if (!authenticatedUserId) {
+      await setLocalMany(entries);
+      return;
+    }
+
     await setCloudStateMany(entries);
   },
 

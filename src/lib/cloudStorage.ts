@@ -6,7 +6,7 @@ export type StorageMap = Record<string, string | null>;
 const USER_STATE_TABLE = 'user_app_state';
 const ATTACHMENT_BUCKET = 'transaction-attachments';
 
-const getAuthenticatedUserId = async () => {
+export const getAuthenticatedUserId = async () => {
   if (!isSupabaseConfigured) return null;
   const {
     data: { session },
