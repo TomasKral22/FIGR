@@ -8,6 +8,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ASSET_TYPE_LABELS, INVESTMENT_PROVIDER_LABELS, TrackedInvestment } from '@/types/investment';
 import { formatCurrencySafe } from '@/utils/currency';
 import { TrackedInvestmentForm } from './TrackedInvestmentForm';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface TrackedInvestmentsPanelProps {
   trackedInvestments: TrackedInvestment[];
@@ -40,6 +41,7 @@ export const TrackedInvestmentsPanel = ({
   onUpdateTrackedInvestment,
   onDeleteTrackedInvestment,
 }: TrackedInvestmentsPanelProps) => {
+  const isMobile = useIsMobile();
   const [filter, setFilter] = useState<'tracked' | 'watchlist'>('tracked');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingInvestment, setEditingInvestment] = useState<TrackedInvestment | null>(null);
@@ -114,6 +116,48 @@ export const TrackedInvestmentsPanel = ({
         </Tabs>
 
         {filteredInvestments.length > 0 ? (
+          isMobile ? (
+            <div className="space-y-3">
+              {filteredInvestments.map((investment) => (
+                <div key={investment.id} className="rounded-2xl border border-border/70 bg-background/50 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold">{investment.ticker}</p>
+                      <p className="text-sm text-muted-foreground">{investment.name}</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => setEditingInvestment(investment)}>
+                        {investment.is_watchlist ? <Eye className="h-4 w-4" /> : <Edit3 className="h-4 w-4" />}
+                      </Button>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => void onDeleteTrackedInvestment(investment.id)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                    <div>
+                      <p className="text-muted-foreground">Typ</p>
+                      <p>{ASSET_TYPE_LABELS[investment.asset_type] || investment.asset_type}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Poskytovatel</p>
+                      <p>{INVESTMENT_PROVIDER_LABELS[investment.provider] || investment.provider}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Hodnota</p>
+                      <p>{formatCurrencySafe(investment.current_value, investment.currency)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Cena</p>
+                      <p>{investment.current_price != null ? formatCurrencySafe(investment.current_price, investment.currency) : '—'}</p>
+                    </div>
+                  </div>
+                  {investment.note ? <p className="mt-3 text-sm text-muted-foreground">{investment.note}</p> : null}
+                </div>
+              ))}
+            </div>
+          ) : (
           <Table>
             <TableHeader>
               <TableRow>
@@ -160,6 +204,7 @@ export const TrackedInvestmentsPanel = ({
               ))}
             </TableBody>
           </Table>
+          )
         ) : (
           <div className="rounded-xl border border-dashed border-border/70 bg-background/30 p-6 text-center text-sm text-muted-foreground">
             Pro tento pohled zatim nejsou zadne polozky.

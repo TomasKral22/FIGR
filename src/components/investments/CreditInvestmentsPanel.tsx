@@ -15,6 +15,7 @@ import {
 import { formatCurrencySafe } from '@/utils/currency';
 import { CreditInvestmentForm } from './CreditInvestmentForm';
 import { CreditRepaymentForm } from './CreditRepaymentForm';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface CreditInvestmentsPanelProps {
   creditInvestments: CreditInvestment[];
@@ -65,6 +66,7 @@ export const CreditInvestmentsPanel = ({
   onAddCreditRepayment,
   onDeleteCreditRepayment,
 }: CreditInvestmentsPanelProps) => {
+  const isMobile = useIsMobile();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingInvestment, setEditingInvestment] = useState<CreditInvestment | null>(null);
   const [selectedInvestmentId, setSelectedInvestmentId] = useState<string | null>(null);
@@ -182,6 +184,52 @@ export const CreditInvestmentsPanel = ({
         </Tabs>
 
         {filteredInvestments.length > 0 ? (
+          isMobile ? (
+            <div className="space-y-3">
+              {filteredInvestments.map((investment) => (
+                <div key={investment.id} className="rounded-2xl border border-border/70 bg-background/50 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold">{investment.name}</p>
+                      <p className="text-sm text-muted-foreground">{CREDIT_INVESTMENT_KIND_LABELS[investment.kind]}</p>
+                    </div>
+                    <span className={`inline-flex rounded-full border px-2 py-1 text-xs ${STATUS_BADGE_STYLES[investment.status]}`}>
+                      {CREDIT_INVESTMENT_STATUS_LABELS[investment.status]}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                    <div>
+                      <p className="text-muted-foreground">Poskytovatel</p>
+                      <p>{INVESTMENT_PROVIDER_LABELS[investment.provider] || investment.provider}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Hodnota</p>
+                      <p>{formatCurrencySafe(investment.current_value, investment.currency)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Úrok</p>
+                      <p>{investment.interest_rate.toLocaleString('cs-CZ', { maximumFractionDigits: 2 })} %</p>
+                    </div>
+                  </div>
+
+                  {investment.note ? <p className="mt-3 text-sm text-muted-foreground">{investment.note}</p> : null}
+
+                  <div className="mt-4 flex justify-end gap-1">
+                    <Button type="button" variant="ghost" size="icon" onClick={() => setSelectedInvestmentId(investment.id)}>
+                      <Building2 className="h-4 w-4" />
+                    </Button>
+                    <Button type="button" variant="ghost" size="icon" onClick={() => setEditingInvestment(investment)}>
+                      <Edit3 className="h-4 w-4" />
+                    </Button>
+                    <Button type="button" variant="ghost" size="icon" onClick={() => void onDeleteCreditInvestment(investment.id)}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
           <Table>
             <TableHeader>
               <TableRow>
@@ -231,6 +279,7 @@ export const CreditInvestmentsPanel = ({
               ))}
             </TableBody>
           </Table>
+          )
         ) : (
           <div className="rounded-xl border border-dashed border-border/70 bg-background/30 p-6 text-center text-sm text-muted-foreground">
             <Building2 className="mx-auto mb-3 h-5 w-5" />

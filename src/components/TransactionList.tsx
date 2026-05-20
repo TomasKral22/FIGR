@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AccountMonthlySnapshot, ExpenseCategory, MonthClosure, Subcategory, Transaction, TransactionDraft } from '@/types/finance';
+import { AccountMonthlySnapshot, BudgetAllocation, BudgetLimit, ExpenseCategory, MonthClosure, RecurringTransaction, Subcategory, Transaction, TransactionDraft } from '@/types/finance';
 import {
   formatCurrency,
   formatMonth,
@@ -26,6 +26,7 @@ import { getCategoryName } from '@/utils/categoryNames';
 import { InstitutionAvatar } from '@/components/InstitutionAvatar';
 import { YearOverview } from '@/components/transactions/YearOverview';
 import { QuickAddInput } from '@/components/transactions/QuickAddInput';
+import { MonthlyWorkflowChecklist } from '@/components/MonthlyWorkflowChecklist';
 import { transactionToDraft, validateTransactionDraft } from '@/utils/transactionWorkflow';
 import { useToast } from '@/hooks/use-toast';
 
@@ -36,6 +37,9 @@ interface TransactionListProps {
   accountSnapshots: AccountMonthlySnapshot[];
   selectedYear: string;
   subcategories: Subcategory[];
+  recurringTransactions: RecurringTransaction[];
+  budgetAllocation: BudgetAllocation;
+  budgetLimits: BudgetLimit[];
   onDelete: (id: string) => void;
   onEdit: (transaction: Transaction) => void;
   onDuplicate: (transaction: Transaction) => void;
@@ -44,6 +48,15 @@ interface TransactionListProps {
   onUpdateSnapshot: (month: string, accountId: string, balance: number) => void;
   monthClosures: MonthClosure[];
   onToggleMonthClosure: (month: string) => void;
+  onFillRecurringForMonth: (month: string) => number;
+}
+
+interface SavedTransactionView {
+  id: string;
+  label: string;
+  transactionFilter: TransactionFilter;
+  accountFilter: string;
+  searchTerm: string;
 }
 
 const DEFAULT_VISIBLE_COUNTS: Record<'income' | 'expense' | 'transfer', number> = {
@@ -64,6 +77,9 @@ export const TransactionList = ({
   accountSnapshots,
   selectedYear,
   subcategories,
+  recurringTransactions,
+  budgetAllocation,
+  budgetLimits,
   onDelete,
   onEdit,
   onDuplicate,
@@ -72,6 +88,7 @@ export const TransactionList = ({
   onUpdateSnapshot,
   monthClosures,
   onToggleMonthClosure,
+  onFillRecurringForMonth,
 }: TransactionListProps) => {
   const { toast } = useToast();
   const [showTransactions, setShowTransactions] = useState(true);
@@ -80,8 +97,41 @@ export const TransactionList = ({
   const [transactionFilter, setTransactionFilter] = useState<TransactionFilter>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [accountFilter, setAccountFilter] = useState('all');
+  const [savedViews, setSavedViews] = useState<SavedTransactionView[]>(() => {
+    if (typeof window === 'undefined') return [];
+    return JSON.parse(window.localStorage.getItem('finance_transaction_saved_views') || '[]') as SavedTransactionView[];
+  });
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [selectedMonth, setSelectedMonth] = useState('');
+  const [showWorkflowTip, setShowWorkflowTip] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return window.localStorage.getItem('finance_transaction_workflow_tip_hidden') !== 'true';
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(
+      'finance_transaction_filters',
+      JSON.stringify({ transactionFilter, accountFilter, searchTerm })
+    );
+  }, [transactionFilter, accountFilter, searchTerm]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem('finance_transaction_saved_views', JSON.stringify(savedViews));
+  }, [savedViews]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = JSON.parse(window.localStorage.getItem('finance_transaction_filters') || '{}') as {
+      transactionFilter?: TransactionFilter;
+      accountFilter?: string;
+      searchTerm?: string;
+    };
+    if (stored.transactionFilter) setTransactionFilter(stored.transactionFilter);
+    if (stored.accountFilter) setAccountFilter(stored.accountFilter);
+    if (typeof stored.searchTerm === 'string') setSearchTerm(stored.searchTerm);
+  }, []);
 
   const filteredTransactions = useMemo(
     () => transactions.filter((transaction) => transaction.month.startsWith(selectedYear)),
@@ -227,6 +277,37 @@ export const TransactionList = ({
     onUpdateSnapshot(editingSnapshot.month, editingSnapshot.accountId, nextBalance);
     setEditingSnapshot(null);
     setEditedBalance('');
+  };
+
+  const saveCurrentView = () => {
+    const label = window.prompt('Název uloženého pohledu', `Pohled ${savedViews.length + 1}`);
+    if (!label?.trim()) return;
+
+    setSavedViews((current) => [
+      {
+        id: crypto.randomUUID(),
+        label: label.trim(),
+        transactionFilter,
+        accountFilter,
+        searchTerm,
+      },
+      ...current,
+    ].slice(0, 8));
+  };
+
+  const applySavedView = (view: SavedTransactionView) => {
+    setTransactionFilter(view.transactionFilter);
+    setAccountFilter(view.accountFilter);
+    setSearchTerm(view.searchTerm);
+  };
+
+  const deleteSavedView = (id: string) => {
+    setSavedViews((current) => current.filter((view) => view.id !== id));
+  };
+
+  const dismissWorkflowTip = () => {
+    setShowWorkflowTip(false);
+    window.localStorage.setItem('finance_transaction_workflow_tip_hidden', 'true');
   };
 
   const toggleSection = (month: string, section: 'income' | 'expense' | 'transfer') => {
@@ -420,6 +501,34 @@ export const TransactionList = ({
             />
           </div>
 
+          {showWorkflowTip ? (
+            <div className="mt-4 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <p className="text-muted-foreground">
+                  Tip: po kontrole trvalých plateb a rozpočtů si ulož oblíbený filtr. Příště se k němu vrátíš jedním klikem.
+                </p>
+                <Button type="button" variant="ghost" size="sm" onClick={dismissWorkflowTip}>
+                  Skrýt tip
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="mt-4">
+            <MonthlyWorkflowChecklist
+              month={selectedMonth}
+              monthLocked={monthLocked}
+              transactions={transactions}
+              recurringTransactions={recurringTransactions}
+              accountSnapshots={selectedMonthSnapshots}
+              budgetAllocation={budgetAllocation}
+              budgetLimits={budgetLimits}
+              subcategories={subcategories}
+              onFillRecurringForMonth={onFillRecurringForMonth}
+              onToggleMonthClosure={onToggleMonthClosure}
+            />
+          </div>
+
           <div className="mt-4 grid gap-3 rounded-2xl border border-border bg-card/70 p-3 md:grid-cols-[minmax(0,1fr)_220px] xl:grid-cols-[auto_minmax(0,1fr)_220px]">
             <div className="flex flex-wrap gap-2">
               {[
@@ -463,6 +572,27 @@ export const TransactionList = ({
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={saveCurrentView}>
+              Uložit pohled
+            </Button>
+            {savedViews.map((view) => (
+              <div key={view.id} className="flex items-center gap-1 rounded-full border border-border/70 bg-background/70 px-2 py-1 text-xs">
+                <button type="button" className="font-medium" onClick={() => applySavedView(view)}>
+                  {view.label}
+                </button>
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground"
+                  onClick={() => deleteSavedView(view.id)}
+                  aria-label={`Smazat pohled ${view.label}`}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
           </div>
 
           <div className="mt-4 rounded-2xl border border-border bg-card/80 p-4 shadow-sm">

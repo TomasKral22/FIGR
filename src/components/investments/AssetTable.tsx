@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { ChevronRight, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { formatCurrencySafe } from '@/utils/currency';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface AssetTableProps {
   assets: PortfolioAsset[];
@@ -62,6 +63,7 @@ export const AssetTable = ({
   onDeleteAsset,
 }: AssetTableProps) => {
   const [breakdown, setBreakdown] = useState<'type' | 'provider' | 'currency' | 'sector'>('type');
+  const isMobile = useIsMobile();
 
   const getBreakdownData = () => {
     const data =
@@ -173,6 +175,71 @@ export const AssetTable = ({
           </div>
 
           {assets.length > 0 ? (
+            isMobile ? (
+              <div className="space-y-3">
+                {assets.map((asset) => {
+                  const isProfit = (asset.profitLossInReportingCurrency ?? 0) >= 0;
+                  const isSelected = selectedAnalysisAssetId === asset.id;
+
+                  return (
+                    <div
+                      key={asset.id}
+                      className={`rounded-2xl border p-4 ${isSelected ? 'border-primary bg-primary/5' : 'border-border/70 bg-background/50'}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-lg font-semibold">{asset.ticker}</p>
+                          <p className="text-sm text-muted-foreground">{asset.name}</p>
+                        </div>
+                        <Button type="button" variant={isSelected ? 'default' : 'outline'} size="sm" onClick={() => onSelectAnalysisAsset(asset.id)}>
+                          {isSelected ? 'Vybráno' : 'Vybrat'}
+                        </Button>
+                      </div>
+
+                      <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                        <div>
+                          <p className="text-muted-foreground">Typ</p>
+                          <p>{ASSET_TYPE_LABELS[asset.asset_type as keyof typeof ASSET_TYPE_LABELS] || asset.asset_type}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Poskytovatel</p>
+                          <p>{INVESTMENT_PROVIDER_LABELS[asset.provider] || asset.provider}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Množství</p>
+                          <p>{formatQuantity(asset.quantity)}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Akt. cena</p>
+                          <p>{asset.currentPriceInReportingCurrency !== null ? formatCurrency(asset.currentPriceInReportingCurrency, reportingCurrency) : '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Hodnota</p>
+                          <p>{asset.currentValueInReportingCurrency !== null ? formatCurrency(asset.currentValueInReportingCurrency, reportingCurrency) : '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Zisk / ztráta</p>
+                          <p className={isProfit ? 'text-success' : 'text-destructive'}>
+                            {asset.profitLossInReportingCurrency !== null
+                              ? `${formatCurrency(asset.profitLossInReportingCurrency, reportingCurrency)} (${formatPercent(asset.profitLossPercent || 0)})`
+                              : '-'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex justify-end gap-2">
+                        <Button type="button" variant="ghost" size="icon" onClick={() => onSelectAsset(asset.id)} aria-label={`Otevřít detail ${asset.ticker}`}>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                        <Button type="button" variant="ghost" size="icon" onClick={async () => onDeleteAsset(asset.id)} aria-label={`Smazat ${asset.ticker}`}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -287,6 +354,7 @@ export const AssetTable = ({
                 })}
               </TableBody>
             </Table>
+            )
           ) : (
             <p className="py-8 text-center text-muted-foreground">Zatím žádná aktiva. Přidej transakci pro začátek.</p>
           )}

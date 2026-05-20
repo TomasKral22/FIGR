@@ -22,6 +22,7 @@ import { QuickActionsPanel } from '@/components/QuickActionsPanel';
 import { SmartInsightsPanel } from '@/components/SmartInsightsPanel';
 import { CategoryAutomationPanel } from '@/components/CategoryAutomationPanel';
 import { SettingsPanel } from '@/components/SettingsPanel';
+import { DecisionDashboardPanel } from '@/components/DecisionDashboardPanel';
 import { Transaction, TransactionDraft } from '@/types/finance';
 import { draftToTransactionInput, duplicateTransaction } from '@/utils/transactionWorkflow';
 import { useAuth } from '@/contexts/AuthContext';
@@ -99,6 +100,7 @@ const Index = () => {
     updateBudgetLimit,
     deleteBudgetLimit,
     updateFeatureToggles,
+    budgetAllocation,
     updateAccountMonthBalance,
     isMonthClosed,
     toggleMonthClosure,
@@ -178,6 +180,31 @@ const Index = () => {
       if (event.key === 'q' || event.key === 'Q') {
         event.preventDefault();
         document.getElementById('quick-add-input')?.focus();
+      }
+
+      if (event.shiftKey && (event.key === 'M' || event.key === 'm')) {
+        event.preventDefault();
+        document.getElementById('month-workflow')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+
+      if (event.shiftKey && (event.key === 'I' || event.key === 'i')) {
+        event.preventDefault();
+        setIsInvestmentsOpen(true);
+      }
+
+      if (event.shiftKey && (event.key === 'R' || event.key === 'r')) {
+        event.preventDefault();
+        setIsAnnualReportsOpen(true);
+      }
+
+      if (event.shiftKey && (event.key === 'T' || event.key === 't')) {
+        event.preventDefault();
+        setIsRecurringOpen(true);
+      }
+
+      if (event.shiftKey && (event.key === 'S' || event.key === 's')) {
+        event.preventDefault();
+        setIsSettingsOpen(true);
       }
 
       if (event.key === 'Escape' && isTransactionFormOpen) {
@@ -332,6 +359,21 @@ const Index = () => {
             bankAccounts={bankAccounts}
             brokerAccounts={brokerAccounts}
           />
+          <DecisionDashboardPanel
+            transactions={transactions}
+            wealthSnapshots={wealthSnapshots}
+            accountSnapshots={accountSnapshots}
+            recurringTransactions={recurringTransactions}
+            monthClosures={monthClosures}
+            budgetLimits={budgetLimits}
+            budgetAllocation={budgetAllocation}
+            subcategories={subcategories}
+            selectedYear={effectiveSelectedYear}
+            onOpenMonthWorkflow={() => {
+              document.getElementById('month-workflow')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
+            onOpenRecurring={() => setIsRecurringOpen(true)}
+          />
           <YearSelector
             transactions={transactions}
             selectedYear={effectiveSelectedYear}
@@ -342,6 +384,9 @@ const Index = () => {
             accountSnapshots={accountSnapshots}
             selectedYear={effectiveSelectedYear}
             subcategories={subcategories}
+            recurringTransactions={recurringTransactions}
+            budgetAllocation={budgetAllocation}
+            budgetLimits={budgetLimits}
             onDelete={deleteTransaction}
             onEdit={(transaction) => {
               setEditingTransaction(transaction);
@@ -367,6 +412,7 @@ const Index = () => {
             onUpdateSnapshot={updateAccountMonthBalance}
             monthClosures={monthClosures}
             onToggleMonthClosure={toggleMonthClosure}
+            onFillRecurringForMonth={fillRecurringTransactions}
           />
           </div>
         </main>
