@@ -72,10 +72,10 @@ export const TickerAnalysisPanel = ({
                 Typ: {selectedAsset.asset_type} · Poskytovatel: {selectedAsset.provider} · Sektor:{' '}
                 {selectedAsset.sector || 'neuvedeno'}
               </p>
-              {marketSnapshot?.regularMarketPrice !== null ? (
+              {marketSnapshot?.regularMarketPrice != null ? (
                 <p className="mt-1 text-sm text-muted-foreground">
                   Aktuální online cena:{' '}
-                  {marketSnapshot.regularMarketPrice?.toLocaleString('cs-CZ', {
+                  {marketSnapshot.regularMarketPrice.toLocaleString('cs-CZ', {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}{' '}
