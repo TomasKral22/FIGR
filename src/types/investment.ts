@@ -185,7 +185,7 @@ export interface TickerAnalysisResult {
   ticker: string;
   generatedAt: string;
   analysis: string;
-  provider: 'mock' | 'backend';
+  provider: 'mock' | 'backend' | 'fallback';
   promptVersion: string;
 }
 

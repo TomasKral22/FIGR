@@ -25,6 +25,112 @@ interface MarketSnapshot {
   summary?: Record<string, unknown> | null;
 }
 
+const formatCurrency = (value: number | null, currency: string | null) => {
+  if (value === null) return "neuvedeno";
+  try {
+    return new Intl.NumberFormat("cs-CZ", {
+      style: "currency",
+      currency: currency || "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+  } catch {
+    return `${value.toFixed(2)} ${currency || ""}`.trim();
+  }
+};
+
+const formatPercent = (value: number | null) => {
+  if (value === null) return "neuvedeno";
+  return `${value.toLocaleString("cs-CZ", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} %`;
+};
+
+const getSummaryNumber = (summary: Record<string, unknown> | null | undefined, key: string) => {
+  const sectionCandidates = [
+    summary?.financialData,
+    summary?.defaultKeyStatistics,
+    summary?.summaryDetail,
+    summary?.price,
+  ] as Array<Record<string, unknown> | undefined>;
+
+  for (const section of sectionCandidates) {
+    const raw = section?.[key];
+    if (typeof raw === "number") return raw;
+    if (raw && typeof raw === "object" && "raw" in raw) {
+      const nested = (raw as { raw?: unknown }).raw;
+      if (typeof nested === "number" && Number.isFinite(nested)) return nested;
+    }
+  }
+
+  return null;
+};
+
+const buildFallbackAnalysis = (
+  snapshot: MarketSnapshot,
+  portfolioItem?: Record<string, unknown>,
+  reason?: string
+) => {
+  const summary = snapshot.summary || null;
+  const marketCap = getSummaryNumber(summary, "marketCap");
+  const trailingPE = getSummaryNumber(summary, "trailingPE");
+  const forwardPE = getSummaryNumber(summary, "forwardPE");
+  const dividendYield = getSummaryNumber(summary, "dividendYield");
+  const beta = getSummaryNumber(summary, "beta");
+  const fiftyTwoWeekLow = getSummaryNumber(summary, "fiftyTwoWeekLow");
+  const fiftyTwoWeekHigh = getSummaryNumber(summary, "fiftyTwoWeekHigh");
+
+  const quantity =
+    portfolioItem && typeof portfolioItem.quantity === "number" ? portfolioItem.quantity : null;
+  const avgBuyPrice =
+    portfolioItem && typeof portfolioItem.avgBuyPrice === "number" ? portfolioItem.avgBuyPrice : null;
+  const pnlPercent =
+    portfolioItem && typeof portfolioItem.profitLossPercent === "number"
+      ? portfolioItem.profitLossPercent
+      : null;
+
+  const lines = [
+    `Analýza titulu ${snapshot.ticker}`,
+    "",
+    "Poznámka",
+    reason
+      ? `Plná AI analýza nebyla dostupná. Důvod: ${reason}`
+      : "Plná AI analýza nebyla dostupná, proto vracím zjednodušený komentář z tržních dat.",
+    "",
+    "1. Rychlý profil",
+    `- Ticker: ${snapshot.ticker}`,
+    `- Název: ${snapshot.shortName || "neuvedeno"}`,
+    `- Burza: ${snapshot.exchange || "neuvedeno"}`,
+    `- Měna: ${snapshot.currency || "neuvedeno"}`,
+    "",
+    "2. Aktuální tržní snapshot",
+    `- Poslední cena: ${formatCurrency(snapshot.regularMarketPrice, snapshot.currency)}`,
+    `- Denní změna: ${formatPercent(snapshot.regularMarketChangePercent)}`,
+    `- Market cap: ${formatCurrency(marketCap, snapshot.currency)}`,
+    `- Trailing P/E: ${trailingPE?.toLocaleString("cs-CZ", { maximumFractionDigits: 2 }) || "neuvedeno"}`,
+    `- Forward P/E: ${forwardPE?.toLocaleString("cs-CZ", { maximumFractionDigits: 2 }) || "neuvedeno"}`,
+    `- Dividend yield: ${dividendYield !== null ? formatPercent(dividendYield * 100) : "neuvedeno"}`,
+    `- Beta: ${beta?.toLocaleString("cs-CZ", { maximumFractionDigits: 2 }) || "neuvedeno"}`,
+    `- 52W low / high: ${formatCurrency(fiftyTwoWeekLow, snapshot.currency)} / ${formatCurrency(fiftyTwoWeekHigh, snapshot.currency)}`,
+    "",
+    "3. Kontext tvé pozice",
+    `- Držené množství: ${quantity !== null ? quantity.toLocaleString("cs-CZ", { maximumFractionDigits: 8 }) : "neuvedeno"}`,
+    `- Průměrná nákupní cena: ${formatCurrency(avgBuyPrice, snapshot.currency)}`,
+    `- Výkonnost pozice: ${pnlPercent !== null ? formatPercent(pnlPercent) : "neuvedeno"}`,
+    "",
+    "4. Krátký komentář",
+    `- Tohle je zjednodušený fallback. Má smysl hlavně pro rychlou orientaci v ceně, valuaci a základních rizikových ukazatelích.`,
+    `- Pro plnou fundamentální analýzu s peer group, DCF a širšími zdroji je potřeba znovu zprovoznit AI provider s aktivním kreditem.`,
+    "",
+    "Použité zdroje",
+    "[1] Yahoo Finance chart endpoint",
+    "[2] Yahoo Finance quoteSummary endpoint",
+  ];
+
+  return lines.join("\n");
+};
+
 const safeNumber = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
 
@@ -218,10 +324,17 @@ const generateAnalysis = async ({
   const provider = (Deno.env.get("AI_PROVIDER") || "openai").toLowerCase();
 
   let analysis: string;
-  if (provider === "anthropic" || provider === "claude") {
-    analysis = await callAnthropic(prompt, snapshot, portfolioItem);
-  } else {
-    analysis = await callOpenAI(prompt, snapshot, portfolioItem);
+  let resultProvider: "backend" | "fallback" = "backend";
+  try {
+    if (provider === "anthropic" || provider === "claude") {
+      analysis = await callAnthropic(prompt, snapshot, portfolioItem);
+    } else {
+      analysis = await callOpenAI(prompt, snapshot, portfolioItem);
+    }
+  } catch (error: unknown) {
+    const reason = error instanceof Error ? error.message : "AI provider selhal.";
+    analysis = buildFallbackAnalysis(snapshot, portfolioItem, reason);
+    resultProvider = "fallback";
   }
 
   return {
@@ -229,7 +342,7 @@ const generateAnalysis = async ({
       ticker: snapshot.ticker,
       generatedAt: new Date().toISOString(),
       analysis,
-      provider: "backend",
+      provider: resultProvider,
       promptVersion: "ticker-analysis-v2",
     },
     marketSnapshot: snapshot,

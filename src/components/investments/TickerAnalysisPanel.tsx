@@ -118,7 +118,12 @@ export const TickerAnalysisPanel = ({
                 <span className="font-medium">{result.ticker}</span>
                 <span className="text-muted-foreground">Vygenerováno: {formatGeneratedAt(result.generatedAt)}</span>
                 <span className="text-muted-foreground">
-                  Zdroj: {result.provider === 'backend' ? 'server-side AI' : 'mock režim'}
+                  Zdroj:{' '}
+                  {result.provider === 'backend'
+                    ? 'server-side AI'
+                    : result.provider === 'fallback'
+                      ? 'serverový fallback z tržních dat'
+                      : 'mock režim'}
                 </span>
               </div>
               <div className="whitespace-pre-wrap text-sm leading-6 text-foreground">{result.analysis}</div>
