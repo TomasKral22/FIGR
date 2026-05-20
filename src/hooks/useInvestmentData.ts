@@ -1,20 +1,27 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import {
   AssetPrice,
   BrokerConnector,
   CreditInvestment,
+  CreditInvestmentRepayment,
   ExchangeRate,
   ImportBatch,
   InvestmentAsset,
   InvestmentAssetType,
+  InvestmentAuditEntry,
+  InvestmentDataMeta,
   InvestmentProvider,
+  InvestmentSyncStatus,
   InvestmentTransaction,
   InvestmentTransactionType,
+  InvestmentValidationIssue,
   PortfolioSettings,
   PortfolioSummary,
+  TrackedInvestment,
 } from '@/types/investment';
 import { calculatePortfolioSummary } from '@/utils/investmentPortfolio';
+import { buildInvestmentValidationIssues } from '@/utils/investmentDiagnostics';
 import { appStorage } from '@/lib/appStorage';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -27,10 +34,21 @@ const STORAGE_KEYS = {
   SETTINGS: 'investment_settings',
   CONNECTORS: 'investment_broker_connectors',
   CREDIT_INVESTMENTS: 'investment_credit_investments',
+  CREDIT_REPAYMENTS: 'investment_credit_repayments',
+  TRACKED_INVESTMENTS: 'investment_tracked_investments',
+  AUDIT_LOG: 'investment_audit_log',
+  META: 'investment_meta',
+};
+
+const FINANCE_AUDIT_KEYS = {
+  TRANSACTIONS: 'finance_transactions',
+  MONTH_CLOSURES: 'finance_month_closures',
 };
 
 const createTimestamp = () => new Date().toISOString();
+const todayIso = () => new Date().toISOString().slice(0, 10);
 const getErrorMessage = (error: unknown) => (error instanceof Error ? error.message : undefined);
+const MAX_AUDIT_ITEMS = 300;
 
 const DEFAULT_CONNECTORS: BrokerConnector[] = [
   {
@@ -39,10 +57,10 @@ const DEFAULT_CONNECTORS: BrokerConnector[] = [
     name: 'Trading 212 API',
     source_kind: 'api_sync',
     status: 'planned',
-    description: 'Připravený konektor pro read-only synchronizaci účtu a historie z Trading 212 Public API.',
+    description: 'Pripraveny konektor pro read-only synchronizaci uctu a historie z Trading 212 Public API.',
     auth_type: 'api_key',
     last_sync_at: null,
-    config_hint: 'Bude vyžadovat API klíč vygenerovaný přímo v účtu Trading 212.',
+    config_hint: 'Bude vyzadovat API klic vygenerovany primo v uctu Trading 212.',
   },
   {
     id: 'connector-ibkr-flex',
@@ -50,12 +68,19 @@ const DEFAULT_CONNECTORS: BrokerConnector[] = [
     name: 'IBKR Flex Web Service',
     source_kind: 'api_sync',
     status: 'planned',
-    description: 'Doporučený oficiální konektor pro activity reporty a historii obchodů z Interactive Brokers.',
+    description: 'Doporuceny oficialni konektor pro activity reporty a historii obchodu z Interactive Brokers.',
     auth_type: 'flex_token',
     last_sync_at: null,
-    config_hint: 'Bude vyžadovat Flex Query ID a Flex token z Client Portalu.',
+    config_hint: 'Bude vyzadovat Flex Query ID a Flex token z Client Portalu.',
   },
 ];
+
+const DEFAULT_META: InvestmentDataMeta = {
+  last_saved_at: null,
+  last_backup_at: null,
+  last_price_sync_at: null,
+  hydrated_at: null,
+};
 
 const isDuplicateInvestmentTransaction = (
   left: InvestmentTransaction,
@@ -79,6 +104,18 @@ const isDuplicateInvestmentTransaction = (
   left.total_value === right.total_value &&
   left.notes === right.notes;
 
+const downloadJson = (fileName: string, payload: unknown) => {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+};
+
 export const useInvestmentData = () => {
   const { toast } = useToast();
   const { session } = useAuth();
@@ -91,83 +128,117 @@ export const useInvestmentData = () => {
   const [settings, setSettings] = useState<PortfolioSettings | null>(null);
   const [connectors, setConnectors] = useState<BrokerConnector[]>([]);
   const [creditInvestments, setCreditInvestments] = useState<CreditInvestment[]>([]);
+  const [creditRepayments, setCreditRepayments] = useState<CreditInvestmentRepayment[]>([]);
+  const [trackedInvestments, setTrackedInvestments] = useState<TrackedInvestment[]>([]);
+  const [auditLog, setAuditLog] = useState<InvestmentAuditEntry[]>([]);
+  const [meta, setMeta] = useState<InvestmentDataMeta>(DEFAULT_META);
+  const [dbPath, setDbPath] = useState<string | null>(null);
+  const [validationIssues, setValidationIssues] = useState<InvestmentValidationIssue[]>([]);
   const [portfolioSummary, setPortfolioSummary] = useState<PortfolioSummary | null>(null);
   const [calculatingPortfolio, setCalculatingPortfolio] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
+
+  const touchMeta = useCallback((updates: Partial<InvestmentDataMeta>) => {
+    setMeta((prev) => ({
+      ...prev,
+      ...updates,
+    }));
+  }, []);
+
+  const pushAudit = useCallback(
+    (entry: Omit<InvestmentAuditEntry, 'id' | 'created_at' | 'actor'>) => {
+      const actor = session?.user.user_metadata?.user_name || session?.user.email || 'lokalni uzivatel';
+      setAuditLog((prev) =>
+        [
+          {
+            id: crypto.randomUUID(),
+            created_at: createTimestamp(),
+            actor,
+            ...entry,
+          },
+          ...prev,
+        ].slice(0, MAX_AUDIT_ITEMS)
+      );
+    },
+    [session?.user.email, session?.user.user_metadata]
+  );
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     setIsHydrated(false);
     try {
       const loaded = await appStorage.getMany(Object.values(STORAGE_KEYS));
-      const storedAssets = loaded[STORAGE_KEYS.ASSETS];
-      const storedTransactions = loaded[STORAGE_KEYS.TRANSACTIONS];
-      const storedPrices = loaded[STORAGE_KEYS.PRICES];
-      const storedExchangeRates = loaded[STORAGE_KEYS.EXCHANGE_RATES];
-      const storedImportBatches = loaded[STORAGE_KEYS.IMPORT_BATCHES];
-      const storedSettings = loaded[STORAGE_KEYS.SETTINGS];
-      const storedConnectors = loaded[STORAGE_KEYS.CONNECTORS];
-      const storedCreditInvestments = loaded[STORAGE_KEYS.CREDIT_INVESTMENTS];
       const now = createTimestamp();
+      const desktopDbPath = await appStorage.getDbPath();
+
+      const parse = <T,>(key: string, fallback: T): T => {
+        const raw = loaded[key];
+        return raw ? (JSON.parse(raw) as T) : fallback;
+      };
 
       setAssets(
-        storedAssets
-          ? (JSON.parse(storedAssets) as InvestmentAsset[])
-              .map((asset) => ({
-                ...asset,
-                provider: asset.provider || 'broker',
-              }))
-              .sort((a, b) => a.ticker.localeCompare(b.ticker))
-          : []
+        parse<InvestmentAsset[]>(STORAGE_KEYS.ASSETS, [])
+          .map((asset) => ({
+            ...asset,
+            provider: asset.provider || 'broker',
+          }))
+          .sort((a, b) => a.ticker.localeCompare(b.ticker))
       );
       setTransactions(
-        storedTransactions
-          ? (JSON.parse(storedTransactions) as InvestmentTransaction[]).sort((a, b) =>
-              b.transaction_date.localeCompare(a.transaction_date)
-            )
-          : []
+        parse<InvestmentTransaction[]>(STORAGE_KEYS.TRANSACTIONS, []).sort((a, b) =>
+          b.transaction_date.localeCompare(a.transaction_date)
+        )
       );
       setPrices(
-        storedPrices
-          ? (JSON.parse(storedPrices) as AssetPrice[]).sort((a, b) => b.price_date.localeCompare(a.price_date))
-          : []
+        parse<AssetPrice[]>(STORAGE_KEYS.PRICES, []).sort((a, b) => b.price_date.localeCompare(a.price_date))
       );
       setExchangeRates(
-        storedExchangeRates
-          ? (JSON.parse(storedExchangeRates) as ExchangeRate[]).sort((a, b) =>
-              b.rate_date.localeCompare(a.rate_date)
-            )
-          : []
+        parse<ExchangeRate[]>(STORAGE_KEYS.EXCHANGE_RATES, []).sort((a, b) => b.rate_date.localeCompare(a.rate_date))
       );
       setImportBatches(
-        storedImportBatches
-          ? (JSON.parse(storedImportBatches) as ImportBatch[]).sort((a, b) =>
-              b.imported_at.localeCompare(a.imported_at)
-            )
-          : []
+        parse<ImportBatch[]>(STORAGE_KEYS.IMPORT_BATCHES, []).sort((a, b) =>
+          b.imported_at.localeCompare(a.imported_at)
+        )
       );
       setSettings(
-        storedSettings
-          ? (JSON.parse(storedSettings) as PortfolioSettings)
-          : {
-              id: crypto.randomUUID(),
-              reporting_currency: 'CZK',
-              created_at: now,
-              updated_at: now,
-            }
+        parse<PortfolioSettings | null>(STORAGE_KEYS.SETTINGS, null) || {
+          id: crypto.randomUUID(),
+          reporting_currency: 'CZK',
+          created_at: now,
+          updated_at: now,
+        }
       );
-      setConnectors(storedConnectors ? (JSON.parse(storedConnectors) as BrokerConnector[]) : DEFAULT_CONNECTORS);
+      setConnectors(parse<BrokerConnector[]>(STORAGE_KEYS.CONNECTORS, DEFAULT_CONNECTORS));
       setCreditInvestments(
-        storedCreditInvestments
-          ? (JSON.parse(storedCreditInvestments) as CreditInvestment[]).sort((a, b) => a.name.localeCompare(b.name))
-          : []
+        parse<CreditInvestment[]>(STORAGE_KEYS.CREDIT_INVESTMENTS, []).sort((a, b) => a.name.localeCompare(b.name))
       );
+      setCreditRepayments(
+        parse<CreditInvestmentRepayment[]>(STORAGE_KEYS.CREDIT_REPAYMENTS, []).sort((a, b) =>
+          b.payment_date.localeCompare(a.payment_date)
+        )
+      );
+      setTrackedInvestments(
+        parse<TrackedInvestment[]>(STORAGE_KEYS.TRACKED_INVESTMENTS, []).sort((a, b) =>
+          a.ticker.localeCompare(b.ticker)
+        )
+      );
+      setAuditLog(
+        parse<InvestmentAuditEntry[]>(STORAGE_KEYS.AUDIT_LOG, []).sort((a, b) =>
+          b.created_at.localeCompare(a.created_at)
+        )
+      );
+      setMeta({
+        ...DEFAULT_META,
+        ...parse<InvestmentDataMeta>(STORAGE_KEYS.META, DEFAULT_META),
+        hydrated_at: now,
+      });
+      setDbPath(desktopDbPath);
       setIsHydrated(true);
     } catch (error: unknown) {
       console.error('Error fetching investment data:', error);
       toast({
         title: 'Chyba',
-        description: 'Nepodařilo se načíst investiční data.',
+        description: 'Nepodarilo se nacist investicni data.',
         variant: 'destructive',
       });
     } finally {
@@ -184,6 +255,7 @@ export const useInvestmentData = () => {
         prices,
         exchangeRates,
         creditInvestments,
+        trackedInvestments,
         reportingCurrency: settings?.reporting_currency || 'CZK',
       });
       setPortfolioSummary(summary);
@@ -192,14 +264,45 @@ export const useInvestmentData = () => {
       console.error('Error calculating portfolio:', error);
       toast({
         title: 'Chyba',
-        description: 'Nepodařilo se vypočítat portfolio.',
+        description: 'Nepodarilo se vypocitat portfolio.',
         variant: 'destructive',
       });
       return null;
     } finally {
       setCalculatingPortfolio(false);
     }
-  }, [assets, transactions, prices, exchangeRates, creditInvestments, settings, toast]);
+  }, [assets, transactions, prices, exchangeRates, creditInvestments, trackedInvestments, settings, toast]);
+
+  const refreshValidationIssues = useCallback(async () => {
+    const financeLoaded = await appStorage.getMany(Object.values(FINANCE_AUDIT_KEYS));
+    const financeTransactions = financeLoaded[FINANCE_AUDIT_KEYS.TRANSACTIONS]
+      ? (JSON.parse(financeLoaded[FINANCE_AUDIT_KEYS.TRANSACTIONS] as string) as Array<{ month: string }>)
+      : [];
+    const monthClosures = financeLoaded[FINANCE_AUDIT_KEYS.MONTH_CLOSURES]
+      ? (JSON.parse(financeLoaded[FINANCE_AUDIT_KEYS.MONTH_CLOSURES] as string) as Array<{ month: string }>)
+      : [];
+
+    const latestFinanceMonth =
+      financeTransactions.length > 0
+        ? financeTransactions.map((item) => item.month).sort((left, right) => right.localeCompare(left))[0]
+        : null;
+
+    const issues = buildInvestmentValidationIssues({
+      assets,
+      transactions,
+      prices,
+      exchangeRates,
+      reportingCurrency: settings?.reporting_currency || 'CZK',
+      creditInvestments,
+      creditRepayments,
+      trackedInvestments,
+      latestFinanceMonth,
+      closedFinanceMonths: monthClosures.map((item) => item.month),
+      todayIso: todayIso(),
+    });
+    setValidationIssues(issues);
+    return issues;
+  }, [assets, transactions, prices, exchangeRates, settings, creditInvestments, creditRepayments, trackedInvestments]);
 
   const addAsset = async (asset: {
     ticker: string;
@@ -224,13 +327,20 @@ export const useInvestmentData = () => {
       };
 
       setAssets((prev) => [...prev, newAsset].sort((a, b) => a.ticker.localeCompare(b.ticker)));
-      toast({ title: 'Aktivum přidáno', description: `${newAsset.ticker} bylo přidáno.` });
+      touchMeta({ last_saved_at: now });
+      pushAudit({
+        action: 'asset-create',
+        detail: `Pridano aktivum ${newAsset.ticker}.`,
+        scope: 'asset',
+        severity: 'info',
+      });
+      toast({ title: 'Aktivum pridano', description: `${newAsset.ticker} bylo pridano.` });
       return newAsset;
     } catch (error: unknown) {
       console.error('Error adding asset:', error);
       toast({
         title: 'Chyba',
-        description: getErrorMessage(error) || 'Nepodařilo se přidat aktivum.',
+        description: getErrorMessage(error) || 'Nepodarilo se pridat aktivum.',
         variant: 'destructive',
       });
       return null;
@@ -242,12 +352,19 @@ export const useInvestmentData = () => {
       setAssets((prev) => prev.filter((asset) => asset.id !== id));
       setTransactions((prev) => prev.filter((transaction) => transaction.asset_id !== id));
       setPrices((prev) => prev.filter((price) => price.asset_id !== id));
-      toast({ title: 'Aktivum smazáno' });
+      touchMeta({ last_saved_at: createTimestamp() });
+      pushAudit({
+        action: 'asset-delete',
+        detail: `Smazano aktivum ${id} vcetne navazanych transakci a cen.`,
+        scope: 'asset',
+        severity: 'warning',
+      });
+      toast({ title: 'Aktivum smazano' });
     } catch (error: unknown) {
       console.error('Error deleting asset:', error);
       toast({
         title: 'Chyba',
-        description: getErrorMessage(error) || 'Nepodařilo se smazat aktivum.',
+        description: getErrorMessage(error) || 'Nepodarilo se smazat aktivum.',
         variant: 'destructive',
       });
     }
@@ -298,20 +415,27 @@ export const useInvestmentData = () => {
           })
         )
       ) {
-        toast({ title: 'Stejná investiční transakce už existuje.' });
+        toast({ title: 'Stejna investicni transakce uz existuje.' });
         return null;
       }
 
       setTransactions((prev) =>
         [newTransaction, ...prev].sort((a, b) => b.transaction_date.localeCompare(a.transaction_date))
       );
-      toast({ title: 'Transakce přidána' });
+      touchMeta({ last_saved_at: createTimestamp() });
+      pushAudit({
+        action: 'transaction-create',
+        detail: `Pridana transakce ${newTransaction.transaction_type} pro aktivum ${newTransaction.asset_id}.`,
+        scope: 'portfolio',
+        severity: 'info',
+      });
+      toast({ title: 'Transakce pridana' });
       return newTransaction;
     } catch (error: unknown) {
       console.error('Error adding transaction:', error);
       toast({
         title: 'Chyba',
-        description: getErrorMessage(error) || 'Nepodařilo se přidat transakci.',
+        description: getErrorMessage(error) || 'Nepodarilo se pridat transakci.',
         variant: 'destructive',
       });
       return null;
@@ -321,12 +445,19 @@ export const useInvestmentData = () => {
   const deleteTransaction = async (id: string) => {
     try {
       setTransactions((prev) => prev.filter((transaction) => transaction.id !== id));
-      toast({ title: 'Transakce smazána' });
+      touchMeta({ last_saved_at: createTimestamp() });
+      pushAudit({
+        action: 'transaction-delete',
+        detail: `Smazana investicni transakce ${id}.`,
+        scope: 'portfolio',
+        severity: 'warning',
+      });
+      toast({ title: 'Transakce smazana' });
     } catch (error: unknown) {
       console.error('Error deleting transaction:', error);
       toast({
         title: 'Chyba',
-        description: 'Nepodařilo se smazat transakci.',
+        description: 'Nepodarilo se smazat transakci.',
         variant: 'destructive',
       });
     }
@@ -361,15 +492,25 @@ export const useInvestmentData = () => {
         );
         return [nextPrice, ...filtered].sort((a, b) => b.price_date.localeCompare(a.price_date));
       });
+      touchMeta({
+        last_saved_at: createTimestamp(),
+        last_price_sync_at: options?.silent ? meta.last_price_sync_at : createTimestamp(),
+      });
       if (!options?.silent) {
-        toast({ title: 'Cena aktualizována' });
+        pushAudit({
+          action: 'price-update',
+          detail: `Ulozena cena pro aktivum ${price.asset_id} k datu ${price.price_date}.`,
+          scope: 'sync',
+          severity: 'info',
+        });
+        toast({ title: 'Cena aktualizovana' });
       }
       return nextPrice;
     } catch (error: unknown) {
       console.error('Error adding price:', error);
       toast({
         title: 'Chyba',
-        description: 'Nepodařilo se přidat cenu.',
+        description: 'Nepodarilo se pridat cenu.',
         variant: 'destructive',
       });
       return null;
@@ -410,13 +551,20 @@ export const useInvestmentData = () => {
         );
         return [nextRate, ...filtered].sort((a, b) => b.rate_date.localeCompare(a.rate_date));
       });
-      toast({ title: 'Směnný kurz aktualizován' });
+      touchMeta({ last_saved_at: createTimestamp() });
+      pushAudit({
+        action: 'exchange-rate-update',
+        detail: `Ulozen kurz ${rate.from_currency}/${rate.to_currency} pro ${rate.rate_date}.`,
+        scope: 'sync',
+        severity: 'info',
+      });
+      toast({ title: 'Smenny kurz aktualizovan' });
       return nextRate;
     } catch (error: unknown) {
       console.error('Error adding exchange rate:', error);
       toast({
         title: 'Chyba',
-        description: 'Nepodařilo se přidat směnný kurz.',
+        description: 'Nepodarilo se pridat smenny kurz.',
         variant: 'destructive',
       });
       return null;
@@ -450,13 +598,20 @@ export const useInvestmentData = () => {
       };
 
       setCreditInvestments((prev) => [...prev, nextInvestment].sort((a, b) => a.name.localeCompare(b.name)));
-      toast({ title: 'Úvěrová investice přidána' });
+      touchMeta({ last_saved_at: now });
+      pushAudit({
+        action: 'credit-create',
+        detail: `Pridana uverova investice ${nextInvestment.name}.`,
+        scope: 'credit',
+        severity: 'info',
+      });
+      toast({ title: 'Uverova investice pridana' });
       return nextInvestment;
     } catch (error: unknown) {
       console.error('Error adding credit investment:', error);
       toast({
         title: 'Chyba',
-        description: getErrorMessage(error) || 'Nepodařilo se přidat úvěrovou investici.',
+        description: getErrorMessage(error) || 'Nepodarilo se pridat uverovou investici.',
         variant: 'destructive',
       });
       return null;
@@ -481,12 +636,19 @@ export const useInvestmentData = () => {
           )
           .sort((a, b) => a.name.localeCompare(b.name))
       );
-      toast({ title: 'Úvěrová investice upravena' });
+      touchMeta({ last_saved_at: createTimestamp() });
+      pushAudit({
+        action: 'credit-update',
+        detail: `Upravena uverova investice ${id}.`,
+        scope: 'credit',
+        severity: 'info',
+      });
+      toast({ title: 'Uverova investice upravena' });
     } catch (error: unknown) {
       console.error('Error updating credit investment:', error);
       toast({
         title: 'Chyba',
-        description: getErrorMessage(error) || 'Nepodařilo se upravit úvěrovou investici.',
+        description: getErrorMessage(error) || 'Nepodarilo se upravit uverovou investici.',
         variant: 'destructive',
       });
     }
@@ -495,12 +657,202 @@ export const useInvestmentData = () => {
   const deleteCreditInvestment = async (id: string) => {
     try {
       setCreditInvestments((prev) => prev.filter((investment) => investment.id !== id));
-      toast({ title: 'Úvěrová investice smazána' });
+      setCreditRepayments((prev) => prev.filter((repayment) => repayment.credit_investment_id !== id));
+      touchMeta({ last_saved_at: createTimestamp() });
+      pushAudit({
+        action: 'credit-delete',
+        detail: `Smazana uverova investice ${id}.`,
+        scope: 'credit',
+        severity: 'warning',
+      });
+      toast({ title: 'Uverova investice smazana' });
     } catch (error: unknown) {
       console.error('Error deleting credit investment:', error);
       toast({
         title: 'Chyba',
-        description: getErrorMessage(error) || 'Nepodařilo se smazat úvěrovou investici.',
+        description: getErrorMessage(error) || 'Nepodarilo se smazat uverovou investici.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const addCreditRepayment = async (repayment: {
+    credit_investment_id: string;
+    payment_date: string;
+    principal_paid: number;
+    interest_paid: number;
+    fee_paid?: number;
+    note?: string;
+  }) => {
+    try {
+      const nextRepayment: CreditInvestmentRepayment = {
+        id: crypto.randomUUID(),
+        credit_investment_id: repayment.credit_investment_id,
+        payment_date: repayment.payment_date,
+        principal_paid: repayment.principal_paid,
+        interest_paid: repayment.interest_paid,
+        fee_paid: repayment.fee_paid || 0,
+        note: repayment.note || null,
+        created_at: createTimestamp(),
+      };
+
+      setCreditRepayments((prev) =>
+        [nextRepayment, ...prev].sort((a, b) => b.payment_date.localeCompare(a.payment_date))
+      );
+      touchMeta({ last_saved_at: createTimestamp() });
+      pushAudit({
+        action: 'credit-repayment-create',
+        detail: `Pridana splatka pro uverovou investici ${repayment.credit_investment_id}.`,
+        scope: 'credit',
+        severity: 'info',
+      });
+      toast({ title: 'Splatka ulozena' });
+      return nextRepayment;
+    } catch (error: unknown) {
+      console.error('Error adding credit repayment:', error);
+      toast({
+        title: 'Chyba',
+        description: getErrorMessage(error) || 'Nepodarilo se ulozit splatku.',
+        variant: 'destructive',
+      });
+      return null;
+    }
+  };
+
+  const deleteCreditRepayment = async (id: string) => {
+    try {
+      setCreditRepayments((prev) => prev.filter((repayment) => repayment.id !== id));
+      touchMeta({ last_saved_at: createTimestamp() });
+      pushAudit({
+        action: 'credit-repayment-delete',
+        detail: `Smazana splatka ${id}.`,
+        scope: 'credit',
+        severity: 'warning',
+      });
+      toast({ title: 'Splatka smazana' });
+    } catch (error: unknown) {
+      console.error('Error deleting credit repayment:', error);
+      toast({
+        title: 'Chyba',
+        description: getErrorMessage(error) || 'Nepodarilo se smazat splatku.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const addTrackedInvestment = async (investment: {
+    ticker: string;
+    name: string;
+    asset_type: TrackedInvestment['asset_type'];
+    provider: TrackedInvestment['provider'];
+    sector?: string;
+    currency: string;
+    current_value: number;
+    quantity?: number | null;
+    current_price?: number | null;
+    include_in_portfolio: boolean;
+    is_watchlist: boolean;
+    note?: string;
+  }) => {
+    try {
+      const now = createTimestamp();
+      const nextTracked: TrackedInvestment = {
+        id: crypto.randomUUID(),
+        ticker: investment.ticker.toUpperCase(),
+        name: investment.name,
+        asset_type: investment.asset_type,
+        provider: investment.provider,
+        sector: investment.sector || null,
+        currency: investment.currency,
+        current_value: investment.current_value,
+        quantity: investment.quantity ?? null,
+        current_price: investment.current_price ?? null,
+        include_in_portfolio: investment.include_in_portfolio,
+        is_watchlist: investment.is_watchlist,
+        note: investment.note || null,
+        last_price_synced_at: null,
+        created_at: now,
+        updated_at: now,
+      };
+
+      setTrackedInvestments((prev) => [...prev, nextTracked].sort((a, b) => a.ticker.localeCompare(b.ticker)));
+      touchMeta({ last_saved_at: now });
+      pushAudit({
+        action: 'tracked-create',
+        detail: `Pridana evidovana pozice ${nextTracked.ticker}${nextTracked.is_watchlist ? ' do watchlistu' : ''}.`,
+        scope: 'tracked',
+        severity: 'info',
+      });
+      toast({ title: nextTracked.is_watchlist ? 'Watchlist polozka pridana' : 'Evidovana pozice pridana' });
+      return nextTracked;
+    } catch (error: unknown) {
+      console.error('Error adding tracked investment:', error);
+      toast({
+        title: 'Chyba',
+        description: getErrorMessage(error) || 'Nepodarilo se pridat evidovanou pozici.',
+        variant: 'destructive',
+      });
+      return null;
+    }
+  };
+
+  const updateTrackedInvestment = async (
+    id: string,
+    updates: Partial<Omit<TrackedInvestment, 'id' | 'created_at' | 'updated_at'>>,
+    options?: { silent?: boolean }
+  ) => {
+    try {
+      setTrackedInvestments((prev) =>
+        prev
+          .map((investment) =>
+            investment.id === id
+              ? {
+                  ...investment,
+                  ...updates,
+                  updated_at: createTimestamp(),
+                }
+              : investment
+          )
+          .sort((a, b) => a.ticker.localeCompare(b.ticker))
+      );
+      touchMeta({ last_saved_at: createTimestamp() });
+      pushAudit({
+        action: 'tracked-update',
+        detail: `Upravena evidovana pozice ${id}.`,
+        scope: 'tracked',
+        severity: 'info',
+      });
+      if (!options?.silent) {
+        toast({ title: 'Evidovana pozice upravena' });
+      }
+    } catch (error: unknown) {
+      console.error('Error updating tracked investment:', error);
+      if (!options?.silent) {
+        toast({
+          title: 'Chyba',
+          description: getErrorMessage(error) || 'Nepodarilo se upravit evidovanou pozici.',
+          variant: 'destructive',
+        });
+      }
+    }
+  };
+
+  const deleteTrackedInvestment = async (id: string) => {
+    try {
+      setTrackedInvestments((prev) => prev.filter((investment) => investment.id !== id));
+      touchMeta({ last_saved_at: createTimestamp() });
+      pushAudit({
+        action: 'tracked-delete',
+        detail: `Smazana evidovana pozice ${id}.`,
+        scope: 'tracked',
+        severity: 'warning',
+      });
+      toast({ title: 'Evidovana pozice smazana' });
+    } catch (error: unknown) {
+      console.error('Error deleting tracked investment:', error);
+      toast({
+        title: 'Chyba',
+        description: getErrorMessage(error) || 'Nepodarilo se smazat evidovanou pozici.',
         variant: 'destructive',
       });
     }
@@ -603,15 +955,22 @@ export const useInvestmentData = () => {
         [...deduplicatedTransactions, ...prev].sort((a, b) => b.transaction_date.localeCompare(a.transaction_date))
       );
       setImportBatches((prev) => [batch, ...prev]);
+      touchMeta({ last_saved_at: now });
+      pushAudit({
+        action: 'import',
+        detail: `Importovano ${deduplicatedTransactions.length} transakci v davce ${batch.id}.`,
+        scope: 'portfolio',
+        severity: 'info',
+      });
       toast({
-        title: 'Import dokončen',
-        description: `Importováno ${deduplicatedTransactions.length} transakcí.`,
+        title: 'Import dokoncen',
+        description: `Importovano ${deduplicatedTransactions.length} transakci.`,
       });
     } catch (error: unknown) {
       console.error('Error importing transactions:', error);
       toast({
         title: 'Chyba importu',
-        description: getErrorMessage(error) || 'Nepodařilo se importovat transakce.',
+        description: getErrorMessage(error) || 'Nepodarilo se importovat transakce.',
         variant: 'destructive',
       });
     }
@@ -621,12 +980,19 @@ export const useInvestmentData = () => {
     try {
       setTransactions((prev) => prev.filter((transaction) => transaction.import_batch_id !== batchId));
       setImportBatches((prev) => prev.filter((batch) => batch.id !== batchId));
-      toast({ title: 'Import vrácen zpět' });
+      touchMeta({ last_saved_at: createTimestamp() });
+      pushAudit({
+        action: 'import-undo',
+        detail: `Vracen import ${batchId}.`,
+        scope: 'portfolio',
+        severity: 'warning',
+      });
+      toast({ title: 'Import vracen zpet' });
     } catch (error: unknown) {
       console.error('Error undoing import:', error);
       toast({
         title: 'Chyba',
-        description: 'Nepodařilo se vrátit import.',
+        description: 'Nepodarilo se vratit import.',
         variant: 'destructive',
       });
     }
@@ -649,12 +1015,19 @@ export const useInvestmentData = () => {
           };
 
       setSettings(nextSettings);
-      toast({ title: 'Nastavení uloženo' });
+      touchMeta({ last_saved_at: now });
+      pushAudit({
+        action: 'settings-update',
+        detail: `Zmenena reportovaci mena na ${reportingCurrency}.`,
+        scope: 'portfolio',
+        severity: 'info',
+      });
+      toast({ title: 'Nastaveni ulozeno' });
     } catch (error: unknown) {
       console.error('Error updating settings:', error);
       toast({
         title: 'Chyba',
-        description: 'Nepodařilo se uložit nastavení.',
+        description: 'Nepodarilo se ulozit nastaveni.',
         variant: 'destructive',
       });
     }
@@ -666,11 +1039,97 @@ export const useInvestmentData = () => {
         connector.id === connectorId ? { ...connector, status: 'configured' } : connector
       )
     );
+    touchMeta({ last_saved_at: createTimestamp() });
+    pushAudit({
+      action: 'connector-configured',
+      detail: `Konektor ${connectorId} byl oznacen jako pripraveny.`,
+      scope: 'sync',
+      severity: 'info',
+    });
     toast({
-      title: 'Konektor připraven',
-      description: 'Konektor byl označen jako připravený pro další napojení.',
+      title: 'Konektor pripraven',
+      description: 'Konektor byl oznacen jako pripraveny pro dalsi napojeni.',
     });
   };
+
+  const recordPriceRefresh = async (summary: { updated: number; failed: number }) => {
+    const now = createTimestamp();
+    touchMeta({ last_saved_at: now, last_price_sync_at: now });
+    pushAudit({
+      action: 'price-refresh',
+      detail: `Hromadna aktualizace cen: ${summary.updated} uspesnych, ${summary.failed} neuspesnych.`,
+      scope: 'sync',
+      severity: summary.failed > 0 ? 'warning' : 'info',
+    });
+  };
+
+  const exportAccountBackup = async () => {
+    const exportedAt = createTimestamp();
+    const financeLoaded = await appStorage.getMany(Object.values(FINANCE_AUDIT_KEYS));
+    const backup = {
+      exportedAt,
+      user: {
+        id: session?.user.id || null,
+        email: session?.user.email || null,
+      },
+      investment: {
+        assets,
+        transactions,
+        prices,
+        exchangeRates,
+        importBatches,
+        settings,
+        connectors,
+        creditInvestments,
+        creditRepayments,
+        trackedInvestments,
+        auditLog,
+        meta: {
+          ...meta,
+          last_backup_at: exportedAt,
+        },
+      },
+      finance: {
+        transactions: financeLoaded[FINANCE_AUDIT_KEYS.TRANSACTIONS]
+          ? JSON.parse(financeLoaded[FINANCE_AUDIT_KEYS.TRANSACTIONS] as string)
+          : [],
+        monthClosures: financeLoaded[FINANCE_AUDIT_KEYS.MONTH_CLOSURES]
+          ? JSON.parse(financeLoaded[FINANCE_AUDIT_KEYS.MONTH_CLOSURES] as string)
+          : [],
+      },
+    };
+
+    downloadJson(`figr-backup-${exportedAt.slice(0, 10)}.json`, backup);
+    touchMeta({ last_backup_at: exportedAt, last_saved_at: exportedAt });
+    pushAudit({
+      action: 'backup-export',
+      detail: 'Exportovana kompletni zaloha investic a auditnich dat.',
+      scope: 'backup',
+      severity: 'info',
+    });
+    toast({
+      title: 'Zaloha exportovana',
+      description: 'JSON zaloha byla stazena do zarizeni.',
+    });
+  };
+
+  const persistEntries = useCallback(async (entries: Record<string, string>) => {
+    await appStorage.setMany(entries);
+  }, []);
+
+  const syncStatus = useMemo<InvestmentSyncStatus>(
+    () => ({
+      mode: session?.user ? 'cloud' : 'local',
+      userEmail: session?.user.email ?? null,
+      userId: session?.user.id ?? null,
+      hydratedAt: meta.hydrated_at,
+      lastSavedAt: meta.last_saved_at,
+      lastBackupAt: meta.last_backup_at,
+      lastPriceSyncAt: meta.last_price_sync_at,
+      dbPath,
+    }),
+    [dbPath, meta, session?.user]
+  );
 
   useEffect(() => {
     fetchData();
@@ -678,48 +1137,84 @@ export const useInvestmentData = () => {
 
   useEffect(() => {
     if (!isHydrated) return;
-    void appStorage.setMany({ [STORAGE_KEYS.ASSETS]: JSON.stringify(assets) });
-  }, [assets, isHydrated]);
+    void persistEntries({ [STORAGE_KEYS.ASSETS]: JSON.stringify(assets) });
+  }, [assets, isHydrated, persistEntries]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    void appStorage.setMany({ [STORAGE_KEYS.TRANSACTIONS]: JSON.stringify(transactions) });
-  }, [transactions, isHydrated]);
+    void persistEntries({ [STORAGE_KEYS.TRANSACTIONS]: JSON.stringify(transactions) });
+  }, [transactions, isHydrated, persistEntries]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    void appStorage.setMany({ [STORAGE_KEYS.PRICES]: JSON.stringify(prices) });
-  }, [prices, isHydrated]);
+    void persistEntries({ [STORAGE_KEYS.PRICES]: JSON.stringify(prices) });
+  }, [prices, isHydrated, persistEntries]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    void appStorage.setMany({ [STORAGE_KEYS.EXCHANGE_RATES]: JSON.stringify(exchangeRates) });
-  }, [exchangeRates, isHydrated]);
+    void persistEntries({ [STORAGE_KEYS.EXCHANGE_RATES]: JSON.stringify(exchangeRates) });
+  }, [exchangeRates, isHydrated, persistEntries]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    void appStorage.setMany({ [STORAGE_KEYS.IMPORT_BATCHES]: JSON.stringify(importBatches) });
-  }, [importBatches, isHydrated]);
+    void persistEntries({ [STORAGE_KEYS.IMPORT_BATCHES]: JSON.stringify(importBatches) });
+  }, [importBatches, isHydrated, persistEntries]);
 
   useEffect(() => {
     if (!isHydrated || !settings) return;
-    void appStorage.setMany({ [STORAGE_KEYS.SETTINGS]: JSON.stringify(settings) });
-  }, [settings, isHydrated]);
+    void persistEntries({ [STORAGE_KEYS.SETTINGS]: JSON.stringify(settings) });
+  }, [settings, isHydrated, persistEntries]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    void appStorage.setMany({ [STORAGE_KEYS.CONNECTORS]: JSON.stringify(connectors) });
-  }, [connectors, isHydrated]);
+    void persistEntries({ [STORAGE_KEYS.CONNECTORS]: JSON.stringify(connectors) });
+  }, [connectors, isHydrated, persistEntries]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    void appStorage.setMany({ [STORAGE_KEYS.CREDIT_INVESTMENTS]: JSON.stringify(creditInvestments) });
-  }, [creditInvestments, isHydrated]);
+    void persistEntries({ [STORAGE_KEYS.CREDIT_INVESTMENTS]: JSON.stringify(creditInvestments) });
+  }, [creditInvestments, isHydrated, persistEntries]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    calculatePortfolio();
-  }, [assets, transactions, prices, exchangeRates, creditInvestments, settings, isHydrated, calculatePortfolio]);
+    void persistEntries({ [STORAGE_KEYS.CREDIT_REPAYMENTS]: JSON.stringify(creditRepayments) });
+  }, [creditRepayments, isHydrated, persistEntries]);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+    void persistEntries({ [STORAGE_KEYS.TRACKED_INVESTMENTS]: JSON.stringify(trackedInvestments) });
+  }, [trackedInvestments, isHydrated, persistEntries]);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+    void persistEntries({ [STORAGE_KEYS.AUDIT_LOG]: JSON.stringify(auditLog) });
+  }, [auditLog, isHydrated, persistEntries]);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+    void persistEntries({ [STORAGE_KEYS.META]: JSON.stringify(meta) });
+  }, [meta, isHydrated, persistEntries]);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+    void calculatePortfolio();
+  }, [assets, transactions, prices, exchangeRates, creditInvestments, trackedInvestments, settings, isHydrated, calculatePortfolio]);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+    void refreshValidationIssues();
+  }, [
+    assets,
+    transactions,
+    prices,
+    exchangeRates,
+    settings,
+    creditInvestments,
+    creditRepayments,
+    trackedInvestments,
+    isHydrated,
+    refreshValidationIssues,
+  ]);
 
   return {
     loading,
@@ -731,10 +1226,17 @@ export const useInvestmentData = () => {
     settings,
     connectors,
     creditInvestments,
+    creditRepayments,
+    trackedInvestments,
+    auditLog,
+    meta,
+    syncStatus,
+    validationIssues,
     portfolioSummary,
     calculatingPortfolio,
     fetchData,
     calculatePortfolio,
+    refreshValidationIssues,
     addAsset,
     deleteAsset,
     addTransaction,
@@ -744,9 +1246,16 @@ export const useInvestmentData = () => {
     addCreditInvestment,
     updateCreditInvestment,
     deleteCreditInvestment,
+    addCreditRepayment,
+    deleteCreditRepayment,
+    addTrackedInvestment,
+    updateTrackedInvestment,
+    deleteTrackedInvestment,
     importTransactions,
     undoImport,
     updateSettings,
     markConnectorConfigured,
+    recordPriceRefresh,
+    exportAccountBackup,
   };
 };

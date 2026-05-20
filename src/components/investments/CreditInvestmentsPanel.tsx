@@ -4,17 +4,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   CREDIT_INVESTMENT_KIND_LABELS,
   CREDIT_INVESTMENT_STATUS_LABELS,
   CreditInvestment,
+  CreditInvestmentRepayment,
   INVESTMENT_PROVIDER_LABELS,
 } from '@/types/investment';
 import { formatCurrencySafe } from '@/utils/currency';
 import { CreditInvestmentForm } from './CreditInvestmentForm';
+import { CreditRepaymentForm } from './CreditRepaymentForm';
 
 interface CreditInvestmentsPanelProps {
   creditInvestments: CreditInvestment[];
+  creditRepayments: CreditInvestmentRepayment[];
   reportingCurrency: string;
   creditCurrentValue: number;
   onAddCreditInvestment: (payload: {
@@ -32,6 +36,15 @@ interface CreditInvestmentsPanelProps {
     updates: Partial<Omit<CreditInvestment, 'id' | 'created_at' | 'updated_at'>>
   ) => Promise<void>;
   onDeleteCreditInvestment: (id: string) => Promise<void>;
+  onAddCreditRepayment: (payload: {
+    credit_investment_id: string;
+    payment_date: string;
+    principal_paid: number;
+    interest_paid: number;
+    fee_paid?: number;
+    note?: string;
+  }) => Promise<void>;
+  onDeleteCreditRepayment: (id: string) => Promise<void>;
 }
 
 const STATUS_BADGE_STYLES: Record<CreditInvestment['status'], string> = {
@@ -43,14 +56,25 @@ const STATUS_BADGE_STYLES: Record<CreditInvestment['status'], string> = {
 
 export const CreditInvestmentsPanel = ({
   creditInvestments,
+  creditRepayments,
   reportingCurrency,
   creditCurrentValue,
   onAddCreditInvestment,
   onUpdateCreditInvestment,
   onDeleteCreditInvestment,
+  onAddCreditRepayment,
+  onDeleteCreditRepayment,
 }: CreditInvestmentsPanelProps) => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingInvestment, setEditingInvestment] = useState<CreditInvestment | null>(null);
+  const [selectedInvestmentId, setSelectedInvestmentId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<'all' | CreditInvestment['status']>('all');
+  const [isRepaymentOpen, setIsRepaymentOpen] = useState(false);
+
+  const filteredInvestments = useMemo(
+    () => creditInvestments.filter((investment) => (filter === 'all' ? true : investment.status === filter)),
+    [creditInvestments, filter]
+  );
 
   const activeInvestments = useMemo(
     () => creditInvestments.filter((investment) => investment.status !== 'repaid'),
@@ -64,16 +88,45 @@ export const CreditInvestmentsPanel = ({
     );
   }, [activeInvestments]);
 
+  const problematicCount = useMemo(
+    () => creditInvestments.filter((investment) => investment.status === 'recovery').length,
+    [creditInvestments]
+  );
+
+  const selectedInvestment = useMemo(
+    () => creditInvestments.find((investment) => investment.id === selectedInvestmentId) || null,
+    [creditInvestments, selectedInvestmentId]
+  );
+
+  const selectedRepayments = useMemo(
+    () =>
+      creditRepayments
+        .filter((repayment) => repayment.credit_investment_id === selectedInvestmentId)
+        .sort((a, b) => b.payment_date.localeCompare(a.payment_date)),
+    [creditRepayments, selectedInvestmentId]
+  );
+
+  const selectedRepaymentSummary = useMemo(() => {
+    const totalPrincipal = selectedRepayments.reduce((sum, repayment) => sum + repayment.principal_paid, 0);
+    const totalInterest = selectedRepayments.reduce((sum, repayment) => sum + repayment.interest_paid, 0);
+    const totalFees = selectedRepayments.reduce((sum, repayment) => sum + repayment.fee_paid, 0);
+    return {
+      totalPrincipal,
+      totalInterest,
+      totalFees,
+    };
+  }, [selectedRepayments]);
+
   return (
     <Card className="border-border/70 bg-card/80">
       <CardHeader className="flex flex-row items-center justify-between gap-3">
         <div>
           <CardTitle className="flex items-center gap-2 text-base">
             <HandCoins className="h-4 w-4 text-primary" />
-            Úvěrové investice
+            Uverove investice
           </CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">
-            P2P a B2B půjčky držíme odděleně od tržních aktiv. Stav `splaceno` se už nepočítá do hodnoty portfolia.
+            P2P a B2B pujcky drzime oddelene od trznich aktiv. Stav `splaceno` se nezapocitava do aktivni hodnoty portfolia.
           </p>
         </div>
 
@@ -81,12 +134,12 @@ export const CreditInvestmentsPanel = ({
           <DialogTrigger asChild>
             <Button size="sm">
               <Plus className="mr-2 h-4 w-4" />
-              Přidat půjčku
+              Pridat pujcku
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Nová úvěrová investice</DialogTitle>
+              <DialogTitle>Nova uverova investice</DialogTitle>
             </DialogHeader>
             <CreditInvestmentForm
               onSave={async (payload) => {
@@ -99,43 +152,55 @@ export const CreditInvestmentsPanel = ({
       </CardHeader>
 
       <CardContent className="space-y-4">
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-4">
           <div className="rounded-xl border border-border/70 bg-background/70 p-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Aktivní hodnota</p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Aktivni hodnota</p>
             <p className="mt-2 text-lg font-semibold">{formatCurrencySafe(creditCurrentValue, reportingCurrency)}</p>
           </div>
           <div className="rounded-xl border border-border/70 bg-background/70 p-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Aktivní půjčky</p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Aktivni pujcky</p>
             <p className="mt-2 text-lg font-semibold">{activeInvestments.length}</p>
           </div>
           <div className="rounded-xl border border-border/70 bg-background/70 p-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Průměrný úrok</p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Prumerny urok</p>
             <p className="mt-2 text-lg font-semibold">{averageRate.toLocaleString('cs-CZ', { maximumFractionDigits: 2 })} %</p>
+          </div>
+          <div className="rounded-xl border border-border/70 bg-background/70 p-4">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Problematicke pujcky</p>
+            <p className="mt-2 text-lg font-semibold">{problematicCount}</p>
           </div>
         </div>
 
-        {creditInvestments.length > 0 ? (
+        <Tabs value={filter} onValueChange={(value) => setFilter(value as typeof filter)}>
+          <TabsList className="flex h-auto flex-wrap gap-1">
+            <TabsTrigger value="all">Vse</TabsTrigger>
+            <TabsTrigger value="repaying">Splaci se</TabsTrigger>
+            <TabsTrigger value="pending">Ceka se</TabsTrigger>
+            <TabsTrigger value="recovery">Vymahani</TabsTrigger>
+            <TabsTrigger value="repaid">Splaceno</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {filteredInvestments.length > 0 ? (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Název</TableHead>
+                <TableHead>Nazev</TableHead>
                 <TableHead>Typ</TableHead>
                 <TableHead>Poskytovatel</TableHead>
                 <TableHead className="text-right">Hodnota</TableHead>
-                <TableHead className="text-right">Úrok</TableHead>
+                <TableHead className="text-right">Urok</TableHead>
                 <TableHead>Stav</TableHead>
-                <TableHead className="w-24" />
+                <TableHead className="w-28" />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {creditInvestments.map((investment) => (
+              {filteredInvestments.map((investment) => (
                 <TableRow key={investment.id}>
                   <TableCell>
                     <div>
                       <p className="font-medium">{investment.name}</p>
-                      {investment.note ? (
-                        <p className="text-xs text-muted-foreground">{investment.note}</p>
-                      ) : null}
+                      {investment.note ? <p className="text-xs text-muted-foreground">{investment.note}</p> : null}
                     </div>
                   </TableCell>
                   <TableCell>{CREDIT_INVESTMENT_KIND_LABELS[investment.kind]}</TableCell>
@@ -151,6 +216,9 @@ export const CreditInvestmentsPanel = ({
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => setSelectedInvestmentId(investment.id)}>
+                        <Building2 className="h-4 w-4" />
+                      </Button>
                       <Button type="button" variant="ghost" size="icon" onClick={() => setEditingInvestment(investment)}>
                         <Edit3 className="h-4 w-4" />
                       </Button>
@@ -166,14 +234,14 @@ export const CreditInvestmentsPanel = ({
         ) : (
           <div className="rounded-xl border border-dashed border-border/70 bg-background/30 p-6 text-center text-sm text-muted-foreground">
             <Building2 className="mx-auto mb-3 h-5 w-5" />
-            Zatím tu nejsou žádné P2P ani B2B půjčky.
+            Zatim tu nejsou zadne P2P ani B2B pujcky pro tento filtr.
           </div>
         )}
 
         <Dialog open={Boolean(editingInvestment)} onOpenChange={(open) => !open && setEditingInvestment(null)}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Upravit úvěrovou investici</DialogTitle>
+              <DialogTitle>Upravit uverovou investici</DialogTitle>
             </DialogHeader>
             {editingInvestment ? (
               <CreditInvestmentForm
@@ -183,6 +251,102 @@ export const CreditInvestmentsPanel = ({
                   setEditingInvestment(null);
                 }}
               />
+            ) : null}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={Boolean(selectedInvestment)} onOpenChange={(open) => !open && setSelectedInvestmentId(null)}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Detail uverove investice</DialogTitle>
+            </DialogHeader>
+            {selectedInvestment ? (
+              <div className="space-y-4">
+                <div className="grid gap-3 md:grid-cols-4">
+                  <div className="rounded-xl border border-border/70 bg-background/70 p-4">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Nazev</p>
+                    <p className="mt-2 font-semibold">{selectedInvestment.name}</p>
+                  </div>
+                  <div className="rounded-xl border border-border/70 bg-background/70 p-4">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Aktualni hodnota</p>
+                    <p className="mt-2 font-semibold">{formatCurrencySafe(selectedInvestment.current_value, selectedInvestment.currency)}</p>
+                  </div>
+                  <div className="rounded-xl border border-border/70 bg-background/70 p-4">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Splacena jistina</p>
+                    <p className="mt-2 font-semibold">{formatCurrencySafe(selectedRepaymentSummary.totalPrincipal, selectedInvestment.currency)}</p>
+                  </div>
+                  <div className="rounded-xl border border-border/70 bg-background/70 p-4">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Prijaty urok</p>
+                    <p className="mt-2 font-semibold">{formatCurrencySafe(selectedRepaymentSummary.totalInterest, selectedInvestment.currency)}</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-medium">Historie splatek</p>
+                    <p className="text-sm text-muted-foreground">
+                      Poplatky celkem {formatCurrencySafe(selectedRepaymentSummary.totalFees, selectedInvestment.currency)}
+                    </p>
+                  </div>
+                  <Dialog open={isRepaymentOpen} onOpenChange={setIsRepaymentOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm">
+                        <Plus className="mr-2 h-4 w-4" />
+                        Pridat splatku
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Nova splatka</DialogTitle>
+                      </DialogHeader>
+                      <CreditRepaymentForm
+                        onSave={async (payload) => {
+                          await onAddCreditRepayment({
+                            ...payload,
+                            credit_investment_id: selectedInvestment.id,
+                          });
+                          setIsRepaymentOpen(false);
+                        }}
+                      />
+                    </DialogContent>
+                  </Dialog>
+                </div>
+
+                {selectedRepayments.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Datum</TableHead>
+                        <TableHead className="text-right">Jistina</TableHead>
+                        <TableHead className="text-right">Urok</TableHead>
+                        <TableHead className="text-right">Poplatek</TableHead>
+                        <TableHead>Poznamka</TableHead>
+                        <TableHead className="w-16" />
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {selectedRepayments.map((repayment) => (
+                        <TableRow key={repayment.id}>
+                          <TableCell>{repayment.payment_date}</TableCell>
+                          <TableCell className="text-right">{formatCurrencySafe(repayment.principal_paid, selectedInvestment.currency)}</TableCell>
+                          <TableCell className="text-right">{formatCurrencySafe(repayment.interest_paid, selectedInvestment.currency)}</TableCell>
+                          <TableCell className="text-right">{formatCurrencySafe(repayment.fee_paid, selectedInvestment.currency)}</TableCell>
+                          <TableCell>{repayment.note || '—'}</TableCell>
+                          <TableCell>
+                            <Button type="button" variant="ghost" size="icon" onClick={() => void onDeleteCreditRepayment(repayment.id)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-border/70 bg-background/30 p-6 text-center text-sm text-muted-foreground">
+                    Zatim tu nejsou zadne splatky.
+                  </div>
+                )}
+              </div>
             ) : null}
           </DialogContent>
         </Dialog>

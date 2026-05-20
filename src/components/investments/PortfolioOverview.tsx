@@ -21,8 +21,8 @@ const formatPercent = (value: number) =>
 export const PortfolioOverview = ({ portfolioSummary, loading }: PortfolioOverviewProps) => {
   if (loading || !portfolioSummary) {
     return (
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        {[1, 2, 3, 4, 5].map((item) => (
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+        {[1, 2, 3, 4, 5, 6].map((item) => (
           <Card key={item} className="animate-pulse">
             <CardHeader className="pb-2">
               <div className="h-4 w-24 rounded bg-muted" />
@@ -40,8 +40,10 @@ export const PortfolioOverview = ({ portfolioSummary, loading }: PortfolioOvervi
     totalInvested,
     currentValue,
     marketCurrentValue,
+    trackedCurrentValue,
     creditCurrentValue,
     activeCreditInvestmentsCount,
+    watchlistCount,
     profitLoss,
     profitLossPercent,
     reportingCurrency,
@@ -62,59 +64,56 @@ export const PortfolioOverview = ({ portfolioSummary, loading }: PortfolioOvervi
               <div className="space-y-3">
                 <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
                   <Wallet className="h-3.5 w-3.5" />
-                  Hlavní přehled portfolia
+                  Hlavni prehled portfolia
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Aktuální hodnota portfolia</p>
+                  <p className="text-sm text-muted-foreground">Aktualni hodnota portfolia</p>
                   <p className="text-3xl font-bold tracking-tight sm:text-4xl">
-                    {currentValue !== null ? formatCurrency(currentValue, reportingCurrency) : 'Chybí ceny'}
+                    {currentValue !== null ? formatCurrency(currentValue, reportingCurrency) : 'Chybi ceny'}
                   </p>
                 </div>
                 <p className="max-w-2xl text-sm text-muted-foreground">
-                  Přehled kombinuje tržní portfolio a aktivní úvěrové investice. Výkonnost je zatím počítaná jen pro tržní část.
+                  Prehled kombinuje trzni portfolio, evidovane portfolio a aktivni uverove investice.
+                  Vykonnost zatim pocitame jen pro transakcne vedene trzni pozice.
                 </p>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[420px]">
+              <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[560px]">
                 <div className="rounded-xl border border-border/70 bg-background/70 p-4">
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Tržní portfolio</p>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Trzni portfolio</p>
                   <p className="mt-2 text-lg font-semibold">
-                    {marketCurrentValue !== null ? formatCurrency(marketCurrentValue, reportingCurrency) : 'Chybí ceny'}
+                    {marketCurrentValue !== null ? formatCurrency(marketCurrentValue, reportingCurrency) : 'Chybi ceny'}
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground">Akcie, ETF, crypto a další tituly s tržní cenou.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Akcie, ETF, crypto a dalsi tituly s trzni cenou.</p>
                 </div>
                 <div className="rounded-xl border border-border/70 bg-background/70 p-4">
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Úvěrové investice</p>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Evidovane portfolio</p>
+                  <p className="mt-2 text-lg font-semibold">{formatCurrency(trackedCurrentValue, reportingCurrency)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Rucne vedene hodnoty bez historie obchodu.</p>
+                </div>
+                <div className="rounded-xl border border-border/70 bg-background/70 p-4">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Uverove investice</p>
                   <p className="mt-2 text-lg font-semibold">{formatCurrency(creditCurrentValue, reportingCurrency)}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Aktivní půjčky: {activeCreditInvestmentsCount}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Aktivni pujcky: {activeCreditInvestmentsCount}</p>
                 </div>
                 <div className="rounded-xl border border-border/70 bg-background/70 p-4">
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Investováno</p>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Investovano</p>
                   <p className="mt-2 text-lg font-semibold">{formatCurrency(totalInvested, reportingCurrency)}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Součet nákupů a vkladů do tržního portfolia.</p>
-                </div>
-                <div className="rounded-xl border border-border/70 bg-background/70 p-4">
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Zisk / ztráta</p>
-                  <p className={`mt-2 text-lg font-semibold ${isProfit ? 'text-success' : 'text-destructive'}`}>
-                    {profitLoss !== null ? formatCurrency(profitLoss, reportingCurrency) : '—'}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {profitLossPercent !== null ? formatPercent(profitLossPercent) : 'Výnos zatím nelze spočítat.'}
-                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">Soucet nakupu a vkladu do trzniho portfolia.</p>
                 </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <div className="grid gap-4 sm:grid-cols-3 xl:grid-cols-1">
+        <div className="grid gap-4 sm:grid-cols-4 xl:grid-cols-1">
           <Card className="border-border/70 bg-card/80">
             <CardContent className="flex items-center gap-4 p-5">
               <div className="rounded-xl bg-primary/10 p-3 text-primary">
                 <PiggyBank className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Investováno</p>
+                <p className="text-sm text-muted-foreground">Investovano</p>
                 <p className="text-xl font-semibold">{formatCurrency(totalInvested, reportingCurrency)}</p>
               </div>
             </CardContent>
@@ -125,7 +124,7 @@ export const PortfolioOverview = ({ portfolioSummary, loading }: PortfolioOvervi
                 {isProfit ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Výkonnost</p>
+                <p className="text-sm text-muted-foreground">Vykonnost</p>
                 <p className={`text-xl font-semibold ${isProfit ? 'text-success' : 'text-destructive'}`}>
                   {profitLossPercent !== null ? formatPercent(profitLossPercent) : '—'}
                 </p>
@@ -138,13 +137,24 @@ export const PortfolioOverview = ({ portfolioSummary, loading }: PortfolioOvervi
                 <Wallet className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Poslední dividenda / daň</p>
+                <p className="text-sm text-muted-foreground">Posledni dividenda / dan</p>
                 <p className="text-lg font-semibold">
                   {latestDividend ? formatCurrency(latestDividend.amount, latestDividend.currency) : '—'}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Odhad daně {formatCurrency(dividendTaxEstimate, reportingCurrency)}
+                  Odhad dane {formatCurrency(dividendTaxEstimate, reportingCurrency)}
                 </p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border/70 bg-card/80">
+            <CardContent className="flex items-center gap-4 p-5">
+              <div className="rounded-xl bg-primary/10 p-3 text-primary">
+                <Wallet className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Watchlist</p>
+                <p className="text-xl font-semibold">{watchlistCount}</p>
               </div>
             </CardContent>
           </Card>
@@ -154,7 +164,7 @@ export const PortfolioOverview = ({ portfolioSummary, loading }: PortfolioOvervi
       {portfolioHistory && portfolioHistory.length > 1 && (
         <Card>
           <CardHeader>
-            <CardTitle>Vývoj portfolia v čase</CardTitle>
+            <CardTitle>Vyvoj portfolia v case</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">

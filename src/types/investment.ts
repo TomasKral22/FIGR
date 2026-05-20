@@ -55,6 +55,80 @@ export interface CreditInvestment {
   updated_at: string;
 }
 
+export interface CreditInvestmentRepayment {
+  id: string;
+  credit_investment_id: string;
+  payment_date: string;
+  principal_paid: number;
+  interest_paid: number;
+  fee_paid: number;
+  note: string | null;
+  created_at: string;
+}
+
+export interface TrackedInvestment {
+  id: string;
+  ticker: string;
+  name: string;
+  asset_type: Exclude<InvestmentAssetType, 'p2p' | 'private_credit'>;
+  provider: InvestmentProvider;
+  sector: string | null;
+  currency: string;
+  current_value: number;
+  quantity: number | null;
+  current_price: number | null;
+  include_in_portfolio: boolean;
+  is_watchlist: boolean;
+  note: string | null;
+  last_price_synced_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InvestmentAuditEntry {
+  id: string;
+  created_at: string;
+  actor: string;
+  action: string;
+  detail: string;
+  scope: 'portfolio' | 'asset' | 'credit' | 'tracked' | 'sync' | 'backup';
+  severity: 'info' | 'warning' | 'error';
+}
+
+export interface InvestmentDataMeta {
+  last_saved_at: string | null;
+  last_backup_at: string | null;
+  last_price_sync_at: string | null;
+  hydrated_at: string | null;
+}
+
+export interface InvestmentValidationIssue {
+  id: string;
+  severity: 'info' | 'warning' | 'error';
+  title: string;
+  detail: string;
+  code:
+    | 'missing-price'
+    | 'stale-price'
+    | 'missing-rate'
+    | 'orphan-transaction'
+    | 'empty-asset'
+    | 'open-finance-month'
+    | 'tracked-value'
+    | 'credit-without-repayment';
+}
+
+export interface InvestmentSyncStatus {
+  mode: 'cloud' | 'local';
+  userEmail: string | null;
+  userId: string | null;
+  hydratedAt: string | null;
+  lastSavedAt: string | null;
+  lastBackupAt: string | null;
+  lastPriceSyncAt: string | null;
+  dbPath: string | null;
+}
+
 export interface InvestmentTransaction {
   id: string;
   asset_id: string;
@@ -166,8 +240,10 @@ export interface PortfolioSummary {
   profitLossPercent: number | null;
   reportingCurrency: string;
   marketCurrentValue: number | null;
+  trackedCurrentValue: number;
   creditCurrentValue: number;
   activeCreditInvestmentsCount: number;
+  watchlistCount: number;
   assets: PortfolioAsset[];
   assetsByType: Record<string, { invested: number; value: number | null }>;
   assetsByProvider: Record<string, { invested: number; value: number | null }>;

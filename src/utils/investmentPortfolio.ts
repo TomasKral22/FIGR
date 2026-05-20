@@ -1,6 +1,7 @@
 import {
   AssetPrice,
   CreditInvestment,
+  TrackedInvestment,
   DividendDetail,
   ExchangeRate,
   InvestmentAsset,
@@ -50,12 +51,14 @@ export const calculatePortfolioSummary = ({
   exchangeRates,
   reportingCurrency = DEFAULT_REPORTING_CURRENCY,
   creditInvestments = [],
+  trackedInvestments = [],
 }: {
   assets: InvestmentAsset[];
   transactions: InvestmentTransaction[];
   prices: AssetPrice[];
   exchangeRates: ExchangeRate[];
   creditInvestments?: CreditInvestment[];
+  trackedInvestments?: TrackedInvestment[];
   reportingCurrency?: string;
 }): PortfolioSummary => {
   const orderedTransactions = [...transactions].sort((a, b) =>
@@ -230,9 +233,16 @@ export const calculatePortfolioSummary = ({
       const rate = getExchangeRate(orderedRates, investment.currency, reportingCurrency);
       return sum + investment.current_value * rate;
     }, 0);
+  const trackedCurrentValue = trackedInvestments
+    .filter((investment) => !investment.is_watchlist && investment.include_in_portfolio)
+    .reduce((sum, investment) => {
+      const rate = getExchangeRate(orderedRates, investment.currency, reportingCurrency);
+      return sum + investment.current_value * rate;
+    }, 0);
   const activeCreditInvestmentsCount = creditInvestments.filter(
     (investment) => investment.status !== 'repaid'
   ).length;
+  const watchlistCount = trackedInvestments.filter((investment) => investment.is_watchlist).length;
   const pricedAssets = portfolioAssets.filter(
     (asset) => asset.currentValueInReportingCurrency !== null
   );
@@ -241,8 +251,8 @@ export const calculatePortfolioSummary = ({
       ? pricedAssets.reduce((sum, asset) => sum + (asset.currentValueInReportingCurrency ?? 0), 0)
       : null;
   const currentValue =
-    marketCurrentValue !== null || creditCurrentValue > 0
-      ? (marketCurrentValue ?? 0) + creditCurrentValue
+    marketCurrentValue !== null || creditCurrentValue > 0 || trackedCurrentValue > 0
+      ? (marketCurrentValue ?? 0) + creditCurrentValue + trackedCurrentValue
       : null;
   const investedForPricedAssets =
     pricedAssets.length > 0
@@ -296,8 +306,10 @@ export const calculatePortfolioSummary = ({
     profitLossPercent,
     reportingCurrency,
     marketCurrentValue,
+    trackedCurrentValue,
     creditCurrentValue,
     activeCreditInvestmentsCount,
+    watchlistCount,
     assets: portfolioAssets,
     assetsByType,
     assetsByProvider,
