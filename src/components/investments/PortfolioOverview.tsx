@@ -2,19 +2,14 @@ import { PiggyBank, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PortfolioSummary } from '@/types/investment';
+import { formatCurrencySafe } from '@/utils/currency';
 
 interface PortfolioOverviewProps {
   portfolioSummary: PortfolioSummary | null;
   loading: boolean;
 }
 
-const formatCurrency = (value: number, currency: string) =>
-  new Intl.NumberFormat('cs-CZ', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
+const formatCurrency = (value: number, currency: string) => formatCurrencySafe(value, currency);
 
 const formatPercent = (value: number) =>
   new Intl.NumberFormat('cs-CZ', {
@@ -44,6 +39,9 @@ export const PortfolioOverview = ({ portfolioSummary, loading }: PortfolioOvervi
   const {
     totalInvested,
     currentValue,
+    marketCurrentValue,
+    creditCurrentValue,
+    activeCreditInvestmentsCount,
     profitLoss,
     profitLossPercent,
     reportingCurrency,
@@ -51,6 +49,7 @@ export const PortfolioOverview = ({ portfolioSummary, loading }: PortfolioOvervi
     dividendCalendar,
     dividendTaxEstimate,
   } = portfolioSummary;
+
   const isProfit = (profitLoss ?? 0) >= 0;
   const latestDividend = dividendCalendar[dividendCalendar.length - 1];
 
@@ -72,15 +71,27 @@ export const PortfolioOverview = ({ portfolioSummary, loading }: PortfolioOvervi
                   </p>
                 </div>
                 <p className="max-w-2xl text-sm text-muted-foreground">
-                  Jakmile jsou doplněné ceny a směnné kurzy, přehled se přepočítá do reportovací měny a ukáže skutečný výkon portfolia.
+                  Přehled kombinuje tržní portfolio a aktivní úvěrové investice. Výkonnost je zatím počítaná jen pro tržní část.
                 </p>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[360px]">
+              <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[420px]">
+                <div className="rounded-xl border border-border/70 bg-background/70 p-4">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Tržní portfolio</p>
+                  <p className="mt-2 text-lg font-semibold">
+                    {marketCurrentValue !== null ? formatCurrency(marketCurrentValue, reportingCurrency) : 'Chybí ceny'}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">Akcie, ETF, crypto a další tituly s tržní cenou.</p>
+                </div>
+                <div className="rounded-xl border border-border/70 bg-background/70 p-4">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Úvěrové investice</p>
+                  <p className="mt-2 text-lg font-semibold">{formatCurrency(creditCurrentValue, reportingCurrency)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Aktivní půjčky: {activeCreditInvestmentsCount}</p>
+                </div>
                 <div className="rounded-xl border border-border/70 bg-background/70 p-4">
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">Investováno</p>
                   <p className="mt-2 text-lg font-semibold">{formatCurrency(totalInvested, reportingCurrency)}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Součet všech nákupů a vkladů do portfolia.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Součet nákupů a vkladů do tržního portfolia.</p>
                 </div>
                 <div className="rounded-xl border border-border/70 bg-background/70 p-4">
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">Zisk / ztráta</p>

@@ -1,5 +1,6 @@
 import {
   AssetPrice,
+  CreditInvestment,
   DividendDetail,
   ExchangeRate,
   InvestmentAsset,
@@ -48,11 +49,13 @@ export const calculatePortfolioSummary = ({
   prices,
   exchangeRates,
   reportingCurrency = DEFAULT_REPORTING_CURRENCY,
+  creditInvestments = [],
 }: {
   assets: InvestmentAsset[];
   transactions: InvestmentTransaction[];
   prices: AssetPrice[];
   exchangeRates: ExchangeRate[];
+  creditInvestments?: CreditInvestment[];
   reportingCurrency?: string;
 }): PortfolioSummary => {
   const orderedTransactions = [...transactions].sort((a, b) =>
@@ -221,19 +224,32 @@ export const calculatePortfolioSummary = ({
     (sum, asset) => sum + asset.totalInvestedInReportingCurrency,
     0
   );
+  const creditCurrentValue = creditInvestments
+    .filter((investment) => investment.status !== 'repaid')
+    .reduce((sum, investment) => {
+      const rate = getExchangeRate(orderedRates, investment.currency, reportingCurrency);
+      return sum + investment.current_value * rate;
+    }, 0);
+  const activeCreditInvestmentsCount = creditInvestments.filter(
+    (investment) => investment.status !== 'repaid'
+  ).length;
   const pricedAssets = portfolioAssets.filter(
     (asset) => asset.currentValueInReportingCurrency !== null
   );
-  const currentValue =
+  const marketCurrentValue =
     pricedAssets.length > 0
       ? pricedAssets.reduce((sum, asset) => sum + (asset.currentValueInReportingCurrency ?? 0), 0)
+      : null;
+  const currentValue =
+    marketCurrentValue !== null || creditCurrentValue > 0
+      ? (marketCurrentValue ?? 0) + creditCurrentValue
       : null;
   const investedForPricedAssets =
     pricedAssets.length > 0
       ? pricedAssets.reduce((sum, asset) => sum + asset.totalInvestedInReportingCurrency, 0)
       : 0;
   const profitLoss =
-    currentValue !== null ? currentValue - investedForPricedAssets : null;
+    marketCurrentValue !== null ? marketCurrentValue - investedForPricedAssets : null;
   const profitLossPercent =
     profitLoss !== null && investedForPricedAssets > 0
       ? (profitLoss / investedForPricedAssets) * 100
@@ -279,6 +295,9 @@ export const calculatePortfolioSummary = ({
     profitLoss,
     profitLossPercent,
     reportingCurrency,
+    marketCurrentValue,
+    creditCurrentValue,
+    activeCreditInvestmentsCount,
     assets: portfolioAssets,
     assetsByType,
     assetsByProvider,

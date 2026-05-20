@@ -13,6 +13,11 @@ import {
   InvestmentProvider,
   InvestmentTransactionType,
 } from '@/types/investment';
+import { formatCurrencySafe } from '@/utils/currency';
+
+const MARKET_ASSET_TYPES = Object.entries(ASSET_TYPE_LABELS).filter(
+  ([value]) => value !== 'p2p' && value !== 'private_credit'
+);
 
 interface AddTransactionFormProps {
   assets: InvestmentAsset[];
@@ -162,7 +167,7 @@ export const AddTransactionForm = ({
                 <Select value={assetType} onValueChange={(value) => setAssetType(value as InvestmentAssetType)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {Object.entries(ASSET_TYPE_LABELS).map(([value, label]) => (
+                    {MARKET_ASSET_TYPES.map(([value, label]) => (
                       <SelectItem key={value} value={value}>{label}</SelectItem>
                     ))}
                   </SelectContent>
@@ -197,6 +202,9 @@ export const AddTransactionForm = ({
                 <Input value={sector} onChange={(event) => setSector(event.target.value)} placeholder="Technologie, P2P, Reality..." />
               </div>
             </div>
+            <p className="text-xs text-muted-foreground">
+              P2P a B2B půjčky teď evidujeme samostatně v sekci `Úvěrové investice`, ne jako tržní aktivum.
+            </p>
           </div>
         )}
       </div>
@@ -292,7 +300,7 @@ export const AddTransactionForm = ({
             {transactionType === 'dividend' ? 'Očekávaná / evidovaná hodnota:' : 'Celková hodnota:'}
           </span>
           <span className="text-xl font-bold">
-            {new Intl.NumberFormat('cs-CZ', { style: 'currency', currency }).format(totalValue)}
+            {formatCurrencySafe(totalValue, currency)}
           </span>
         </div>
       </div>

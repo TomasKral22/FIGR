@@ -21,6 +21,10 @@ export type InvestmentProvider =
   | 'conseq'
   | 'other';
 
+export type CreditInvestmentKind = 'p2p' | 'b2b';
+
+export type CreditInvestmentStatus = 'repaying' | 'pending' | 'recovery' | 'repaid';
+
 export type BrokerConnectorKind = 'manual_template' | 'broker_export' | 'api_sync';
 
 export type BrokerConnectorStatus = 'planned' | 'configured' | 'ready';
@@ -33,6 +37,20 @@ export interface InvestmentAsset {
   provider: InvestmentProvider;
   sector: string | null;
   currency: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreditInvestment {
+  id: string;
+  name: string;
+  kind: CreditInvestmentKind;
+  provider: InvestmentProvider;
+  current_value: number;
+  interest_rate: number;
+  status: CreditInvestmentStatus;
+  currency: string;
+  note: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -147,6 +165,9 @@ export interface PortfolioSummary {
   profitLoss: number | null;
   profitLossPercent: number | null;
   reportingCurrency: string;
+  marketCurrentValue: number | null;
+  creditCurrentValue: number;
+  activeCreditInvestmentsCount: number;
   assets: PortfolioAsset[];
   assetsByType: Record<string, { invested: number; value: number | null }>;
   assetsByProvider: Record<string, { invested: number; value: number | null }>;
@@ -203,3 +224,15 @@ export const INVESTMENT_PROVIDER_LABELS: Record<InvestmentProvider, string> = {
 };
 
 export const COMMON_CURRENCIES = ['CZK', 'USD', 'EUR', 'GBP', 'CHF'];
+
+export const CREDIT_INVESTMENT_KIND_LABELS: Record<CreditInvestmentKind, string> = {
+  p2p: 'P2P pĹŻjÄŤka',
+  b2b: 'B2B pĹŻjÄŤka',
+};
+
+export const CREDIT_INVESTMENT_STATUS_LABELS: Record<CreditInvestmentStatus, string> = {
+  repaying: 'SplĂˇcĂ­ se',
+  pending: 'ÄŚekĂˇ se',
+  recovery: 'VymĂˇhĂˇnĂ­',
+  repaid: 'Splaceno',
+};

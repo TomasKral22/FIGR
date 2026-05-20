@@ -22,6 +22,7 @@ import { ExchangeRateManagement } from './ExchangeRateManagement';
 import { DividendOverview } from './DividendOverview';
 import { BrokerConnectionsPanel } from './BrokerConnectionsPanel';
 import { TickerAnalysisPanel } from './TickerAnalysisPanel';
+import { CreditInvestmentsPanel } from './CreditInvestmentsPanel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -72,6 +73,7 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
     importBatches,
     settings,
     connectors,
+    creditInvestments,
     portfolioSummary,
     calculatingPortfolio,
     calculatePortfolio,
@@ -81,6 +83,9 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
     deleteTransaction,
     addPrice,
     addExchangeRate,
+    addCreditInvestment,
+    updateCreditInvestment,
+    deleteCreditInvestment,
     importTransactions,
     undoImport,
     updateSettings,
@@ -437,6 +442,15 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
           </div>
 
           <PortfolioOverview portfolioSummary={portfolioSummary} loading={calculatingPortfolio} />
+
+          <CreditInvestmentsPanel
+            creditInvestments={creditInvestments}
+            reportingCurrency={settings?.reporting_currency || 'CZK'}
+            creditCurrentValue={portfolioSummary?.creditCurrentValue || 0}
+            onAddCreditInvestment={addCreditInvestment}
+            onUpdateCreditInvestment={updateCreditInvestment}
+            onDeleteCreditInvestment={deleteCreditInvestment}
+          />
 
           <Tabs defaultValue="assets" className="space-y-4">
             <TabsList className="flex h-auto flex-wrap gap-1">

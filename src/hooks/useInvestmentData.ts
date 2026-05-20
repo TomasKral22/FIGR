@@ -3,6 +3,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
   AssetPrice,
   BrokerConnector,
+  CreditInvestment,
   ExchangeRate,
   ImportBatch,
   InvestmentAsset,
@@ -25,6 +26,7 @@ const STORAGE_KEYS = {
   IMPORT_BATCHES: 'investment_import_batches',
   SETTINGS: 'investment_settings',
   CONNECTORS: 'investment_broker_connectors',
+  CREDIT_INVESTMENTS: 'investment_credit_investments',
 };
 
 const createTimestamp = () => new Date().toISOString();
@@ -88,6 +90,7 @@ export const useInvestmentData = () => {
   const [importBatches, setImportBatches] = useState<ImportBatch[]>([]);
   const [settings, setSettings] = useState<PortfolioSettings | null>(null);
   const [connectors, setConnectors] = useState<BrokerConnector[]>([]);
+  const [creditInvestments, setCreditInvestments] = useState<CreditInvestment[]>([]);
   const [portfolioSummary, setPortfolioSummary] = useState<PortfolioSummary | null>(null);
   const [calculatingPortfolio, setCalculatingPortfolio] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
@@ -104,6 +107,7 @@ export const useInvestmentData = () => {
       const storedImportBatches = loaded[STORAGE_KEYS.IMPORT_BATCHES];
       const storedSettings = loaded[STORAGE_KEYS.SETTINGS];
       const storedConnectors = loaded[STORAGE_KEYS.CONNECTORS];
+      const storedCreditInvestments = loaded[STORAGE_KEYS.CREDIT_INVESTMENTS];
       const now = createTimestamp();
 
       setAssets(
@@ -153,6 +157,11 @@ export const useInvestmentData = () => {
             }
       );
       setConnectors(storedConnectors ? (JSON.parse(storedConnectors) as BrokerConnector[]) : DEFAULT_CONNECTORS);
+      setCreditInvestments(
+        storedCreditInvestments
+          ? (JSON.parse(storedCreditInvestments) as CreditInvestment[]).sort((a, b) => a.name.localeCompare(b.name))
+          : []
+      );
       setIsHydrated(true);
     } catch (error: unknown) {
       console.error('Error fetching investment data:', error);
@@ -174,6 +183,7 @@ export const useInvestmentData = () => {
         transactions,
         prices,
         exchangeRates,
+        creditInvestments,
         reportingCurrency: settings?.reporting_currency || 'CZK',
       });
       setPortfolioSummary(summary);
@@ -189,7 +199,7 @@ export const useInvestmentData = () => {
     } finally {
       setCalculatingPortfolio(false);
     }
-  }, [assets, transactions, prices, exchangeRates, settings, toast]);
+  }, [assets, transactions, prices, exchangeRates, creditInvestments, settings, toast]);
 
   const addAsset = async (asset: {
     ticker: string;
@@ -413,6 +423,89 @@ export const useInvestmentData = () => {
     }
   };
 
+  const addCreditInvestment = async (investment: {
+    name: string;
+    kind: CreditInvestment['kind'];
+    provider: CreditInvestment['provider'];
+    current_value: number;
+    interest_rate: number;
+    status: CreditInvestment['status'];
+    currency: string;
+    note?: string;
+  }) => {
+    try {
+      const now = createTimestamp();
+      const nextInvestment: CreditInvestment = {
+        id: crypto.randomUUID(),
+        name: investment.name,
+        kind: investment.kind,
+        provider: investment.provider,
+        current_value: investment.current_value,
+        interest_rate: investment.interest_rate,
+        status: investment.status,
+        currency: investment.currency,
+        note: investment.note || null,
+        created_at: now,
+        updated_at: now,
+      };
+
+      setCreditInvestments((prev) => [...prev, nextInvestment].sort((a, b) => a.name.localeCompare(b.name)));
+      toast({ title: 'Úvěrová investice přidána' });
+      return nextInvestment;
+    } catch (error: unknown) {
+      console.error('Error adding credit investment:', error);
+      toast({
+        title: 'Chyba',
+        description: getErrorMessage(error) || 'Nepodařilo se přidat úvěrovou investici.',
+        variant: 'destructive',
+      });
+      return null;
+    }
+  };
+
+  const updateCreditInvestment = async (
+    id: string,
+    updates: Partial<Omit<CreditInvestment, 'id' | 'created_at' | 'updated_at'>>
+  ) => {
+    try {
+      setCreditInvestments((prev) =>
+        prev
+          .map((investment) =>
+            investment.id === id
+              ? {
+                  ...investment,
+                  ...updates,
+                  updated_at: createTimestamp(),
+                }
+              : investment
+          )
+          .sort((a, b) => a.name.localeCompare(b.name))
+      );
+      toast({ title: 'Úvěrová investice upravena' });
+    } catch (error: unknown) {
+      console.error('Error updating credit investment:', error);
+      toast({
+        title: 'Chyba',
+        description: getErrorMessage(error) || 'Nepodařilo se upravit úvěrovou investici.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const deleteCreditInvestment = async (id: string) => {
+    try {
+      setCreditInvestments((prev) => prev.filter((investment) => investment.id !== id));
+      toast({ title: 'Úvěrová investice smazána' });
+    } catch (error: unknown) {
+      console.error('Error deleting credit investment:', error);
+      toast({
+        title: 'Chyba',
+        description: getErrorMessage(error) || 'Nepodařilo se smazat úvěrovou investici.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const importTransactions = async (
     importData: {
       ticker: string;
@@ -620,8 +713,13 @@ export const useInvestmentData = () => {
 
   useEffect(() => {
     if (!isHydrated) return;
+    void appStorage.setMany({ [STORAGE_KEYS.CREDIT_INVESTMENTS]: JSON.stringify(creditInvestments) });
+  }, [creditInvestments, isHydrated]);
+
+  useEffect(() => {
+    if (!isHydrated) return;
     calculatePortfolio();
-  }, [assets, transactions, prices, exchangeRates, settings, isHydrated, calculatePortfolio]);
+  }, [assets, transactions, prices, exchangeRates, creditInvestments, settings, isHydrated, calculatePortfolio]);
 
   return {
     loading,
@@ -632,6 +730,7 @@ export const useInvestmentData = () => {
     importBatches,
     settings,
     connectors,
+    creditInvestments,
     portfolioSummary,
     calculatingPortfolio,
     fetchData,
@@ -642,6 +741,9 @@ export const useInvestmentData = () => {
     deleteTransaction,
     addPrice,
     addExchangeRate,
+    addCreditInvestment,
+    updateCreditInvestment,
+    deleteCreditInvestment,
     importTransactions,
     undoImport,
     updateSettings,
