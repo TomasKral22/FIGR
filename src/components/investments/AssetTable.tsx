@@ -6,6 +6,7 @@ import { ASSET_TYPE_LABELS, INVESTMENT_PROVIDER_LABELS, PortfolioAsset } from '@
 import { Button } from '@/components/ui/button';
 import { ChevronRight, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
+import { formatCurrencySafe } from '@/utils/currency';
 
 interface AssetTableProps {
   assets: PortfolioAsset[];
@@ -20,13 +21,8 @@ interface AssetTableProps {
   onDeleteAsset: (id: string) => Promise<void>;
 }
 
-const formatCurrency = (value: number, currency: string): string =>
-  new Intl.NumberFormat('cs-CZ', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
+const formatCurrency = (value: number | null | undefined, currency: string): string =>
+  formatCurrencySafe(value, currency);
 
 const formatPercent = (value: number): string =>
   new Intl.NumberFormat('cs-CZ', {

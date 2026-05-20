@@ -14,6 +14,7 @@ import {
 import { ArrowLeft, Plus, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
 import { Line, LineChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { formatCurrencySafe } from '@/utils/currency';
 
 interface AssetDetailProps {
   asset: PortfolioAsset;
@@ -26,13 +27,8 @@ interface AssetDetailProps {
   onAddPrice: (price: { asset_id: string; price: number; currency: string; price_date: string }) => Promise<void>;
 }
 
-const formatCurrency = (value: number, currency: string): string =>
-  new Intl.NumberFormat('cs-CZ', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
+const formatCurrency = (value: number | null | undefined, currency: string): string =>
+  formatCurrencySafe(value, currency);
 
 const formatPercent = (value: number): string =>
   new Intl.NumberFormat('cs-CZ', {

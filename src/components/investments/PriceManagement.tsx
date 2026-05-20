@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { InvestmentAsset, AssetPrice } from '@/types/investment';
 import { Plus } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { formatCurrencySafe } from '@/utils/currency';
 
 interface PriceManagementProps {
   assets: InvestmentAsset[];
@@ -16,12 +17,7 @@ interface PriceManagementProps {
 }
 
 const formatCurrency = (value: number, currency: string): string => {
-  return new Intl.NumberFormat('cs-CZ', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 8,
-  }).format(value);
+  return formatCurrencySafe(value, currency);
 };
 
 export const PriceManagement = ({ assets, prices, onAddPrice }: PriceManagementProps) => {

@@ -1,18 +1,13 @@
 import { CalendarDays, Landmark } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PortfolioSummary } from '@/types/investment';
+import { formatCurrencySafe } from '@/utils/currency';
 
 interface DividendOverviewProps {
   portfolioSummary: PortfolioSummary | null;
 }
 
-const formatCurrency = (value: number, currency: string) =>
-  new Intl.NumberFormat('cs-CZ', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
+const formatCurrency = (value: number, currency: string) => formatCurrencySafe(value, currency);
 
 const formatDate = (value: string | null) =>
   value ? new Date(value).toLocaleDateString('cs-CZ') : '—';

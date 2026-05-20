@@ -1,5 +1,6 @@
 import { requestTickerAnalysis, TickerAnalysisResponse } from '@/lib/aiClient';
 import { PortfolioAsset } from '@/types/investment';
+import { formatCurrencySafe } from '@/utils/currency';
 
 export const TICKER_ANALYSIS_PROMPT_TEMPLATE = `
 Jednej jako akciovy analytik (CFA). V cestine zpracuj aktualni analyzu spolecnosti {TICKER} s overenymi cisly a citacemi zdroju.
@@ -34,12 +35,7 @@ FORMAT
 const formatNumber = (value: number | null, currency?: string) => {
   if (value === null) return 'neuvedeno';
   return currency
-    ? new Intl.NumberFormat('cs-CZ', {
-        style: 'currency',
-        currency,
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(value)
+    ? formatCurrencySafe(value, currency)
     : new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 4 }).format(value);
 };
 
