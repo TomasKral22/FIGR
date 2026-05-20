@@ -93,6 +93,7 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
 
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [selectedAnalysisAssetId, setSelectedAnalysisAssetId] = useState<string | null>(null);
+  const [isAnalysisActionsOpen, setIsAnalysisActionsOpen] = useState(false);
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -179,6 +180,7 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
   const handleSelectAnalysisAsset = (id: string) => {
     setSelectedAssetId(null);
     setSelectedAnalysisAssetId(id);
+    setIsAnalysisActionsOpen(true);
   };
 
   const copyPromptToClipboard = async () => {
@@ -210,6 +212,7 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
         title: 'Prompt zkopírován',
         description: 'Prompt pro analýzu je ve schránce.',
       });
+      setIsAnalysisActionsOpen(false);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Prompt se nepodařilo zkopírovat.';
       toast({
@@ -233,6 +236,7 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
         title: target === 'chatgpt' ? 'Otevírám ChatGPT' : 'Otevírám Claude',
         description: 'Prompt je zkopírovaný do schránky. Vlož ho do nové konverzace.',
       });
+      setIsAnalysisActionsOpen(false);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Nepodařilo se otevřít externí AI.';
       toast({
@@ -608,6 +612,62 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
                 setIsAddTransactionOpen(false);
               }}
             />
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isAnalysisActionsOpen} onOpenChange={setIsAnalysisActionsOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Externí AI analýza</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="rounded-lg border border-border/70 bg-background/50 px-3 py-3 text-sm">
+                {selectedAnalysisAsset ? (
+                  <div className="space-y-1">
+                    <p>
+                      Vybraný ticker:{' '}
+                      <span className="font-semibold text-primary">
+                        {selectedAnalysisAsset.ticker} · {selectedAnalysisAsset.name}
+                      </span>
+                    </p>
+                    <p className="text-muted-foreground">
+                      Vyber cílovou AI službu. Prompt se před otevřením zkopíruje do schránky.
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">Nejdřív vyber ticker v seznamu aktiv.</p>
+                )}
+              </div>
+              <div className="grid gap-2 sm:grid-cols-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void handleCopyAnalysisPrompt()}
+                  disabled={!selectedAnalysisAsset}
+                >
+                  <Copy className="mr-2 h-4 w-4" />
+                  Zkopírovat prompt
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void handleOpenExternalAnalysis('chatgpt')}
+                  disabled={!selectedAnalysisAsset}
+                >
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  ChatGPT
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void handleOpenExternalAnalysis('claude')}
+                  disabled={!selectedAnalysisAsset}
+                >
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  Claude
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
 
