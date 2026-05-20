@@ -154,7 +154,7 @@ export const AssetTable = ({
           <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
             <CardTitle>Přehled aktiv</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Vyber jeden ticker pro AI analýzu a kliknutím na řádek otevři detail aktiva.
+              Vyber ticker pro externí AI analýzu a přes šipku otevři detail aktiva.
             </p>
           </div>
         </CardHeader>
@@ -162,13 +162,13 @@ export const AssetTable = ({
           <div className="mb-4 rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-sm">
             {selectedAnalysisAssetId ? (
               <span>
-                Vybraný ticker pro AI:{' '}
+                Vybraný ticker:{' '}
                 <span className="font-semibold text-primary">
                   {assets.find((asset) => asset.id === selectedAnalysisAssetId)?.ticker || 'N/A'}
                 </span>
               </span>
             ) : (
-              <span className="text-muted-foreground">Zatím není vybraný žádný ticker pro AI analýzu.</span>
+              <span className="text-muted-foreground">Zatím není vybraný žádný ticker pro externí AI analýzu.</span>
             )}
           </div>
 
@@ -176,7 +176,7 @@ export const AssetTable = ({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-24">AI</TableHead>
+                  <TableHead className="w-28">Prompt</TableHead>
                   <TableHead>Ticker</TableHead>
                   <TableHead>Název</TableHead>
                   <TableHead>Poskytovatel</TableHead>

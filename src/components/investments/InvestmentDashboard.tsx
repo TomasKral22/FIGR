@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronDown,
   ChevronUp,
+  Copy,
+  ExternalLink,
   Link2,
   Plus,
   RefreshCw,
   Settings,
-  Sparkles,
   Upload,
 } from 'lucide-react';
 import { useInvestmentData } from '@/hooks/useInvestmentData';
@@ -21,15 +22,13 @@ import { PriceManagement } from './PriceManagement';
 import { ExchangeRateManagement } from './ExchangeRateManagement';
 import { DividendOverview } from './DividendOverview';
 import { BrokerConnectionsPanel } from './BrokerConnectionsPanel';
-import { TickerAnalysisPanel } from './TickerAnalysisPanel';
 import { CreditInvestmentsPanel } from './CreditInvestmentsPanel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MarketSnapshot, TickerAnalysisResult, TickerAnalysisStatus } from '@/types/investment';
-import { generateTickerAnalysis } from '@/services/aiAnalysis';
+import { buildTickerAnalysisPrompt, EXTERNAL_AI_URLS } from '@/services/aiAnalysis';
 import { fetchTickerMarketSnapshot, marketSnapshotToAssetPrice } from '@/services/marketData';
 import { useToast } from '@/hooks/use-toast';
 
@@ -93,20 +92,14 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
   } = useInvestmentData();
 
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const [selectedAnalysisAssetId, setSelectedAnalysisAssetId] = useState<string | null>(null);
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [selectedAnalysisAssetId, setSelectedAnalysisAssetId] = useState<string | null>(null);
-  const [analysisStatus, setAnalysisStatus] = useState<TickerAnalysisStatus>('idle');
-  const [analysisResult, setAnalysisResult] = useState<TickerAnalysisResult | null>(null);
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
-  const [analysisMarketSnapshot, setAnalysisMarketSnapshot] = useState<MarketSnapshot | null>(null);
   const [updatingPrices, setUpdatingPrices] = useState(false);
   const [isWorkflowCollapsed, setIsWorkflowCollapsed] = useState(true);
   const [isConnectorsCollapsed, setIsConnectorsCollapsed] = useState(true);
-  const [isAnalysisCollapsed, setIsAnalysisCollapsed] = useState(false);
   const autoRefreshGuardRef = useRef<string | null>(null);
-  const analysisPanelRef = useRef<HTMLDivElement | null>(null);
 
   const selectedAsset = selectedAssetId
     ? portfolioSummary?.assets.find((asset) => asset.id === selectedAssetId) || null
@@ -147,6 +140,14 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
     };
   }, [assets, portfolioSummary?.assets, selectedAnalysisAssetId]);
 
+  const selectedAnalysisPrompt = useMemo(() => {
+    if (!selectedAnalysisAsset) {
+      return '';
+    }
+
+    return buildTickerAnalysisPrompt(selectedAnalysisAsset.ticker, selectedAnalysisAsset);
+  }, [selectedAnalysisAsset]);
+
   const assetTransactions = selectedAssetId
     ? transactions.filter((transaction) => transaction.asset_id === selectedAssetId)
     : [];
@@ -172,63 +173,70 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
 
     if (selectedAnalysisAssetId === assetId) {
       setSelectedAnalysisAssetId(null);
-      setAnalysisStatus('idle');
-      setAnalysisResult(null);
-      setAnalysisError(null);
-      setAnalysisMarketSnapshot(null);
     }
   };
 
   const handleSelectAnalysisAsset = (id: string) => {
     setSelectedAssetId(null);
-
-    if (id !== selectedAnalysisAssetId) {
-      setAnalysisStatus('idle');
-      setAnalysisResult(null);
-      setAnalysisMarketSnapshot(null);
-    }
-
     setSelectedAnalysisAssetId(id);
-    setAnalysisError(null);
-    setIsAnalysisCollapsed(false);
-
-    requestAnimationFrame(() => {
-      analysisPanelRef.current?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      });
-    });
   };
 
-  const handleGenerateAnalysis = async () => {
-    if (!selectedAnalysisAsset) {
-      const message = 'Nejdřív vyber jeden ticker symbol v seznamu portfolia.';
-      setAnalysisStatus('error');
-      setAnalysisError(message);
-      setAnalysisResult(null);
-      toast({
-        title: 'Chybí vybraný titul',
-        description: message,
-        variant: 'destructive',
-      });
+  const copyPromptToClipboard = async () => {
+    if (!selectedAnalysisAsset || !selectedAnalysisPrompt) {
+      throw new Error('Nejdřív vyber jeden ticker v seznamu aktiv.');
+    }
+
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(selectedAnalysisPrompt);
       return;
     }
 
-    setAnalysisStatus('loading');
-    setAnalysisError(null);
+    const textarea = document.createElement('textarea');
+    textarea.value = selectedAnalysisPrompt;
+    textarea.setAttribute('readonly', 'true');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+  };
 
+  const handleCopyAnalysisPrompt = async () => {
     try {
-      const response = await generateTickerAnalysis(selectedAnalysisAsset.ticker, selectedAnalysisAsset);
-      setAnalysisResult(response.result);
-      setAnalysisMarketSnapshot(response.marketSnapshot);
-      setAnalysisStatus('success');
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Nepodařilo se vygenerovat AI analýzu.';
-      setAnalysisStatus('error');
-      setAnalysisError(message);
-      setAnalysisResult(null);
+      await copyPromptToClipboard();
       toast({
-        title: 'AI analýza selhala',
+        title: 'Prompt zkopírován',
+        description: 'Prompt pro analýzu je ve schránce.',
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Prompt se nepodařilo zkopírovat.';
+      toast({
+        title: 'Kopírování selhalo',
+        description: message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleOpenExternalAnalysis = async (target: keyof typeof EXTERNAL_AI_URLS) => {
+    try {
+      await copyPromptToClipboard();
+
+      const opened = window.open(EXTERNAL_AI_URLS[target], '_blank', 'noopener,noreferrer');
+      if (!opened) {
+        throw new Error('Prohlížeč zablokoval otevření nového okna.');
+      }
+
+      toast({
+        title: target === 'chatgpt' ? 'Otevírám ChatGPT' : 'Otevírám Claude',
+        description: 'Prompt je zkopírovaný do schránky. Vlož ho do nové konverzace.',
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Nepodařilo se otevřít externí AI.';
+      toast({
+        title: 'Externí AI se neotevřela',
         description: message,
         variant: 'destructive',
       });
@@ -269,12 +277,15 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
       try {
         const snapshot = await fetchTickerMarketSnapshot(asset.ticker);
         const nextPrice = marketSnapshotToAssetPrice(asset, snapshot);
-        await addPrice({
-          asset_id: nextPrice.asset_id,
-          price: nextPrice.price,
-          currency: nextPrice.currency,
-          price_date: nextPrice.price_date,
-        }, { silent: true });
+        await addPrice(
+          {
+            asset_id: nextPrice.asset_id,
+            price: nextPrice.price,
+            currency: nextPrice.currency,
+            price_date: nextPrice.price_date,
+          },
+          { silent: true }
+        );
         updated += 1;
       } catch (error) {
         failed += 1;
@@ -343,7 +354,7 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
               <Card className="border-primary/20 bg-primary/5">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-base">
-                    <Sparkles className="h-4 w-4 text-primary" />
+                    <Link2 className="h-4 w-4 text-primary" />
                     Doporučený investiční workflow
                   </CardTitle>
                 </CardHeader>
@@ -352,8 +363,7 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
                     <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Krok 1</p>
                     <p className="font-medium">Načíst data z brokera</p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Ideálně importem exportu brokera. Šablonu použij jen tehdy, když broker nemá
-                      vhodný export.
+                      Ideálně importem exportu brokera. Šablonu použij jen tehdy, když broker nemá vhodný export.
                     </p>
                   </div>
                   <div className="rounded-lg border border-border/60 bg-card p-3">
@@ -365,10 +375,9 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
                   </div>
                   <div className="rounded-lg border border-border/60 bg-card p-3">
                     <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Krok 3</p>
-                    <p className="font-medium">Sledovat dividendy a výkon</p>
+                    <p className="font-medium">Vyhodnotit titul v externí AI</p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Jakmile jsou data nahraná, přehled se dopočítá automaticky a zůstává průběžně
-                      aktualizovaný.
+                      Pro detailní analýzu vyber ticker, zkopíruj prompt a otevři ho v ChatGPT nebo Claude.
                     </p>
                   </div>
                 </CardContent>
@@ -382,8 +391,7 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
                   <div className="rounded-lg border border-border/60 bg-card p-3">
                     <p className="font-medium">Export brokera</p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Preferovaná cesta pro Trading 212, IBKR a další brokery s dostupným exportem
-                      obchodů.
+                      Preferovaná cesta pro Trading 212, IBKR a další brokery s dostupným exportem obchodů.
                     </p>
                   </div>
                   <div className="rounded-lg border border-border/60 bg-card p-3">
@@ -395,11 +403,10 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
                   <div className="rounded-lg border border-dashed border-border/60 bg-muted/20 p-3">
                     <p className="flex items-center gap-2 font-medium">
                       <Link2 className="h-4 w-4 text-primary" />
-                      API synchronizace
+                      Online ceny
                     </p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Pro živá data používáme server-side napojení. Reálné konektory zapínáme jen tam,
-                      kde je oficiální a stabilní API.
+                      Aktuální ceny načítáme server-side. AI analýzu necháváme na externí službě přes prompt z aplikace.
                     </p>
                   </div>
                 </CardContent>
@@ -485,32 +492,83 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
                 />
               ) : (
                 <>
-                  <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
-                    <AssetTable
-                      assets={portfolioSummary?.assets || []}
-                      assetsByType={portfolioSummary?.assetsByType || {}}
-                      assetsByProvider={portfolioSummary?.assetsByProvider || {}}
-                      assetsByCurrency={portfolioSummary?.assetsByCurrency || {}}
-                      assetsBySector={portfolioSummary?.assetsBySector || {}}
+                  <Card className="border-border/70 bg-card/80">
+                    <CardHeader className="pb-3">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div>
+                          <CardTitle className="text-base">Prompt pro externí AI analýzu</CardTitle>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            Vyber ticker, prompt zkopíruj do schránky a otevři ho v ChatGPT nebo Claude.
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => void handleCopyAnalysisPrompt()}
+                            disabled={!selectedAnalysisAsset}
+                          >
+                            <Copy className="mr-2 h-4 w-4" />
+                            Zkopírovat prompt
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => void handleOpenExternalAnalysis('chatgpt')}
+                            disabled={!selectedAnalysisAsset}
+                          >
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            Otevřít ChatGPT
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => void handleOpenExternalAnalysis('claude')}
+                            disabled={!selectedAnalysisAsset}
+                          >
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            Otevřít Claude
+                          </Button>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="rounded-lg border border-border/70 bg-background/50 px-3 py-2 text-sm">
+                        {selectedAnalysisAsset ? (
+                          <span>
+                            Vybraný ticker:{' '}
+                            <span className="font-semibold text-primary">
+                              {selectedAnalysisAsset.ticker} · {selectedAnalysisAsset.name}
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">
+                            Zatím není vybraný žádný ticker pro externí AI analýzu.
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Prompt používá ticker, dostupná tržní data a kontext tvé pozice. Výsledek se už nezobrazuje
+                        v aplikaci, ale přímo v otevřené AI službě.
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <AssetTable
+                    assets={portfolioSummary?.assets || []}
+                    assetsByType={portfolioSummary?.assetsByType || {}}
+                    assetsByProvider={portfolioSummary?.assetsByProvider || {}}
+                    assetsByCurrency={portfolioSummary?.assetsByCurrency || {}}
+                    assetsBySector={portfolioSummary?.assetsBySector || {}}
                     reportingCurrency={settings?.reporting_currency || 'CZK'}
                     onSelectAsset={setSelectedAssetId}
                     selectedAnalysisAssetId={selectedAnalysisAssetId}
                     onDeleteAsset={handleDeleteAsset}
                     onSelectAnalysisAsset={handleSelectAnalysisAsset}
                   />
-                  <div ref={analysisPanelRef}>
-                    <TickerAnalysisPanel
-                      selectedAsset={selectedAnalysisAsset}
-                      status={analysisStatus}
-                      result={analysisResult}
-                      error={analysisError}
-                      marketSnapshot={analysisMarketSnapshot}
-                      onGenerate={() => void handleGenerateAnalysis()}
-                      collapsed={isAnalysisCollapsed}
-                      onToggleCollapsed={() => setIsAnalysisCollapsed((value) => !value)}
-                    />
-                  </div>
-                  </div>
                 </>
               )}
             </TabsContent>

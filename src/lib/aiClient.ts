@@ -1,16 +1,5 @@
 import { isSupabaseConfigured, supabase } from '@/integrations/supabase/client';
-import { MarketSnapshot, PortfolioAsset, TickerAnalysisResult } from '@/types/investment';
-
-interface RequestTickerAnalysisParams {
-  ticker: string;
-  portfolioItem: PortfolioAsset;
-  prompt: string;
-}
-
-export interface TickerAnalysisResponse {
-  result: TickerAnalysisResult;
-  marketSnapshot: MarketSnapshot | null;
-}
+import { MarketSnapshot } from '@/types/investment';
 
 export interface QuoteResponse {
   snapshot: MarketSnapshot;
@@ -68,24 +57,6 @@ const invokeInvestmentIntelligence = async <T>(
   }
 
   return payload as T;
-};
-
-export const requestTickerAnalysis = async (
-  params: RequestTickerAnalysisParams
-): Promise<TickerAnalysisResponse> => {
-  const data = await invokeInvestmentIntelligence<TickerAnalysisResponse>(
-    {
-      mode: 'analysis',
-      ...params,
-    },
-    'Nepodařilo se spojit s AI službou pro investiční analýzu.'
-  );
-
-  if (!data?.result?.analysis || !data?.result?.ticker) {
-    throw new Error('AI služba vrátila prázdnou nebo neplatnou odpověď.');
-  }
-
-  return data;
 };
 
 export const requestTickerQuote = async (ticker: string): Promise<QuoteResponse> => {
