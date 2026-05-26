@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, X } from 'lucide-react';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useToast } from '@/hooks/use-toast';
 import { Header } from '@/components/Header';
 import { Sidebar } from '@/components/Sidebar';
 import { TransactionForm } from '@/components/TransactionForm';
@@ -26,6 +27,9 @@ import { DecisionDashboardPanel } from '@/components/DecisionDashboardPanel';
 import { MainDashboardPanels } from '@/components/MainDashboardPanels';
 import { Transaction, TransactionDraft } from '@/types/finance';
 import { draftToTransactionInput, duplicateTransaction } from '@/utils/transactionWorkflow';
+import { formatCurrency, formatMonth } from '@/utils/calculations';
+import { getBudgetAlerts } from '@/utils/categoryAutomation';
+import { appStorage } from '@/lib/appStorage';
 import { useAuth } from '@/contexts/AuthContext';
 import { SidebarItemId } from '@/components/Sidebar';
 
@@ -40,6 +44,13 @@ const DEFAULT_SIDEBAR_ORDER: SidebarItemId[] = [
   'analytics',
   'settings',
 ];
+
+const BUDGET_ALERT_NOTIFICATION_KEY = 'finance_budget_alert_notification_state';
+const BUDGET_ALERT_LEVEL_RANK = {
+  warning: 1,
+  exceeded: 2,
+  critical: 3,
+} as const;
 
 type DashboardPanelId =
   | 'gettingStarted'
@@ -80,6 +91,7 @@ const normalizeSidebarOrder = (value: unknown): SidebarItemId[] => {
 
 const Index = () => {
   const { user, signOut } = useAuth();
+  const { toast } = useToast();
   const {
     transactions,
     bankAccounts,
@@ -146,6 +158,14 @@ const Index = () => {
   const [isAuditOpen, setIsAuditOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isLayoutEditing, setIsLayoutEditing] = useState(false);
+  const [budgetAlertNotificationState, setBudgetAlertNotificationState] = useState<{
+    initialized: boolean;
+    levels: Record<string, 'warning' | 'exceeded' | 'critical'>;
+  }>({
+    initialized: false,
+    levels: {},
+  });
+  const hasLoadedBudgetAlertNotificationState = useRef(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [draftTransaction, setDraftTransaction] = useState<TransactionDraft | null>(null);
   const [transactionFormMode, setTransactionFormMode] = useState<'single' | 'bulk' | 'quick'>('single');
@@ -182,6 +202,14 @@ const Index = () => {
     if (matchingMonths.includes(currentMonth)) return currentMonth;
     return matchingMonths[matchingMonths.length - 1] || `${effectiveSelectedYear}-01`;
   }, [effectiveSelectedYear, transactions]);
+
+  const currentBudgetAlerts = useMemo(
+    () =>
+      getBudgetAlerts(budgetLimits, transactions, subcategories, activeBudgetMonth).sort(
+        (left, right) => BUDGET_ALERT_LEVEL_RANK[right.level] - BUDGET_ALERT_LEVEL_RANK[left.level]
+      ),
+    [activeBudgetMonth, budgetLimits, subcategories, transactions]
+  );
 
   useEffect(() => {
     const isEditableElement = (target: EventTarget | null) => {
@@ -261,6 +289,99 @@ const Index = () => {
   useEffect(() => {
     window.localStorage.setItem('finance_hidden_dashboard_panels', JSON.stringify(hiddenPanels));
   }, [hiddenPanels]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadBudgetAlertNotificationState = async () => {
+      const loaded = await appStorage.getMany([BUDGET_ALERT_NOTIFICATION_KEY]);
+      if (cancelled) return;
+
+      try {
+        const parsed = loaded[BUDGET_ALERT_NOTIFICATION_KEY]
+          ? (JSON.parse(loaded[BUDGET_ALERT_NOTIFICATION_KEY]!) as {
+              initialized?: boolean;
+              levels?: Record<string, 'warning' | 'exceeded' | 'critical'>;
+            })
+          : null;
+
+        setBudgetAlertNotificationState({
+          initialized: parsed?.initialized === true,
+          levels: parsed?.levels || {},
+        });
+      } catch {
+        setBudgetAlertNotificationState({ initialized: false, levels: {} });
+      } finally {
+        hasLoadedBudgetAlertNotificationState.current = true;
+      }
+    };
+
+    void loadBudgetAlertNotificationState();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedBudgetAlertNotificationState.current) return;
+
+    const nextLevels = Object.fromEntries(
+      currentBudgetAlerts.map((alert) => [`${alert.month}:${alert.limit.id}`, alert.level])
+    ) as Record<string, 'warning' | 'exceeded' | 'critical'>;
+
+    if (!budgetAlertNotificationState.initialized) {
+      const baselineState = { initialized: true, levels: nextLevels };
+      setBudgetAlertNotificationState(baselineState);
+      void appStorage.setMany({
+        [BUDGET_ALERT_NOTIFICATION_KEY]: JSON.stringify(baselineState),
+      });
+      return;
+    }
+
+    const newlyEscalatedAlerts = currentBudgetAlerts.filter((alert) => {
+      const key = `${alert.month}:${alert.limit.id}`;
+      const previousLevel = budgetAlertNotificationState.levels[key];
+      if (!previousLevel) return true;
+      return BUDGET_ALERT_LEVEL_RANK[alert.level] > BUDGET_ALERT_LEVEL_RANK[previousLevel];
+    });
+
+    if (newlyEscalatedAlerts.length > 0) {
+      const headline =
+        newlyEscalatedAlerts.length === 1
+          ? newlyEscalatedAlerts[0]
+          : newlyEscalatedAlerts.sort((left, right) => right.ratio - left.ratio)[0];
+      const label = headline.subcategoryLabel
+        ? `${headline.categoryLabel} · ${headline.subcategoryLabel}`
+        : headline.categoryLabel;
+      const moreCount = newlyEscalatedAlerts.length - 1;
+
+      toast({
+        title:
+          headline.level === 'critical'
+            ? 'Limit je výrazně překročen'
+            : headline.level === 'exceeded'
+              ? 'Byl překročen rozpočtový limit'
+              : 'Blížíš se rozpočtovému limitu',
+        description:
+          `${label} v ${formatMonth(headline.month)}: ${formatCurrency(headline.spent)} z limitu ${formatCurrency(
+            headline.limit.monthlyLimit
+          )}.` + (moreCount > 0 ? ` A další ${moreCount}.` : ''),
+        variant: headline.level === 'warning' ? 'default' : 'destructive',
+      });
+    }
+
+    const levelsChanged =
+      JSON.stringify(budgetAlertNotificationState.levels) !== JSON.stringify(nextLevels);
+
+    if (levelsChanged) {
+      const persistedState = { initialized: true, levels: nextLevels };
+      setBudgetAlertNotificationState(persistedState);
+      void appStorage.setMany({
+        [BUDGET_ALERT_NOTIFICATION_KEY]: JSON.stringify(persistedState),
+      });
+    }
+  }, [budgetAlertNotificationState, currentBudgetAlerts, toast]);
 
   const userDisplayName =
     typeof user?.user_metadata?.username === 'string' && user.user_metadata.username.trim().length > 0
