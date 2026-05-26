@@ -1,4 +1,11 @@
 import { Transaction, MonthlyData, ExpenseCategory } from '@/types/finance';
+import { normalizeCurrencyCode } from '@/utils/currency';
+
+export const getSignedAmount = (amount: number) => amount;
+
+export const getExpenseCashAmount = (amount: number) => Math.abs(amount);
+
+export const getTransferCashAmount = (amount: number) => Math.abs(amount);
 
 export const groupTransactionsByMonth = (transactions: Transaction[]): MonthlyData[] => {
   const grouped = transactions.reduce((acc, transaction) => {
@@ -28,13 +35,13 @@ export const groupTransactionsByMonth = (transactions: Transaction[]): MonthlyDa
       acc[month].totalIncome += transaction.amount;
     } else if (transaction.type === 'expense') {
       acc[month].expenses.push(transaction);
-      acc[month].totalExpenses += transaction.amount;
+      acc[month].totalExpenses += getExpenseCashAmount(transaction.amount);
       if (transaction.category) {
-        acc[month].categoryBreakdown[transaction.category] += transaction.amount;
+        acc[month].categoryBreakdown[transaction.category] += getSignedAmount(transaction.amount);
       }
     } else if (transaction.type === 'transfer') {
       acc[month].transfers.push(transaction);
-      acc[month].totalTransfers += transaction.amount;
+      acc[month].totalTransfers += getTransferCashAmount(transaction.amount);
     }
 
     return acc;
@@ -49,10 +56,10 @@ export const groupTransactionsByMonth = (transactions: Transaction[]): MonthlyDa
   return Object.values(grouped).sort((a, b) => b.month.localeCompare(a.month));
 };
 
-export const formatCurrency = (amount: number): string => {
+export const formatCurrency = (amount: number, currency = 'CZK'): string => {
   return new Intl.NumberFormat('cs-CZ', {
     style: 'currency',
-    currency: 'CZK',
+    currency: normalizeCurrencyCode(currency, 'CZK'),
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount);

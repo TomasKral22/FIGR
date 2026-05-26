@@ -18,6 +18,8 @@ import {
 } from '@/types/finance';
 import { appStorage } from '@/lib/appStorage';
 import { useAuth } from '@/contexts/AuthContext';
+import { getExpenseCashAmount, getTransferCashAmount } from '@/utils/calculations';
+import { convertCurrencyValue, ExchangeRateLike, normalizeCurrencyCode } from '@/utils/currency';
 import {
   DEFAULT_FINANCE_FEATURE_TOGGLES,
   mergeAutoCategorizationRules,
@@ -45,6 +47,7 @@ const STORAGE_KEYS = {
   AUTO_CATEGORIZATION_RULES: 'finance_auto_categorization_rules',
   BUDGET_LIMITS: 'finance_budget_limits',
   FEATURE_TOGGLES: 'finance_feature_toggles',
+  INVESTMENT_EXCHANGE_RATES: 'investment_exchange_rates',
 };
 const DEFAULT_BUDGET: BudgetAllocation = {
   necessities: 50,
@@ -56,6 +59,11 @@ const DEFAULT_PORTFOLIO_SETTINGS: PortfolioSettings = {
   annualReturn: 7,
   currentAge: 30,
 };
+
+const normalizeAccount = (account: BankAccount): BankAccount => ({
+  ...account,
+  currency: normalizeCurrencyCode(account.currency, 'CZK'),
+});
 
 const createTimestamp = () => new Date().toISOString();
 const monthStamp = (isoDate: string) => isoDate.slice(0, 7);
@@ -133,6 +141,7 @@ export const useFinanceData = () => {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [visualTheme, setVisualTheme] = useState('dark-blue');
   const [lastTransaction, setLastTransaction] = useState<Omit<Transaction, 'id' | 'createdAt'> | null>(null);
+  const [exchangeRates, setExchangeRates] = useState<ExchangeRateLike[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
 
   const decorateGoals = useCallback(
@@ -184,8 +193,8 @@ export const useFinanceData = () => {
       };
 
       setTransactions(parse<Transaction[]>(STORAGE_KEYS.TRANSACTIONS, []));
-      setBankAccounts(parse<BankAccount[]>(STORAGE_KEYS.BANK_ACCOUNTS, []));
-      setBrokerAccounts(parse<BankAccount[]>(STORAGE_KEYS.BROKER_ACCOUNTS, []));
+      setBankAccounts(parse<BankAccount[]>(STORAGE_KEYS.BANK_ACCOUNTS, []).map(normalizeAccount));
+      setBrokerAccounts(parse<BankAccount[]>(STORAGE_KEYS.BROKER_ACCOUNTS, []).map(normalizeAccount));
       setBudgetAllocation(parse<BudgetAllocation>(STORAGE_KEYS.BUDGET, DEFAULT_BUDGET));
       setPortfolioSettings(parse<PortfolioSettings>(STORAGE_KEYS.PORTFOLIO, DEFAULT_PORTFOLIO_SETTINGS));
       setRecurringTransactions(parse<RecurringTransaction[]>(STORAGE_KEYS.RECURRING_TRANSACTIONS, []));
@@ -206,6 +215,7 @@ export const useFinanceData = () => {
         ...parse<FinanceFeatureToggles>(STORAGE_KEYS.FEATURE_TOGGLES, DEFAULT_FINANCE_FEATURE_TOGGLES),
       });
       setLastTransaction(parse<Omit<Transaction, 'id' | 'createdAt'> | null>(STORAGE_KEYS.LAST_TRANSACTION, null));
+      setExchangeRates(parse<ExchangeRateLike[]>(STORAGE_KEYS.INVESTMENT_EXCHANGE_RATES, []).sort((a, b) => b.rate_date.localeCompare(a.rate_date)));
 
       const legacyTheme = loaded[STORAGE_KEYS.THEME] ?? localStorage.getItem(STORAGE_KEYS.THEME);
       const rawVisualTheme =
@@ -282,6 +292,31 @@ export const useFinanceData = () => {
   useEffect(() => {
     if (!isHydrated) return;
 
+    let cancelled = false;
+
+    const loadExchangeRates = async () => {
+      const loaded = await appStorage.getMany([STORAGE_KEYS.INVESTMENT_EXCHANGE_RATES]);
+      if (cancelled) return;
+      const parsed = loaded[STORAGE_KEYS.INVESTMENT_EXCHANGE_RATES]
+        ? (JSON.parse(loaded[STORAGE_KEYS.INVESTMENT_EXCHANGE_RATES]!) as ExchangeRateLike[])
+        : [];
+      setExchangeRates(parsed.sort((a, b) => b.rate_date.localeCompare(a.rate_date)));
+    };
+
+    void loadExchangeRates();
+    const intervalId = window.setInterval(() => {
+      void loadExchangeRates();
+    }, 30000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [isHydrated, session?.user.id]);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+
     const now = createTimestamp();
     const currentMonth = monthStamp(now);
     const transactionMonths = transactions.map((transaction) => transaction.month);
@@ -293,6 +328,7 @@ export const useFinanceData = () => {
         accountId: account.id,
         accountName: account.name,
         institutionId: account.institutionId,
+        currency: account.currency,
         accountGroup: 'bank' as const,
         initialBalance: account.initialBalance,
         currentBalance: account.currentBalance,
@@ -301,6 +337,7 @@ export const useFinanceData = () => {
         accountId: account.id,
         accountName: account.name,
         institutionId: account.institutionId,
+        currency: account.currency,
         accountGroup: 'broker' as const,
         initialBalance: account.initialBalance,
         currentBalance: account.currentBalance,
@@ -313,6 +350,7 @@ export const useFinanceData = () => {
         {
           accountName: account.accountName,
           institutionId: account.institutionId,
+          currency: account.currency,
           accountGroup: account.accountGroup,
           initialBalance: account.initialBalance,
           currentBalance: account.currentBalance,
@@ -323,6 +361,7 @@ export const useFinanceData = () => {
       {
         accountName: string;
         institutionId?: string;
+        currency: string;
         accountGroup: 'bank' | 'broker';
         initialBalance: number;
         currentBalance: number;
@@ -340,13 +379,13 @@ export const useFinanceData = () => {
       if (transaction.type === 'income') {
         applyDelta(transaction.account, transaction.amount);
       } else if (transaction.type === 'expense') {
-        applyDelta(transaction.account, -transaction.amount);
+        applyDelta(transaction.account, -getExpenseCashAmount(transaction.amount));
         if (transaction.category === 'investments' && transaction.investmentAccount) {
-          applyDelta(transaction.investmentAccount, transaction.amount);
+          applyDelta(transaction.investmentAccount, getExpenseCashAmount(transaction.amount));
         }
       } else {
-        applyDelta(transaction.sourceAccount, -transaction.amount);
-        applyDelta(transaction.transferAccount, transaction.amount);
+        applyDelta(transaction.sourceAccount, -getTransferCashAmount(transaction.amount));
+        applyDelta(transaction.transferAccount, getTransferCashAmount(transaction.amount));
       }
 
       return acc;
@@ -390,7 +429,15 @@ export const useFinanceData = () => {
           accountName: account.accountName,
           institutionId: account.institutionId,
           accountGroup: account.accountGroup,
+          currency: account.currency,
           balance: (balancesByAccount[account.accountId] ?? 0) + adjustment,
+          balanceCzk: convertCurrencyValue(
+            (balancesByAccount[account.accountId] ?? 0) + adjustment,
+            account.currency,
+            'CZK',
+            exchangeRates,
+            `${month}-31`
+          ),
           isSavings: account.accountGroup === 'bank' ? bankAccounts.find((item) => item.id === account.accountId)?.isSavings : false,
           source: 'computed',
           createdAt: now,
@@ -413,7 +460,9 @@ export const useFinanceData = () => {
           accountName: matchedAccount.name,
           institutionId: matchedAccount.institutionId,
           accountGroup: bankMatch ? 'bank' : 'broker',
+          currency: matchedAccount.currency,
           balance: snapshot.balance,
+          balanceCzk: convertCurrencyValue(snapshot.balance, matchedAccount.currency, 'CZK', exchangeRates, `${snapshot.month}-31`),
           isSavings: bankMatch?.isSavings || false,
           source: 'import',
           createdAt: snapshot.createdAt,
@@ -434,10 +483,10 @@ export const useFinanceData = () => {
       const monthSnapshots = mergedSnapshots.filter((snapshot) => snapshot.month === month);
       const bankAssets = monthSnapshots
         .filter((snapshot) => snapshot.accountGroup === 'bank')
-        .reduce((sum, snapshot) => sum + snapshot.balance, 0);
+        .reduce((sum, snapshot) => sum + (snapshot.balanceCzk ?? convertCurrencyValue(snapshot.balance, snapshot.currency, 'CZK', exchangeRates, `${month}-31`)), 0);
       const brokerAssets = monthSnapshots
         .filter((snapshot) => snapshot.accountGroup === 'broker')
-        .reduce((sum, snapshot) => sum + snapshot.balance, 0);
+        .reduce((sum, snapshot) => sum + (snapshot.balanceCzk ?? convertCurrencyValue(snapshot.balance, snapshot.currency, 'CZK', exchangeRates, `${month}-31`)), 0);
 
       return {
         id: `wealth-${month}`,
@@ -453,7 +502,7 @@ export const useFinanceData = () => {
       mergedSnapshots.sort((a, b) => b.month.localeCompare(a.month) || a.accountName.localeCompare(b.accountName))
     );
     setWealthSnapshots(computedWealthSnapshots.reverse());
-  }, [bankAccounts, brokerAccounts, transactions, importedAccountBalances, isHydrated]);
+  }, [bankAccounts, brokerAccounts, transactions, importedAccountBalances, isHydrated, exchangeRates]);
 
   const toggleTheme = useCallback(() => {
     setVisualTheme((prev) => {
@@ -508,16 +557,16 @@ export const useFinanceData = () => {
     if (payload.type === 'income' && payload.account) {
       updateAccountBalance(payload.account, payload.amount * direction);
     } else if (payload.type === 'expense' && payload.account) {
-      updateAccountBalance(payload.account, -payload.amount * direction);
+      updateAccountBalance(payload.account, -getExpenseCashAmount(payload.amount) * direction);
       if (payload.category === 'investments' && payload.investmentAccount) {
-        updateAccountBalance(payload.investmentAccount, payload.amount * direction);
+        updateAccountBalance(payload.investmentAccount, getExpenseCashAmount(payload.amount) * direction);
       }
     } else if (payload.type === 'transfer') {
       if (payload.sourceAccount) {
-        updateAccountBalance(payload.sourceAccount, -payload.amount * direction);
+        updateAccountBalance(payload.sourceAccount, -getTransferCashAmount(payload.amount) * direction);
       }
       if (payload.transferAccount) {
-        updateAccountBalance(payload.transferAccount, payload.amount * direction);
+        updateAccountBalance(payload.transferAccount, getTransferCashAmount(payload.amount) * direction);
       }
     }
   }, [updateAccountBalance]);
@@ -644,11 +693,12 @@ export const useFinanceData = () => {
       });
     }, [applyBalanceDelta, pushAudit]);
 
-  const addBankAccount = useCallback((name: string, initialBalance: number, isSavings?: boolean, interestRate?: number, institutionId?: string) => {
+  const addBankAccount = useCallback((name: string, initialBalance: number, currency = 'CZK', isSavings?: boolean, interestRate?: number, institutionId?: string) => {
     const newAccount: BankAccount = {
       id: crypto.randomUUID(),
       name,
       institutionId,
+      currency: normalizeCurrencyCode(currency, 'CZK'),
       initialBalance,
       currentBalance: initialBalance,
       isSavings: isSavings || false,
@@ -662,11 +712,11 @@ export const useFinanceData = () => {
     });
   }, [pushAudit]);
 
-  const updateBankAccount = useCallback((id: string, name: string, currentBalance: number, isSavings?: boolean, interestRate?: number, institutionId?: string) => {
+  const updateBankAccount = useCallback((id: string, name: string, currentBalance: number, currency = 'CZK', isSavings?: boolean, interestRate?: number, institutionId?: string) => {
     setBankAccounts((prev) =>
       prev.map((account) =>
         account.id === id
-          ? { ...account, name, currentBalance, isSavings: isSavings || false, interestRate: interestRate || 0, institutionId }
+          ? { ...account, name, currentBalance, currency: normalizeCurrencyCode(currency, 'CZK'), isSavings: isSavings || false, interestRate: interestRate || 0, institutionId }
           : account
       )
     );
@@ -686,11 +736,12 @@ export const useFinanceData = () => {
     });
   }, [pushAudit]);
 
-  const addBrokerAccount = useCallback((name: string, initialBalance: number, institutionId?: string) => {
+  const addBrokerAccount = useCallback((name: string, initialBalance: number, currency = 'CZK', institutionId?: string) => {
     const newAccount: BankAccount = {
       id: crypto.randomUUID(),
       name,
       institutionId,
+      currency: normalizeCurrencyCode(currency, 'CZK'),
       initialBalance,
       currentBalance: initialBalance,
     };
@@ -702,10 +753,10 @@ export const useFinanceData = () => {
     });
   }, [pushAudit]);
 
-  const updateBrokerAccount = useCallback((id: string, name: string, currentBalance: number, institutionId?: string) => {
+  const updateBrokerAccount = useCallback((id: string, name: string, currentBalance: number, currency = 'CZK', institutionId?: string) => {
     setBrokerAccounts((prev) =>
       prev.map((account) =>
-        account.id === id ? { ...account, name, currentBalance, institutionId } : account
+        account.id === id ? { ...account, name, currentBalance, currency: normalizeCurrencyCode(currency, 'CZK'), institutionId } : account
       )
     );
     pushAudit({
@@ -1132,6 +1183,7 @@ export const useFinanceData = () => {
     auditLog,
     wealthSnapshots,
     accountSnapshots,
+    exchangeRates,
     monthClosures,
     subcategories,
     autoCategorizationRules,

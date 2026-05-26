@@ -96,6 +96,7 @@ export interface BankAccount {
   id: string;
   name: string;
   institutionId?: string;
+  currency: string;
   initialBalance: number;
   currentBalance: number;
   isSavings?: boolean;
@@ -198,7 +199,9 @@ export interface AccountMonthlySnapshot {
   accountName: string;
   institutionId?: string;
   accountGroup: 'bank' | 'broker';
+  currency: string;
   balance: number;
+  balanceCzk?: number;
   isSavings?: boolean;
   source?: 'computed' | 'import';
   createdAt: string;

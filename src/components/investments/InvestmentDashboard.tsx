@@ -4,7 +4,9 @@ import {
   ChevronUp,
   Copy,
   ExternalLink,
+  FolderKanban,
   Link2,
+  ListFilter,
   Plus,
   RefreshCw,
   Settings,
@@ -25,6 +27,7 @@ import { BrokerConnectionsPanel } from './BrokerConnectionsPanel';
 import { CreditInvestmentsPanel } from './CreditInvestmentsPanel';
 import { TrackedInvestmentsPanel } from './TrackedInvestmentsPanel';
 import { InvestmentAuditPanel } from './InvestmentAuditPanel';
+import { InvestmentWorkspacePanels } from './InvestmentWorkspacePanels';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -38,6 +41,63 @@ interface InvestmentDashboardProps {
   isOpen: boolean;
   onClose: () => void;
 }
+
+type InvestmentTabKey = 'assets' | 'prices' | 'dividends' | 'rates' | 'imports';
+type InvestmentFocusSection = 'portfolio' | 'tracked' | 'credit' | 'audit' | 'assets';
+
+interface InvestmentSavedView {
+  id: string;
+  name: string;
+  tab: InvestmentTabKey;
+  focusSection: InvestmentFocusSection;
+  workflowCollapsed: boolean;
+  connectorsCollapsed: boolean;
+}
+
+const INVESTMENT_DASHBOARD_PREFS_KEY = 'finance_investment_dashboard_prefs';
+const INVESTMENT_DASHBOARD_VIEWS_KEY = 'finance_investment_dashboard_saved_views';
+const INVESTMENT_DASHBOARD_TIP_KEY = 'finance_investment_dashboard_tip_hidden';
+
+const DEFAULT_INVESTMENT_VIEWS: InvestmentSavedView[] = [
+  {
+    id: 'market-overview',
+    name: 'Trzni portfolio',
+    tab: 'assets',
+    focusSection: 'portfolio',
+    workflowCollapsed: true,
+    connectorsCollapsed: true,
+  },
+  {
+    id: 'tracked-positions',
+    name: 'Evidovane pozice',
+    tab: 'assets',
+    focusSection: 'tracked',
+    workflowCollapsed: true,
+    connectorsCollapsed: true,
+  },
+  {
+    id: 'credit-investments',
+    name: 'Uverove investice',
+    tab: 'assets',
+    focusSection: 'credit',
+    workflowCollapsed: true,
+    connectorsCollapsed: true,
+  },
+  {
+    id: 'audit-check',
+    name: 'Audit a kontrola',
+    tab: 'assets',
+    focusSection: 'audit',
+    workflowCollapsed: true,
+    connectorsCollapsed: true,
+  },
+];
+
+const isEditableTarget = (target: EventTarget | null) => {
+  if (!(target instanceof HTMLElement)) return false;
+  const tagName = target.tagName.toLowerCase();
+  return tagName === 'input' || tagName === 'textarea' || tagName === 'select' || target.isContentEditable;
+};
 
 const SectionToggle = ({
   title,
@@ -112,16 +172,28 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<InvestmentTabKey>('assets');
   const [updatingPrices, setUpdatingPrices] = useState(false);
   const [isWorkflowCollapsed, setIsWorkflowCollapsed] = useState(true);
   const [isConnectorsCollapsed, setIsConnectorsCollapsed] = useState(true);
+  const [savedViews, setSavedViews] = useState<InvestmentSavedView[]>([]);
+  const [showDashboardTip, setShowDashboardTip] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return window.localStorage.getItem(INVESTMENT_DASHBOARD_TIP_KEY) !== 'true';
+  });
   const [lastPriceRefreshReport, setLastPriceRefreshReport] = useState<{
     ranAt: string;
     updated: number;
     failed: number;
     failures: string[];
   } | null>(null);
+  const [isLayoutEditing, setIsLayoutEditing] = useState(false);
   const autoRefreshGuardRef = useRef<string | null>(null);
+  const portfolioSectionRef = useRef<HTMLDivElement | null>(null);
+  const trackedSectionRef = useRef<HTMLDivElement | null>(null);
+  const creditSectionRef = useRef<HTMLDivElement | null>(null);
+  const auditSectionRef = useRef<HTMLDivElement | null>(null);
+  const assetsSectionRef = useRef<HTMLDivElement | null>(null);
 
   const selectedAsset = selectedAssetId
     ? portfolioSummary?.assets.find((asset) => asset.id === selectedAssetId) || null
@@ -198,6 +270,49 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
     ? transactions.filter((transaction) => transaction.asset_id === selectedAssetId)
     : [];
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const rawPrefs = window.localStorage.getItem(INVESTMENT_DASHBOARD_PREFS_KEY);
+      if (rawPrefs) {
+        const parsed = JSON.parse(rawPrefs) as Partial<{
+          activeTab: InvestmentTabKey;
+          workflowCollapsed: boolean;
+          connectorsCollapsed: boolean;
+        }>;
+
+        if (parsed.activeTab) setActiveTab(parsed.activeTab);
+        if (typeof parsed.workflowCollapsed === 'boolean') setIsWorkflowCollapsed(parsed.workflowCollapsed);
+        if (typeof parsed.connectorsCollapsed === 'boolean') setIsConnectorsCollapsed(parsed.connectorsCollapsed);
+      }
+
+      const rawViews = window.localStorage.getItem(INVESTMENT_DASHBOARD_VIEWS_KEY);
+      if (rawViews) {
+        setSavedViews(JSON.parse(rawViews) as InvestmentSavedView[]);
+      }
+    } catch {
+      setSavedViews([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(
+      INVESTMENT_DASHBOARD_PREFS_KEY,
+      JSON.stringify({
+        activeTab,
+        workflowCollapsed: isWorkflowCollapsed,
+        connectorsCollapsed: isConnectorsCollapsed,
+      })
+    );
+  }, [activeTab, isConnectorsCollapsed, isWorkflowCollapsed]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(INVESTMENT_DASHBOARD_VIEWS_KEY, JSON.stringify(savedViews));
+  }, [savedViews]);
+
   const latestPriceDateByAsset = useMemo(() => {
     const map = new Map<string, string>();
     for (const price of prices) {
@@ -225,6 +340,67 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
     setSelectedAssetId(null);
     setSelectedAnalysisAssetId(id);
     setIsAnalysisActionsOpen(true);
+  };
+
+  const sectionRefs = useMemo(
+    () => ({
+      portfolio: portfolioSectionRef,
+      tracked: trackedSectionRef,
+      credit: creditSectionRef,
+      audit: auditSectionRef,
+      assets: assetsSectionRef,
+    }),
+    []
+  );
+
+  const scrollToSection = useCallback(
+    (section: InvestmentFocusSection) => {
+      sectionRefs[section].current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    },
+    [sectionRefs]
+  );
+
+  const applySavedView = useCallback(
+    (view: InvestmentSavedView) => {
+      setActiveTab(view.tab);
+      setIsWorkflowCollapsed(view.workflowCollapsed);
+      setIsConnectorsCollapsed(view.connectorsCollapsed);
+      requestAnimationFrame(() => {
+        scrollToSection(view.focusSection);
+      });
+    },
+    [scrollToSection]
+  );
+
+  const handleSaveCurrentView = () => {
+    const name = window.prompt('Nazev pohledu');
+    if (!name || !name.trim()) return;
+
+    const nextView: InvestmentSavedView = {
+      id: `${Date.now()}`,
+      name: name.trim(),
+      tab: activeTab,
+      focusSection:
+        activeTab === 'assets'
+          ? selectedAsset
+            ? 'assets'
+            : selectedAnalysisAsset
+              ? 'assets'
+              : 'portfolio'
+          : 'assets',
+      workflowCollapsed: isWorkflowCollapsed,
+      connectorsCollapsed: isConnectorsCollapsed,
+    };
+
+    setSavedViews((current) => [nextView, ...current].slice(0, 8));
+    toast({
+      title: 'Pohled ulozen',
+      description: `Ulozil jsem pohled "${name.trim()}".`,
+    });
+  };
+
+  const handleDeleteSavedView = (viewId: string) => {
+    setSavedViews((current) => current.filter((view) => view.id !== viewId));
   };
 
   const copyPromptToClipboard = async () => {
@@ -395,9 +571,9 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
     }
   }, [addPrice, assets, latestPriceDateByAsset, recordPriceRefresh, toast, trackedInvestments, updateTrackedInvestment]);
 
-  const handleRefreshPrices = async () => {
+  const handleRefreshPrices = useCallback(async () => {
     await refreshPrices({ silent: false, onlyStale: false });
-  };
+  }, [refreshPrices]);
 
   useEffect(() => {
     if (!isOpen || (assets.length === 0 && trackedInvestments.length === 0) || updatingPrices) return;
@@ -409,6 +585,312 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
 
     void refreshPrices({ silent: true, onlyStale: true });
   }, [isOpen, assets, trackedInvestments, updatingPrices, refreshPrices]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (isEditableTarget(event.target) || !event.altKey) return;
+
+      const key = event.key.toLowerCase();
+      if (key === 'r') {
+        event.preventDefault();
+        void handleRefreshPrices();
+      } else if (key === 'i') {
+        event.preventDefault();
+        setIsImportOpen(true);
+      } else if (key === 'n') {
+        event.preventDefault();
+        setIsAddTransactionOpen(true);
+      } else if (key === '1') {
+        event.preventDefault();
+        applySavedView(DEFAULT_INVESTMENT_VIEWS[0]);
+      } else if (key === '2') {
+        event.preventDefault();
+        applySavedView(DEFAULT_INVESTMENT_VIEWS[1]);
+      } else if (key === '3') {
+        event.preventDefault();
+        applySavedView(DEFAULT_INVESTMENT_VIEWS[2]);
+      } else if (key === '4') {
+        event.preventDefault();
+        applySavedView(DEFAULT_INVESTMENT_VIEWS[3]);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [applySavedView, handleRefreshPrices, isOpen]);
+
+  const dismissDashboardTip = () => {
+    setShowDashboardTip(false);
+    window.localStorage.setItem(INVESTMENT_DASHBOARD_TIP_KEY, 'true');
+  };
+
+  const investmentPanels = {
+    workflow: (
+      <>
+        <SectionToggle
+          title="Investicni workflow a zdroje dat"
+          description="Doporuceny postup prace s importy, cenami a analytikou."
+          collapsed={isWorkflowCollapsed}
+          onToggle={() => setIsWorkflowCollapsed((value) => !value)}
+        />
+
+        {isWorkflowCollapsed ? null : (
+          <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+            <Card className="border-primary/20 bg-primary/5">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Link2 className="h-4 w-4 text-primary" />
+                  Doporuceny investicni workflow
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-3 md:grid-cols-3">
+                <div className="rounded-lg border border-border/60 bg-card p-3">
+                  <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Krok 1</p>
+                  <p className="font-medium">Nacist data z brokera</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Idealne importem exportu brokera. Sablonu pouzij jen tehdy, kdyz broker nema vhodny export.
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border/60 bg-card p-3">
+                  <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Krok 2</p>
+                  <p className="font-medium">Doplnit ceny a kurzy</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Portfolio pak spravne prepocita hodnotu, ziskovost i menove prepočty.
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border/60 bg-card p-3">
+                  <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Krok 3</p>
+                  <p className="font-medium">Vyhodnotit titul v externi AI</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Pro detailni analyzu vyber ticker, zkopiruj prompt a otevri ho v ChatGPT nebo Claude.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Zdroje dat</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-3">
+                <div className="rounded-lg border border-border/60 bg-card p-3">
+                  <p className="font-medium">Export brokera</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Preferovana cesta pro Trading 212, IBKR a dalsi brokery s dostupnym exportem obchodu.
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border/60 bg-card p-3">
+                  <p className="font-medium">Univerzalni sablona FIGR</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Zalozni cesta pro rucni doplneni nebo jednorazove cisteni dat pred importem.
+                  </p>
+                </div>
+                <div className="rounded-lg border border-dashed border-border/60 bg-muted/20 p-3">
+                  <p className="flex items-center gap-2 font-medium">
+                    <Link2 className="h-4 w-4 text-primary" />
+                    Online ceny a audit
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Aktualni ceny nacitame server-side. Validace dat a audit bezne ukazuji, co chybi nebo co je zastarale.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </>
+    ),
+    connectors: (
+      <>
+        <SectionToggle
+          title="Broker konektory"
+          description="Pripravene konektory pro napojeni brokeru a budoucí synchronizaci."
+          collapsed={isConnectorsCollapsed}
+          onToggle={() => setIsConnectorsCollapsed((value) => !value)}
+        />
+        {isConnectorsCollapsed ? null : (
+          <div className="mt-4">
+            <BrokerConnectionsPanel connectors={connectors} onMarkConfigured={markConnectorConfigured} />
+          </div>
+        )}
+      </>
+    ),
+    actions: (
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" onClick={() => void calculatePortfolio()} disabled={calculatingPortfolio}>
+          <RefreshCw className={`mr-2 h-4 w-4 ${calculatingPortfolio ? 'animate-spin' : ''}`} />
+          Prepocitat portfolio
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => void handleRefreshPrices()} disabled={updatingPrices}>
+          <RefreshCw className={`mr-2 h-4 w-4 ${updatingPrices ? 'animate-spin' : ''}`} />
+          Aktualizovat ceny
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => setIsImportOpen(true)}>
+          <Upload className="mr-2 h-4 w-4" />
+          Import brokera / sablony
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => setIsSettingsOpen(true)}>
+          <Settings className="mr-2 h-4 w-4" />
+          Nastaveni
+        </Button>
+        <Button size="sm" onClick={() => setIsAddTransactionOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Pridat rucni transakci
+        </Button>
+      </div>
+    ),
+    audit: (
+      <div ref={auditSectionRef}>
+        <InvestmentAuditPanel
+          syncStatus={syncStatus}
+          validationIssues={validationIssues}
+          auditLog={auditLog}
+          onRefreshAudit={refreshValidationIssues}
+          onExportBackup={exportAccountBackup}
+          lastPriceRefreshReport={lastPriceRefreshReport}
+        />
+      </div>
+    ),
+    portfolio: (
+      <div ref={portfolioSectionRef}>
+        <PortfolioOverview portfolioSummary={portfolioSummary} loading={calculatingPortfolio} />
+      </div>
+    ),
+    tracked: (
+      <div ref={trackedSectionRef}>
+        <TrackedInvestmentsPanel
+          trackedInvestments={trackedInvestments}
+          reportingCurrency={settings?.reporting_currency || 'CZK'}
+          onAddTrackedInvestment={addTrackedInvestment}
+          onUpdateTrackedInvestment={updateTrackedInvestment}
+          onDeleteTrackedInvestment={deleteTrackedInvestment}
+        />
+      </div>
+    ),
+    credit: (
+      <div ref={creditSectionRef}>
+        <CreditInvestmentsPanel
+          creditInvestments={creditInvestments}
+          creditRepayments={creditRepayments}
+          reportingCurrency={settings?.reporting_currency || 'CZK'}
+          creditCurrentValue={portfolioSummary?.creditCurrentValue || 0}
+          onAddCreditInvestment={addCreditInvestment}
+          onUpdateCreditInvestment={updateCreditInvestment}
+          onDeleteCreditInvestment={deleteCreditInvestment}
+          onAddCreditRepayment={addCreditRepayment}
+          onDeleteCreditRepayment={deleteCreditRepayment}
+        />
+      </div>
+    ),
+    marketAssets: (
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as InvestmentTabKey)} className="space-y-4">
+        <TabsList className="flex h-auto flex-wrap gap-1">
+          <TabsTrigger value="assets" className="text-xs md:text-sm">Aktiva</TabsTrigger>
+          <TabsTrigger value="prices" className="text-xs md:text-sm">Ceny</TabsTrigger>
+          <TabsTrigger value="dividends" className="text-xs md:text-sm">Dividendy</TabsTrigger>
+          <TabsTrigger value="rates" className="text-xs md:text-sm">Smenne kurzy</TabsTrigger>
+          <TabsTrigger value="imports" className="text-xs md:text-sm">Historie importu</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="assets" className="space-y-4">
+          <div ref={assetsSectionRef} />
+          {selectedAsset ? (
+            <AssetDetail
+              asset={selectedAsset}
+              transactions={assetTransactions}
+              prices={prices.filter((price) => price.asset_id === selectedAssetId)}
+              reportingCurrency={settings?.reporting_currency || 'CZK'}
+              onBack={() => setSelectedAssetId(null)}
+              onDeleteAsset={handleDeleteAsset}
+              onDeleteTransaction={deleteTransaction}
+              onAddPrice={addPrice}
+            />
+          ) : (
+            <>
+              <Card className="border-border/70 bg-card/80">
+                <CardHeader className="pb-3">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                      <CardTitle className="text-base">Prompt pro externi AI analyzu</CardTitle>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Vyber ticker, prompt zkopiruj do schranky a otevri ho v ChatGPT nebo Claude.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" variant="outline" size="sm" onClick={() => void handleCopyAnalysisPrompt()} disabled={!selectedAnalysisAsset}>
+                        <Copy className="mr-2 h-4 w-4" />
+                        Zkopirovat prompt
+                      </Button>
+                      <Button type="button" variant="outline" size="sm" onClick={() => void handleOpenExternalAnalysis('chatgpt')} disabled={!selectedAnalysisAsset}>
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        Otevrit ChatGPT
+                      </Button>
+                      <Button type="button" variant="outline" size="sm" onClick={() => void handleOpenExternalAnalysis('claude')} disabled={!selectedAnalysisAsset}>
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        Otevrit Claude
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="rounded-lg border border-border/70 bg-background/50 px-3 py-2 text-sm">
+                    {selectedAnalysisAsset ? (
+                      <span>
+                        Vybrany ticker:{' '}
+                        <span className="font-semibold text-primary">
+                          {selectedAnalysisAsset.ticker} · {selectedAnalysisAsset.name}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">Zatim neni vybrany zadny ticker pro externi AI analyzu.</span>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Prompt pouziva ticker, dostupna trzni data a kontext tve pozice. Vysledek se zobrazi primo v otevrene AI sluzbe.
+                  </p>
+                </CardContent>
+              </Card>
+
+              <AssetTable
+                assets={portfolioSummary?.assets || []}
+                assetsByType={portfolioSummary?.assetsByType || {}}
+                assetsByProvider={portfolioSummary?.assetsByProvider || {}}
+                assetsByCurrency={portfolioSummary?.assetsByCurrency || {}}
+                assetsBySector={portfolioSummary?.assetsBySector || {}}
+                reportingCurrency={settings?.reporting_currency || 'CZK'}
+                onSelectAsset={setSelectedAssetId}
+                selectedAnalysisAssetId={selectedAnalysisAssetId}
+                onDeleteAsset={handleDeleteAsset}
+                onSelectAnalysisAsset={handleSelectAnalysisAsset}
+              />
+            </>
+          )}
+        </TabsContent>
+
+        <TabsContent value="prices">
+          <PriceManagement assets={assets} prices={prices} onAddPrice={addPrice} />
+        </TabsContent>
+
+        <TabsContent value="dividends">
+          <DividendOverview
+            assets={assets}
+            transactions={transactions}
+            reportingCurrency={settings?.reporting_currency || 'CZK'}
+          />
+        </TabsContent>
+
+        <TabsContent value="rates">
+          <ExchangeRateManagement exchangeRates={exchangeRates} onAddExchangeRate={addExchangeRate} />
+        </TabsContent>
+
+        <TabsContent value="imports" className="space-y-4">
+          <ImportHistory batches={importBatches} onUndoImport={undoImport} />
+        </TabsContent>
+      </Tabs>
+    ),
+  } satisfies Parameters<typeof InvestmentWorkspacePanels>[0]['panels'];
 
   if (loading) {
     return (
@@ -426,6 +908,77 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
         </SheetHeader>
 
         <div className="space-y-4 md:space-y-6">
+          {showDashboardTip ? (
+            <Card className="border-primary/20 bg-primary/5">
+              <CardContent className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-1 text-sm">
+                  <p className="font-medium text-primary">Investicni pracovni prostor</p>
+                  <p className="text-muted-foreground">
+                    Alt + 1 az 4 prepina rychle pohledy. Alt + R obnovi ceny, Alt + I otevre import a Alt + N novou rucni transakci.
+                    Ulozene pohledy si pamatuji aktivni sekci i stav panelu.
+                  </p>
+                </div>
+                <Button type="button" variant="ghost" size="sm" onClick={dismissDashboardTip}>
+                  Rozumim
+                </Button>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          <Card className="border-border/70 bg-card/80">
+            <CardHeader className="pb-3">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <FolderKanban className="h-4 w-4 text-primary" />
+                    Pohledy investic
+                  </CardTitle>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Pouzij rychle pohledy nebo si uloz vlastni pracovni rozlozeni dashboardu.
+                  </p>
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={handleSaveCurrentView}>
+                  <ListFilter className="mr-2 h-4 w-4" />
+                  Ulozit aktualni pohled
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                {DEFAULT_INVESTMENT_VIEWS.map((view, index) => (
+                  <Button key={view.id} type="button" variant="outline" size="sm" onClick={() => applySavedView(view)}>
+                    {index + 1}. {view.name}
+                  </Button>
+                ))}
+              </div>
+
+              {savedViews.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {savedViews.map((view) => (
+                    <div key={view.id} className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-background/60 px-2 py-1 text-sm">
+                      <button type="button" className="px-1 text-left" onClick={() => applySavedView(view)}>
+                        {view.name}
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-full px-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        onClick={() => handleDeleteSavedView(view.id)}
+                        aria-label={`Smazat pohled ${view.name}`}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <InvestmentWorkspacePanels panels={investmentPanels} editing={isLayoutEditing} />
+
+          {false ? (
+            <>
+
           <SectionToggle
             title="Investicni workflow a zdroje dat"
             description="Doporuceny postup prace s importy, cenami a analytikou."
@@ -532,38 +1085,46 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
             </Button>
           </div>
 
-          <InvestmentAuditPanel
-            syncStatus={syncStatus}
-            validationIssues={validationIssues}
-            auditLog={auditLog}
-            onRefreshAudit={refreshValidationIssues}
-            onExportBackup={exportAccountBackup}
-            lastPriceRefreshReport={lastPriceRefreshReport}
-          />
+          <div ref={auditSectionRef}>
+            <InvestmentAuditPanel
+              syncStatus={syncStatus}
+              validationIssues={validationIssues}
+              auditLog={auditLog}
+              onRefreshAudit={refreshValidationIssues}
+              onExportBackup={exportAccountBackup}
+              lastPriceRefreshReport={lastPriceRefreshReport}
+            />
+          </div>
 
-          <PortfolioOverview portfolioSummary={portfolioSummary} loading={calculatingPortfolio} />
+          <div ref={portfolioSectionRef}>
+            <PortfolioOverview portfolioSummary={portfolioSummary} loading={calculatingPortfolio} />
+          </div>
 
-          <TrackedInvestmentsPanel
-            trackedInvestments={trackedInvestments}
-            reportingCurrency={settings?.reporting_currency || 'CZK'}
-            onAddTrackedInvestment={addTrackedInvestment}
-            onUpdateTrackedInvestment={updateTrackedInvestment}
-            onDeleteTrackedInvestment={deleteTrackedInvestment}
-          />
+          <div ref={trackedSectionRef}>
+            <TrackedInvestmentsPanel
+              trackedInvestments={trackedInvestments}
+              reportingCurrency={settings?.reporting_currency || 'CZK'}
+              onAddTrackedInvestment={addTrackedInvestment}
+              onUpdateTrackedInvestment={updateTrackedInvestment}
+              onDeleteTrackedInvestment={deleteTrackedInvestment}
+            />
+          </div>
 
-          <CreditInvestmentsPanel
-            creditInvestments={creditInvestments}
-            creditRepayments={creditRepayments}
-            reportingCurrency={settings?.reporting_currency || 'CZK'}
-            creditCurrentValue={portfolioSummary?.creditCurrentValue || 0}
-            onAddCreditInvestment={addCreditInvestment}
-            onUpdateCreditInvestment={updateCreditInvestment}
-            onDeleteCreditInvestment={deleteCreditInvestment}
-            onAddCreditRepayment={addCreditRepayment}
-            onDeleteCreditRepayment={deleteCreditRepayment}
-          />
+          <div ref={creditSectionRef}>
+            <CreditInvestmentsPanel
+              creditInvestments={creditInvestments}
+              creditRepayments={creditRepayments}
+              reportingCurrency={settings?.reporting_currency || 'CZK'}
+              creditCurrentValue={portfolioSummary?.creditCurrentValue || 0}
+              onAddCreditInvestment={addCreditInvestment}
+              onUpdateCreditInvestment={updateCreditInvestment}
+              onDeleteCreditInvestment={deleteCreditInvestment}
+              onAddCreditRepayment={addCreditRepayment}
+              onDeleteCreditRepayment={deleteCreditRepayment}
+            />
+          </div>
 
-          <Tabs defaultValue="assets" className="space-y-4">
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as InvestmentTabKey)} className="space-y-4">
             <TabsList className="flex h-auto flex-wrap gap-1">
               <TabsTrigger value="assets" className="text-xs md:text-sm">Aktiva</TabsTrigger>
               <TabsTrigger value="prices" className="text-xs md:text-sm">Ceny</TabsTrigger>
@@ -573,6 +1134,7 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
             </TabsList>
 
             <TabsContent value="assets" className="space-y-4">
+              <div ref={assetsSectionRef} />
               {selectedAsset ? (
                 <AssetDetail
                   asset={selectedAsset}
@@ -686,10 +1248,12 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
               <ImportHistory batches={importBatches} onUndoImport={undoImport} />
             </TabsContent>
           </Tabs>
+            </>
+          ) : null}
         </div>
 
         <Dialog open={isAddTransactionOpen} onOpenChange={setIsAddTransactionOpen}>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1.5rem)] overflow-y-auto p-4 sm:max-w-lg sm:p-6">
             <DialogHeader>
               <DialogTitle>Pridat transakci</DialogTitle>
             </DialogHeader>
@@ -705,7 +1269,7 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
         </Dialog>
 
         <Dialog open={isAnalysisActionsOpen} onOpenChange={setIsAnalysisActionsOpen}>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-[calc(100vw-1.5rem)] p-4 sm:max-w-lg sm:p-6">
             <DialogHeader>
               <DialogTitle>Externi AI analyza</DialogTitle>
             </DialogHeader>
@@ -761,7 +1325,7 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
         </Dialog>
 
         <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
-          <DialogContent className="max-h-[80vh] max-w-2xl overflow-y-auto">
+          <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1.5rem)] overflow-y-auto p-4 sm:max-w-2xl sm:p-6">
             <DialogHeader>
               <DialogTitle>Import investicnich transakci</DialogTitle>
             </DialogHeader>
@@ -775,7 +1339,7 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
         </Dialog>
 
         <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-          <DialogContent>
+          <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1.5rem)] overflow-y-auto p-4 sm:max-w-lg sm:p-6">
             <DialogHeader>
               <DialogTitle>Nastaveni portfolia</DialogTitle>
             </DialogHeader>
@@ -785,6 +1349,8 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
                 await updateSettings(currency);
                 setIsSettingsOpen(false);
               }}
+              isLayoutEditing={isLayoutEditing}
+              onToggleLayoutEditing={() => setIsLayoutEditing((current) => !current)}
             />
           </DialogContent>
         </Dialog>

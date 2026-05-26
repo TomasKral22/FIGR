@@ -416,7 +416,7 @@ export function validateTransactionDraft(draft: TransactionDraft) {
 
   if (!draft.month) errors.month = 'Chybí měsíc.';
   if (!draft.name.trim()) errors.name = 'Chybí název.';
-  if (!Number.isFinite(draft.amount) || (draft.amount ?? 0) <= 0) errors.amount = 'Chybí částka.';
+  if (!Number.isFinite(draft.amount) || (draft.amount ?? 0) === 0) errors.amount = 'Castka nesmi byt 0.';
 
   if (draft.type === 'income') {
     if (!draft.account) errors.account = 'Příjem musí mít cílový účet.';
@@ -501,3 +501,4 @@ export function getTransactionTypeLabel(type: TransactionDraftType) {
 export function getCategoryLabel(category?: ExpenseCategory) {
   return category ? CATEGORY_LABELS[category] || category : '';
 }
+

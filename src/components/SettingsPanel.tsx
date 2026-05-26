@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Check, PaintBucket, Settings2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, LayoutGrid, PaintBucket, Settings2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { SidebarItemId } from '@/components/Sidebar';
@@ -43,6 +43,8 @@ interface SettingsPanelProps {
   onSelectTheme: (theme: string) => void;
   sidebarOrder: SidebarItemId[];
   onMoveSidebarItem: (itemId: SidebarItemId, direction: 'up' | 'down') => void;
+  isDashboardLayoutEditing: boolean;
+  onToggleDashboardLayoutEditing: () => void;
 }
 
 export const SettingsPanel = ({
@@ -52,6 +54,8 @@ export const SettingsPanel = ({
   onSelectTheme,
   sidebarOrder,
   onMoveSidebarItem,
+  isDashboardLayoutEditing,
+  onToggleDashboardLayoutEditing,
 }: SettingsPanelProps) => {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -104,43 +108,66 @@ export const SettingsPanel = ({
             </div>
           </section>
 
-          <section className="rounded-2xl border border-border bg-card/60 p-4">
-            <div className="mb-4 flex items-center gap-2">
-              <PaintBucket className="h-4 w-4 text-primary" />
-              <div>
-                <h3 className="font-semibold">Styly</h3>
-                <p className="text-sm text-muted-foreground">
-                  Rozložení zůstává stejné. Mění se pouze vizuální téma a barvy aplikace.
-                </p>
+          <div className="space-y-6">
+            <section className="rounded-2xl border border-border bg-card/60 p-4">
+              <div className="mb-4 flex items-center gap-2">
+                <LayoutGrid className="h-4 w-4 text-primary" />
+                <div>
+                  <h3 className="font-semibold">Rozložení dashboardu</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Režim úprav zapni jen tehdy, když chceš přesouvat nebo skrývat panely hlavní obrazovky.
+                  </p>
+                </div>
               </div>
-            </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
-              {visualThemes.map((theme) => {
-                const isActive = currentTheme === theme.id;
+              <Button
+                type="button"
+                variant={isDashboardLayoutEditing ? 'default' : 'outline'}
+                onClick={onToggleDashboardLayoutEditing}
+                className="w-full"
+              >
+                {isDashboardLayoutEditing ? 'Ukončit úpravy rozložení' : 'Upravit rozložení dashboardu'}
+              </Button>
+            </section>
 
-                return (
-                  <button
-                    key={theme.id}
-                    type="button"
-                    onClick={() => onSelectTheme(theme.id)}
-                    className={`action-card text-left ${isActive ? 'border-primary/45 bg-primary/5' : ''}`}
-                  >
-                    <div className="mb-3 flex items-center justify-between">
-                      <span className="font-medium">{theme.name}</span>
-                      {isActive ? <Check className="h-4 w-4 text-primary" /> : null}
-                    </div>
-                    <div className="mb-3 flex h-16 overflow-hidden rounded-[var(--radius-control)] border border-border/60">
-                      {theme.swatches.map((swatch) => (
-                        <div key={swatch} className="flex-1" style={{ backgroundColor: swatch }} />
-                      ))}
-                    </div>
-                    <p className="text-sm text-muted-foreground">{theme.description}</p>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
+            <section className="rounded-2xl border border-border bg-card/60 p-4">
+              <div className="mb-4 flex items-center gap-2">
+                <PaintBucket className="h-4 w-4 text-primary" />
+                <div>
+                  <h3 className="font-semibold">Styly</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Rozložení zůstává stejné. Mění se pouze vizuální téma a barvy aplikace.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                {visualThemes.map((theme) => {
+                  const isActive = currentTheme === theme.id;
+
+                  return (
+                    <button
+                      key={theme.id}
+                      type="button"
+                      onClick={() => onSelectTheme(theme.id)}
+                      className={`action-card text-left ${isActive ? 'border-primary/45 bg-primary/5' : ''}`}
+                    >
+                      <div className="mb-3 flex items-center justify-between">
+                        <span className="font-medium">{theme.name}</span>
+                        {isActive ? <Check className="h-4 w-4 text-primary" /> : null}
+                      </div>
+                      <div className="mb-3 flex h-16 overflow-hidden rounded-[var(--radius-control)] border border-border/60">
+                        {theme.swatches.map((swatch) => (
+                          <div key={swatch} className="flex-1" style={{ backgroundColor: swatch }} />
+                        ))}
+                      </div>
+                      <p className="text-sm text-muted-foreground">{theme.description}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

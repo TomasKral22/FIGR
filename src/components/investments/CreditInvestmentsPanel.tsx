@@ -139,7 +139,7 @@ export const CreditInvestmentsPanel = ({
               Pridat pujcku
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1.5rem)] overflow-y-auto p-4 sm:max-w-lg sm:p-6">
             <DialogHeader>
               <DialogTitle>Nova uverova investice</DialogTitle>
             </DialogHeader>
@@ -288,7 +288,7 @@ export const CreditInvestmentsPanel = ({
         )}
 
         <Dialog open={Boolean(editingInvestment)} onOpenChange={(open) => !open && setEditingInvestment(null)}>
-          <DialogContent>
+          <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1.5rem)] overflow-y-auto p-4 sm:max-w-lg sm:p-6">
             <DialogHeader>
               <DialogTitle>Upravit uverovou investici</DialogTitle>
             </DialogHeader>
@@ -344,7 +344,7 @@ export const CreditInvestmentsPanel = ({
                         Pridat splatku
                       </Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1.5rem)] overflow-y-auto p-4 sm:max-w-lg sm:p-6">
                       <DialogHeader>
                         <DialogTitle>Nova splatka</DialogTitle>
                       </DialogHeader>

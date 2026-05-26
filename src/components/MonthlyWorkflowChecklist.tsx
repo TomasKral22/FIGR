@@ -12,7 +12,6 @@ import {
 } from '@/types/finance';
 import {
   buildPendingItems,
-  buildPlanVsRealityRows,
   buildRecurringMonthStatuses,
   buildWorkflowChecklist,
 } from '@/utils/financeDashboard';
@@ -37,7 +36,7 @@ export const MonthlyWorkflowChecklist = ({
   transactions,
   recurringTransactions,
   accountSnapshots,
-  budgetAllocation,
+  budgetAllocation: _budgetAllocation,
   budgetLimits,
   subcategories,
   onFillRecurringForMonth,
@@ -48,14 +47,11 @@ export const MonthlyWorkflowChecklist = ({
     return window.localStorage.getItem('finance_month_workflow_tip_hidden') !== 'true';
   });
 
-  const monthTransactions = useMemo(
-    () => transactions.filter((transaction) => transaction.month === month),
-    [month, transactions]
-  );
   const recurringStatuses = useMemo(
     () => buildRecurringMonthStatuses(recurringTransactions, transactions, month),
     [month, recurringTransactions, transactions]
   );
+
   const checklist = useMemo(
     () =>
       buildWorkflowChecklist({
@@ -69,27 +65,7 @@ export const MonthlyWorkflowChecklist = ({
       }),
     [accountSnapshots, budgetLimits, month, monthLocked, recurringStatuses, subcategories, transactions]
   );
-  const planVsReality = useMemo(() => {
-    const totalIncome = monthTransactions
-      .filter((transaction) => transaction.type === 'income')
-      .reduce((sum, transaction) => sum + transaction.amount, 0);
-    const categoryBreakdown = monthTransactions
-      .filter((transaction) => transaction.type === 'expense' && transaction.category)
-      .reduce(
-        (acc, transaction) => {
-          if (transaction.category) acc[transaction.category] += transaction.amount;
-          return acc;
-        },
-        {
-          necessities: 0,
-          investments: 0,
-          savings: 0,
-          whims: 0,
-          selfInvestment: 0,
-        }
-      );
-    return buildPlanVsRealityRows({ totalIncome, categoryBreakdown, budgetAllocation });
-  }, [budgetAllocation, monthTransactions]);
+
   const pendingItems = useMemo(
     () =>
       buildPendingItems({
@@ -115,19 +91,24 @@ export const MonthlyWorkflowChecklist = ({
           <div>
             <CardTitle className="flex items-center gap-2 text-base">
               <Clock3 className="h-4 w-4 text-primary" />
-              Workflow měsíční uzávěrky
+              Workflow mesicni uzaverky
             </CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
-              Checklist, plán vs. realita, potvrzení trvalých plateb a seznam toho, co ještě chybí.
+              Checklist, potvrzeni trvalych plateb a seznam toho, co jeste chybi.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" size="sm" onClick={() => onFillRecurringForMonth(month)}>
               <RefreshCw className="mr-2 h-4 w-4" />
-              Doplnit trvalé platby
+              Doplnit trvale platby
             </Button>
-            <Button type="button" size="sm" variant={monthLocked ? 'outline' : 'default'} onClick={() => onToggleMonthClosure(month)}>
-              {monthLocked ? 'Znovu otevřít měsíc' : 'Uzavřít po kontrole'}
+            <Button
+              type="button"
+              size="sm"
+              variant={monthLocked ? 'outline' : 'default'}
+              onClick={() => onToggleMonthClosure(month)}
+            >
+              {monthLocked ? 'Znovu otevrit mesic' : 'Uzavrit po kontrole'}
             </Button>
           </div>
         </div>
@@ -136,10 +117,10 @@ export const MonthlyWorkflowChecklist = ({
           <div className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-3 text-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <p className="text-muted-foreground">
-                Doporučený postup: doplň trvalé platby, zkontroluj stavy účtů, porovnej plán a realitu a teprve pak měsíc uzavři.
+                Doporuceny postup: dopln trvale platby, zkontroluj stavy uctu a teprve pak mesic uzavri.
               </p>
               <Button type="button" variant="ghost" size="sm" onClick={dismissTip}>
-                Skrýt tip
+                Skryt tip
               </Button>
             </div>
           </div>
@@ -174,30 +155,33 @@ export const MonthlyWorkflowChecklist = ({
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
           <div className="space-y-3">
-            <p className="text-sm font-medium">Pravidelné platby: zaúčtováno / chybí</p>
+            <p className="text-sm font-medium">Pravidelne platby: zauctovano / chybi</p>
             <div className="space-y-2">
               {recurringStatuses.length > 0 ? (
                 recurringStatuses.map((item) => (
-                  <div key={item.recurringId} className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-background/50 px-3 py-3 text-sm">
+                  <div
+                    key={item.recurringId}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-background/50 px-3 py-3 text-sm"
+                  >
                     <div>
                       <p className="font-medium">{item.name}</p>
                       <p className="text-xs text-muted-foreground">{formatCurrency(item.amount)}</p>
                     </div>
                     <span className={item.status === 'accounted' ? 'text-success' : 'text-warning'}>
-                      {item.status === 'accounted' ? 'zaúčtováno' : 'chybí'}
+                      {item.status === 'accounted' ? 'zauctovano' : 'chybi'}
                     </span>
                   </div>
                 ))
               ) : (
                 <div className="rounded-xl border border-dashed border-border/70 bg-background/40 px-4 py-6 text-sm text-muted-foreground">
-                  V tomto měsíci zatím nejsou aktivní trvalé platby.
+                  V tomto mesici zatim nejsou aktivni trvale platby.
                 </div>
               )}
             </div>
           </div>
 
           <div className="space-y-3">
-            <p className="text-sm font-medium">Co ještě zapsat nebo zkontrolovat</p>
+            <p className="text-sm font-medium">Co jeste zapsat nebo zkontrolovat</p>
             {pendingItems.length > 0 ? (
               <div className="space-y-2">
                 {pendingItems.map((item) => (
@@ -208,29 +192,9 @@ export const MonthlyWorkflowChecklist = ({
               </div>
             ) : (
               <div className="rounded-xl border border-dashed border-border/70 bg-background/40 px-4 py-6 text-sm text-muted-foreground">
-                Tento měsíc už nevykazuje zjevné chybějící kroky.
+                Tento mesic uz nevykazuje zjevne chybejici kroky.
               </div>
             )}
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <p className="text-sm font-medium">Plán vs. realita</p>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {planVsReality.map((row) => (
-              <div key={row.category} className="rounded-xl border border-border/60 bg-background/50 p-4">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-medium">{row.label}</p>
-                  <span className={row.variance <= 0 ? 'text-success' : 'text-warning'}>
-                    {row.variance <= 0 ? 'v plánu' : 'nad plán'}
-                  </span>
-                </div>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Plán {row.plannedRatio.toFixed(0)} % · {formatCurrency(row.plannedAmount)}
-                </p>
-                <p className="mt-1 text-sm font-medium">Realita {formatCurrency(row.actualAmount)}</p>
-              </div>
-            ))}
           </div>
         </div>
       </CardContent>

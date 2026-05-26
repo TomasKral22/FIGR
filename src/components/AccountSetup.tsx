@@ -14,22 +14,59 @@ import { InstitutionAvatar } from '@/components/InstitutionAvatar';
 import { getInstitution, getInstitutionsByKind } from '@/lib/institutions';
 import { BankAccount } from '@/types/finance';
 import { formatCurrency } from '@/utils/calculations';
+import { SUPPORTED_CURRENCIES } from '@/utils/currency';
 
 interface AccountSetupProps {
   isOpen: boolean;
   onClose: () => void;
   bankAccounts: BankAccount[];
   brokerAccounts: BankAccount[];
-  onAddBankAccount: (name: string, balance: number, isSavings?: boolean, interestRate?: number, institutionId?: string) => void;
-  onUpdateBankAccount: (id: string, name: string, balance: number, isSavings?: boolean, interestRate?: number, institutionId?: string) => void;
+  onAddBankAccount: (
+    name: string,
+    balance: number,
+    currency?: string,
+    isSavings?: boolean,
+    interestRate?: number,
+    institutionId?: string
+  ) => void;
+  onUpdateBankAccount: (
+    id: string,
+    name: string,
+    balance: number,
+    currency?: string,
+    isSavings?: boolean,
+    interestRate?: number,
+    institutionId?: string
+  ) => void;
   onDeleteBankAccount: (id: string) => void;
-  onAddBrokerAccount: (name: string, balance: number, institutionId?: string) => void;
-  onUpdateBrokerAccount: (id: string, name: string, balance: number, institutionId?: string) => void;
+  onAddBrokerAccount: (name: string, balance: number, currency?: string, institutionId?: string) => void;
+  onUpdateBrokerAccount: (id: string, name: string, balance: number, currency?: string, institutionId?: string) => void;
   onDeleteBrokerAccount: (id: string) => void;
 }
 
 const bankInstitutions = getInstitutionsByKind('bank');
 const brokerInstitutions = getInstitutionsByKind('broker');
+
+const CurrencySelect = ({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) => (
+  <Select value={value} onValueChange={onChange}>
+    <SelectTrigger>
+      <SelectValue />
+    </SelectTrigger>
+    <SelectContent>
+      {SUPPORTED_CURRENCIES.map((currency) => (
+        <SelectItem key={currency} value={currency}>
+          {currency}
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+);
 
 export const AccountSetup = ({
   isOpen,
@@ -46,21 +83,28 @@ export const AccountSetup = ({
   const [bankName, setBankName] = useState('');
   const [bankInstitutionId, setBankInstitutionId] = useState('custom');
   const [bankBalance, setBankBalance] = useState('');
+  const [bankCurrency, setBankCurrency] = useState('CZK');
   const [bankIsSavings, setBankIsSavings] = useState(false);
   const [bankInterestRate, setBankInterestRate] = useState('');
+
   const [brokerName, setBrokerName] = useState('');
   const [brokerInstitutionId, setBrokerInstitutionId] = useState('custom');
   const [brokerBalance, setBrokerBalance] = useState('');
+  const [brokerCurrency, setBrokerCurrency] = useState('CZK');
+
   const [editingBankId, setEditingBankId] = useState<string | null>(null);
-  const [editingBrokerId, setEditingBrokerId] = useState<string | null>(null);
   const [editBankName, setEditBankName] = useState('');
   const [editBankInstitutionId, setEditBankInstitutionId] = useState('custom');
   const [editBankBalance, setEditBankBalance] = useState('');
+  const [editBankCurrency, setEditBankCurrency] = useState('CZK');
   const [editBankIsSavings, setEditBankIsSavings] = useState(false);
   const [editBankInterestRate, setEditBankInterestRate] = useState('');
+
+  const [editingBrokerId, setEditingBrokerId] = useState<string | null>(null);
   const [editBrokerName, setEditBrokerName] = useState('');
   const [editBrokerInstitutionId, setEditBrokerInstitutionId] = useState('custom');
   const [editBrokerBalance, setEditBrokerBalance] = useState('');
+  const [editBrokerCurrency, setEditBrokerCurrency] = useState('CZK');
 
   const resolvedBankName = useMemo(() => {
     if (bankInstitutionId === 'custom') return bankName;
@@ -74,30 +118,38 @@ export const AccountSetup = ({
 
   const handleAddBank = () => {
     if (!resolvedBankName || !bankBalance) return;
+
     onAddBankAccount(
       resolvedBankName,
       parseFloat(bankBalance),
+      bankCurrency,
       bankIsSavings,
       bankIsSavings ? parseFloat(bankInterestRate) || 0 : 0,
       bankInstitutionId === 'custom' ? undefined : bankInstitutionId
     );
+
     setBankName('');
     setBankInstitutionId('custom');
     setBankBalance('');
+    setBankCurrency('CZK');
     setBankIsSavings(false);
     setBankInterestRate('');
   };
 
   const handleAddBroker = () => {
     if (!resolvedBrokerName || !brokerBalance) return;
+
     onAddBrokerAccount(
       resolvedBrokerName,
       parseFloat(brokerBalance),
+      brokerCurrency,
       brokerInstitutionId === 'custom' ? undefined : brokerInstitutionId
     );
+
     setBrokerName('');
     setBrokerInstitutionId('custom');
     setBrokerBalance('');
+    setBrokerCurrency('CZK');
   };
 
   const startEditBank = (account: BankAccount) => {
@@ -105,24 +157,29 @@ export const AccountSetup = ({
     setEditBankName(account.name);
     setEditBankInstitutionId(account.institutionId || 'custom');
     setEditBankBalance(account.currentBalance.toString());
+    setEditBankCurrency(account.currency || 'CZK');
     setEditBankIsSavings(account.isSavings || false);
     setEditBankInterestRate((account.interestRate || 0).toString());
   };
 
   const saveEditBank = () => {
     if (!editingBankId || !editBankName || !editBankBalance) return;
+
     const institutionName =
       editBankInstitutionId === 'custom'
         ? editBankName
         : getInstitution(editBankInstitutionId)?.name || editBankName;
+
     onUpdateBankAccount(
       editingBankId,
       institutionName,
       parseFloat(editBankBalance),
+      editBankCurrency,
       editBankIsSavings,
       editBankIsSavings ? parseFloat(editBankInterestRate) || 0 : 0,
       editBankInstitutionId === 'custom' ? undefined : editBankInstitutionId
     );
+
     setEditingBankId(null);
   };
 
@@ -131,20 +188,25 @@ export const AccountSetup = ({
     setEditBrokerName(account.name);
     setEditBrokerInstitutionId(account.institutionId || 'custom');
     setEditBrokerBalance(account.currentBalance.toString());
+    setEditBrokerCurrency(account.currency || 'CZK');
   };
 
   const saveEditBroker = () => {
     if (!editingBrokerId || !editBrokerName || !editBrokerBalance) return;
+
     const institutionName =
       editBrokerInstitutionId === 'custom'
         ? editBrokerName
         : getInstitution(editBrokerInstitutionId)?.name || editBrokerName;
+
     onUpdateBrokerAccount(
       editingBrokerId,
       institutionName,
       parseFloat(editBrokerBalance),
+      editBrokerCurrency,
       editBrokerInstitutionId === 'custom' ? undefined : editBrokerInstitutionId
     );
+
     setEditingBrokerId(null);
   };
 
@@ -162,10 +224,10 @@ export const AccountSetup = ({
 
         <div className="space-y-8 p-4 sm:p-6">
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Bankovní účty</h3>
+            <h3 className="text-lg font-semibold">Bankovni ucty</h3>
 
             <div className="space-y-3 rounded-lg border border-border p-4">
-              <div className="grid gap-3 xl:grid-cols-[1.3fr_1fr_1fr_auto]">
+              <div className="grid gap-3 xl:grid-cols-[1.2fr_1fr_1fr_120px_auto]">
                 <div className="space-y-2">
                   <Label>Instituce</Label>
                   <Select value={bankInstitutionId} onValueChange={setBankInstitutionId}>
@@ -173,7 +235,7 @@ export const AccountSetup = ({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="custom">Vlastní název</SelectItem>
+                      <SelectItem value="custom">Vlastni nazev</SelectItem>
                       {bankInstitutions.map((institution) => (
                         <SelectItem key={institution.id} value={institution.id}>
                           {institution.name}
@@ -182,17 +244,19 @@ export const AccountSetup = ({
                     </SelectContent>
                   </Select>
                 </div>
+
                 <div className="space-y-2">
-                  <Label>Název účtu</Label>
+                  <Label>Nazev uctu</Label>
                   <Input
                     value={bankInstitutionId === 'custom' ? bankName : resolvedBankName}
                     onChange={(event) => setBankName(event.target.value)}
                     disabled={bankInstitutionId !== 'custom'}
-                    placeholder="např. Moje banka"
+                    placeholder="napr. Moje banka"
                   />
                 </div>
+
                 <div className="space-y-2">
-                  <Label>Počáteční zůstatek (Kč)</Label>
+                  <Label>Pocatecni zustatek</Label>
                   <Input
                     type="number"
                     step="0.01"
@@ -201,6 +265,12 @@ export const AccountSetup = ({
                     placeholder="0.00"
                   />
                 </div>
+
+                <div className="space-y-2">
+                  <Label>Mena</Label>
+                  <CurrencySelect value={bankCurrency} onChange={setBankCurrency} />
+                </div>
+
                 <div className="flex items-end">
                   <Button onClick={handleAddBank} size="icon" className="w-full xl:w-10">
                     <Plus className="h-4 w-4" />
@@ -217,11 +287,11 @@ export const AccountSetup = ({
                     className="rounded"
                   />
                   <Landmark className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">Spořicí účet</span>
+                  <span className="text-sm">Sporici ucet</span>
                 </label>
                 {bankIsSavings && (
                   <div className="flex items-center gap-2">
-                    <Label htmlFor="interestRate" className="whitespace-nowrap text-sm">Úrok (% p.a.)</Label>
+                    <Label htmlFor="interestRate" className="whitespace-nowrap text-sm">Urok (% p.a.)</Label>
                     <Input
                       id="interestRate"
                       type="number"
@@ -240,13 +310,13 @@ export const AccountSetup = ({
                 <div key={account.id} className="w-full rounded-lg bg-muted/50 p-3 md:w-[calc(50%-0.375rem)]">
                   {editingBankId === account.id ? (
                     <div className="space-y-3">
-                      <div className="grid gap-3 xl:grid-cols-[1.2fr_1fr_1fr_auto]">
+                      <div className="grid gap-3 xl:grid-cols-[1.1fr_1fr_1fr_120px_auto]">
                         <Select value={editBankInstitutionId} onValueChange={setEditBankInstitutionId}>
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="custom">Vlastní název</SelectItem>
+                            <SelectItem value="custom">Vlastni nazev</SelectItem>
                             {bankInstitutions.map((institution) => (
                               <SelectItem key={institution.id} value={institution.id}>
                                 {institution.name}
@@ -255,7 +325,11 @@ export const AccountSetup = ({
                           </SelectContent>
                         </Select>
                         <Input
-                          value={editBankInstitutionId === 'custom' ? editBankName : getInstitution(editBankInstitutionId)?.name || editBankName}
+                          value={
+                            editBankInstitutionId === 'custom'
+                              ? editBankName
+                              : getInstitution(editBankInstitutionId)?.name || editBankName
+                          }
                           onChange={(event) => setEditBankName(event.target.value)}
                           disabled={editBankInstitutionId !== 'custom'}
                         />
@@ -265,6 +339,7 @@ export const AccountSetup = ({
                           value={editBankBalance}
                           onChange={(event) => setEditBankBalance(event.target.value)}
                         />
+                        <CurrencySelect value={editBankCurrency} onChange={setEditBankCurrency} />
                         <Button onClick={saveEditBank} size="icon" variant="ghost" className="w-full xl:w-10">
                           <Check className="h-4 w-4 text-primary" />
                         </Button>
@@ -277,7 +352,7 @@ export const AccountSetup = ({
                             onChange={(event) => setEditBankIsSavings(event.target.checked)}
                             className="rounded"
                           />
-                          <span className="text-sm">Spořicí účet</span>
+                          <span className="text-sm">Sporici ucet</span>
                         </label>
                         {editBankIsSavings && (
                           <Input
@@ -297,14 +372,15 @@ export const AccountSetup = ({
                         <div className="min-w-0">
                           <p className="break-words font-medium">
                             {account.name}
+                            <span className="ml-2 text-xs text-muted-foreground">{account.currency}</span>
                             {account.isSavings && (
                               <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
-                                Spořicí {account.interestRate}% p.a.
+                                Sporici {account.interestRate}% p.a.
                               </span>
                             )}
                           </p>
                           <p className="text-sm text-muted-foreground">
-                            Aktuální: {formatCurrency(account.currentBalance)}
+                            Aktualni: {formatCurrency(account.currentBalance, account.currency)}
                           </p>
                         </div>
                       </div>
@@ -324,9 +400,10 @@ export const AccountSetup = ({
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Brokerské účty</h3>
+            <h3 className="text-lg font-semibold">Brokerske ucty</h3>
+
             <div className="space-y-3 rounded-lg border border-border p-4">
-              <div className="grid gap-3 xl:grid-cols-[1.3fr_1fr_1fr_auto]">
+              <div className="grid gap-3 xl:grid-cols-[1.2fr_1fr_1fr_120px_auto]">
                 <div className="space-y-2">
                   <Label>Instituce</Label>
                   <Select value={brokerInstitutionId} onValueChange={setBrokerInstitutionId}>
@@ -334,7 +411,7 @@ export const AccountSetup = ({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="custom">Vlastní název</SelectItem>
+                      <SelectItem value="custom">Vlastni nazev</SelectItem>
                       {brokerInstitutions.map((institution) => (
                         <SelectItem key={institution.id} value={institution.id}>
                           {institution.name}
@@ -343,17 +420,19 @@ export const AccountSetup = ({
                     </SelectContent>
                   </Select>
                 </div>
+
                 <div className="space-y-2">
-                  <Label>Název účtu</Label>
+                  <Label>Nazev uctu</Label>
                   <Input
                     value={brokerInstitutionId === 'custom' ? brokerName : resolvedBrokerName}
                     onChange={(event) => setBrokerName(event.target.value)}
                     disabled={brokerInstitutionId !== 'custom'}
-                    placeholder="např. Můj broker"
+                    placeholder="napr. Muj broker"
                   />
                 </div>
+
                 <div className="space-y-2">
-                  <Label>Počáteční zůstatek (Kč)</Label>
+                  <Label>Pocatecni zustatek</Label>
                   <Input
                     type="number"
                     step="0.01"
@@ -362,6 +441,12 @@ export const AccountSetup = ({
                     placeholder="0.00"
                   />
                 </div>
+
+                <div className="space-y-2">
+                  <Label>Mena</Label>
+                  <CurrencySelect value={brokerCurrency} onChange={setBrokerCurrency} />
+                </div>
+
                 <div className="flex items-end">
                   <Button onClick={handleAddBroker} size="icon" className="w-full xl:w-10">
                     <Plus className="h-4 w-4" />
@@ -374,13 +459,13 @@ export const AccountSetup = ({
               {brokerAccounts.map((account) => (
                 <div key={account.id} className="w-full rounded-lg bg-muted/50 p-3 md:w-[calc(50%-0.375rem)]">
                   {editingBrokerId === account.id ? (
-                    <div className="grid gap-3 xl:grid-cols-[1.2fr_1fr_1fr_auto]">
+                    <div className="grid gap-3 xl:grid-cols-[1.1fr_1fr_1fr_120px_auto]">
                       <Select value={editBrokerInstitutionId} onValueChange={setEditBrokerInstitutionId}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="custom">Vlastní název</SelectItem>
+                          <SelectItem value="custom">Vlastni nazev</SelectItem>
                           {brokerInstitutions.map((institution) => (
                             <SelectItem key={institution.id} value={institution.id}>
                               {institution.name}
@@ -389,7 +474,11 @@ export const AccountSetup = ({
                         </SelectContent>
                       </Select>
                       <Input
-                        value={editBrokerInstitutionId === 'custom' ? editBrokerName : getInstitution(editBrokerInstitutionId)?.name || editBrokerName}
+                        value={
+                          editBrokerInstitutionId === 'custom'
+                            ? editBrokerName
+                            : getInstitution(editBrokerInstitutionId)?.name || editBrokerName
+                        }
                         onChange={(event) => setEditBrokerName(event.target.value)}
                         disabled={editBrokerInstitutionId !== 'custom'}
                       />
@@ -399,6 +488,7 @@ export const AccountSetup = ({
                         value={editBrokerBalance}
                         onChange={(event) => setEditBrokerBalance(event.target.value)}
                       />
+                      <CurrencySelect value={editBrokerCurrency} onChange={setEditBrokerCurrency} />
                       <Button onClick={saveEditBroker} size="icon" variant="ghost" className="w-full xl:w-10">
                         <Check className="h-4 w-4 text-primary" />
                       </Button>
@@ -408,9 +498,12 @@ export const AccountSetup = ({
                       <div className="flex min-w-0 items-center gap-3">
                         <InstitutionAvatar institutionId={account.institutionId} fallback={account.name} />
                         <div className="min-w-0">
-                          <p className="break-words font-medium">{account.name}</p>
+                          <p className="break-words font-medium">
+                            {account.name}
+                            <span className="ml-2 text-xs text-muted-foreground">{account.currency}</span>
+                          </p>
                           <p className="text-sm text-muted-foreground">
-                            Aktuální: {formatCurrency(account.currentBalance)}
+                            Aktualni: {formatCurrency(account.currentBalance, account.currency)}
                           </p>
                         </div>
                       </div>

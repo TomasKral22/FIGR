@@ -151,12 +151,12 @@ export const InvestmentCSVImport = ({ onImport }: InvestmentCSVImportProps) => {
         .toUpperCase();
       const sector = String(firstNonEmpty(values, ['sector', 'sektor', 'group', 'assetgroup']) || '').trim() || undefined;
       const exDividendDate = String(
-        firstNonEmpty(values, ['exdividenddate', 'exdividend', 'exdividenddateutc']) || ''
+        firstNonEmpty(values, ['exdividenddate', 'exdividend', 'exdividenddateutc', 'exdividenddatum', 'datumexdividendy']) || ''
       ).trim() || undefined;
-      const payDate = String(firstNonEmpty(values, ['paydate', 'dividendpaydate', 'paymentdate']) || '').trim() || undefined;
+      const payDate = String(firstNonEmpty(values, ['paydate', 'dividendpaydate', 'paymentdate', 'datumvyplaty']) || '').trim() || undefined;
       const expectedDividendAmountRaw = firstNonEmpty(
         values,
-        ['expecteddividendamount', 'expectedamount', 'dividendamount', 'grossdividend']
+        ['expecteddividendamount', 'expectedamount', 'dividendamount', 'grossdividend', 'ocekavanadividenda']
       );
       const expectedDividendAmount =
         expectedDividendAmountRaw !== '' ? parseAmount(expectedDividendAmountRaw) : undefined;
@@ -426,3 +426,4 @@ export const InvestmentCSVImport = ({ onImport }: InvestmentCSVImportProps) => {
     </div>
   );
 };
+

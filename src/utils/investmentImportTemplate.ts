@@ -69,19 +69,19 @@ export const exportInvestmentImportTemplate = async (filename = 'figr-investice-
   listSheet.state = 'veryHidden';
 
   const headers = [
-    'ticker',
-    'name',
-    'asset_type',
-    'provider',
-    'transaction_type',
-    'quantity',
-    'price_per_unit',
-    'currency',
-    'transaction_date',
-    'sector',
-    'ex_dividend_date',
-    'pay_date',
-    'expected_dividend_amount',
+    'Ticker',
+    'Název',
+    'Typ aktiva',
+    'Poskytovatel',
+    'Typ transakce',
+    'Množství',
+    'Cena za jednotku',
+    'Mìna',
+    'Datum transakce',
+    'Sektor',
+    'Ex-dividend datum',
+    'Datum výplaty',
+    'Oèekávaná dividenda',
   ];
 
   importSheet.addRow(headers);
@@ -145,20 +145,20 @@ export const exportInvestmentImportTemplate = async (filename = 'figr-investice-
   }
 
   [
-    ['Sloupec', 'Popis', 'PÅ™Ã­klad'],
-    ['ticker', 'Ticker nebo internÃ­ oznaÄenÃ­ aktiva', 'VWCE, AAPL, INVESTOWN-BYT-1'],
-    ['name', 'NÃ¡zev aktiva', 'Vanguard FTSE All-World'],
-    ['asset_type', 'Typ aktiva', 'stock | etf | crypto | bond | commodity | p2p | private_credit | real_estate | managed_portfolio | fund | other'],
-    ['provider', 'Poskytovatel investice', 'broker | investown | fingood | edward | conseq | other'],
-    ['transaction_type', 'Typ transakce', 'buy | sell | dividend'],
-    ['quantity', 'MnoÅ¾stvÃ­ kusÅ¯ / podÃ­lÅ¯ / jednotek', 'u dividend poÄet kusÅ¯ pro odhad'],
-    ['price_per_unit', 'Cena za jednotku nebo dividenda na kus', '121.5 nebo 0.26'],
-    ['currency', 'MÄ›na transakce', 'CZK | USD | EUR | GBP | CHF'],
-    ['transaction_date', 'Datum transakce', 'YYYY-MM-DD'],
-    ['sector', 'VolitelnÃ½ sektor nebo skupina', 'Technologie, Reality, SoukromÃ½ ÃºvÄ›r'],
-    ['ex_dividend_date', 'Ex-dividend date', 'YYYY-MM-DD'],
-    ['pay_date', 'Dividend pay date', 'YYYY-MM-DD'],
-    ['expected_dividend_amount', 'PÅ™edpoklÃ¡danÃ¡ vÃ½plata dividendy', 'VolitelnÃ© pÅ™epsÃ¡nÃ­ dopoÄtu'],
+    ['Sloupec', 'Popis', 'Pøíklad'],
+    ['Ticker', 'Ticker nebo interní oznaèení aktiva', 'VWCE, AAPL, INVESTOWN-BYT-1'],
+    ['Název', 'Název aktiva', 'Vanguard FTSE All-World'],
+    ['Typ aktiva', 'Typ aktiva', 'stock | etf | crypto | bond | commodity | p2p | private_credit | real_estate | managed_portfolio | fund | other'],
+    ['Poskytovatel', 'Poskytovatel investice', 'broker | investown | fingood | edward | conseq | other'],
+    ['Typ transakce', 'Typ transakce', 'buy | sell | dividend'],
+    ['Množství', 'Množství kusù / podílù / jednotek', 'u dividend poèet kusù pro odhad'],
+    ['Cena za jednotku', 'Cena za jednotku nebo dividenda na kus', '121.5 nebo 0.26'],
+    ['Mìna', 'Mìna transakce', 'CZK | USD | EUR | GBP | CHF'],
+    ['Datum transakce', 'Datum transakce', 'YYYY-MM-DD'],
+    ['Sektor', 'Volitelný sektor nebo skupina', 'Technologie, Reality, Soukromý úvìr'],
+    ['Ex-dividend datum', 'Datum ex-dividendy', 'YYYY-MM-DD'],
+    ['Datum výplaty', 'Datum výplaty dividendy', 'YYYY-MM-DD'],
+    ['Oèekávaná dividenda', 'Pøedpokládaná výplata dividendy', 'Volitelné pøepsání dopoètu'],
   ].forEach((row) => helpSheet.addRow(row));
   helpSheet.getRow(1).font = { bold: true };
 

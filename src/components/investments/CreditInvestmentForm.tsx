@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { useIsMobile } from '@/hooks/use-mobile';
 import {
   COMMON_CURRENCIES,
   CREDIT_INVESTMENT_KIND_LABELS,
@@ -30,6 +31,7 @@ interface CreditInvestmentFormProps {
 }
 
 export const CreditInvestmentForm = ({ initialValue = null, onSave }: CreditInvestmentFormProps) => {
+  const isMobile = useIsMobile();
   const [name, setName] = useState(initialValue?.name || '');
   const [kind, setKind] = useState<CreditInvestmentKind>(initialValue?.kind || 'p2p');
   const [provider, setProvider] = useState<InvestmentProvider>(initialValue?.provider || 'investown');
@@ -61,8 +63,14 @@ export const CreditInvestmentForm = ({ initialValue = null, onSave }: CreditInve
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {isMobile ? (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-3 text-sm text-muted-foreground">
+          Uverove investice ved samostatne od akcii a ETF. Stav splaceno se uz nezapocita do aktivni hodnoty portfolia.
+        </div>
+      ) : null}
+
       <div className="space-y-2">
-        <Label htmlFor="credit-name">Název</Label>
+        <Label htmlFor="credit-name">Nazev</Label>
         <Input id="credit-name" value={name} onChange={(event) => setName(event.target.value)} required />
       </div>
 
@@ -70,23 +78,32 @@ export const CreditInvestmentForm = ({ initialValue = null, onSave }: CreditInve
         <div className="space-y-2">
           <Label>Typ</Label>
           <Select value={kind} onValueChange={(value) => setKind(value as CreditInvestmentKind)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               {Object.entries(CREDIT_INVESTMENT_KIND_LABELS).map(([value, label]) => (
-                <SelectItem key={value} value={value}>{label}</SelectItem>
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
+
         <div className="space-y-2">
           <Label>Poskytovatel</Label>
           <Select value={provider} onValueChange={(value) => setProvider(value as InvestmentProvider)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               {Object.entries(INVESTMENT_PROVIDER_LABELS)
                 .filter(([value]) => value !== 'broker')
                 .map(([value, label]) => (
-                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
                 ))}
             </SelectContent>
           </Select>
@@ -95,12 +112,25 @@ export const CreditInvestmentForm = ({ initialValue = null, onSave }: CreditInve
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label>Aktuální hodnota</Label>
-          <Input type="number" step="any" value={currentValue} onChange={(event) => setCurrentValue(event.target.value)} required />
+          <Label>Aktualni hodnota</Label>
+          <Input
+            type="number"
+            step="any"
+            value={currentValue}
+            onChange={(event) => setCurrentValue(event.target.value)}
+            required
+          />
         </div>
+
         <div className="space-y-2">
-          <Label>Úrok (%)</Label>
-          <Input type="number" step="any" value={interestRate} onChange={(event) => setInterestRate(event.target.value)} required />
+          <Label>Urok (%)</Label>
+          <Input
+            type="number"
+            step="any"
+            value={interestRate}
+            onChange={(event) => setInterestRate(event.target.value)}
+            required
+          />
         </div>
       </div>
 
@@ -108,21 +138,30 @@ export const CreditInvestmentForm = ({ initialValue = null, onSave }: CreditInve
         <div className="space-y-2">
           <Label>Stav</Label>
           <Select value={status} onValueChange={(value) => setStatus(value as CreditInvestmentStatus)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               {Object.entries(CREDIT_INVESTMENT_STATUS_LABELS).map(([value, label]) => (
-                <SelectItem key={value} value={value}>{label}</SelectItem>
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
+
         <div className="space-y-2">
-          <Label>Měna</Label>
+          <Label>Mena</Label>
           <Select value={currency} onValueChange={setCurrency}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               {COMMON_CURRENCIES.map((item) => (
-                <SelectItem key={item} value={item}>{item}</SelectItem>
+                <SelectItem key={item} value={item}>
+                  {item}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -130,12 +169,12 @@ export const CreditInvestmentForm = ({ initialValue = null, onSave }: CreditInve
       </div>
 
       <div className="space-y-2">
-        <Label>Poznámka</Label>
+        <Label>Poznamka</Label>
         <Textarea value={note} onChange={(event) => setNote(event.target.value)} rows={3} />
       </div>
 
-      <Button type="submit" className="w-full" disabled={saving}>
-        {saving ? 'Ukládám...' : initialValue ? 'Uložit změny' : 'Přidat úvěrovou investici'}
+      <Button type="submit" className="w-full sm:w-auto" disabled={saving}>
+        {saving ? 'Ukladam...' : initialValue ? 'Ulozit zmeny' : 'Pridat uverovou investici'}
       </Button>
     </form>
   );

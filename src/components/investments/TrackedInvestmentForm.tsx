@@ -12,6 +12,7 @@ import {
   InvestmentProvider,
   TrackedInvestment,
 } from '@/types/investment';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const TRACKED_TYPES = Object.entries(ASSET_TYPE_LABELS).filter(
   ([value]) => value !== 'p2p' && value !== 'private_credit'
@@ -36,6 +37,7 @@ interface TrackedInvestmentFormProps {
 }
 
 export const TrackedInvestmentForm = ({ initialValue = null, onSave }: TrackedInvestmentFormProps) => {
+  const isMobile = useIsMobile();
   const [ticker, setTicker] = useState(initialValue?.ticker || '');
   const [name, setName] = useState(initialValue?.name || '');
   const [assetType, setAssetType] = useState<TrackedInvestment['asset_type']>(initialValue?.asset_type || 'stock');
@@ -75,6 +77,12 @@ export const TrackedInvestmentForm = ({ initialValue = null, onSave }: TrackedIn
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {isMobile ? (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-3 text-sm text-muted-foreground">
+          Evidovane portfolio je vhodne pro pozice bez historie obchodu. Watchlist se do hodnoty portfolia nepocita.
+        </div>
+      ) : null}
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="tracked-ticker">Ticker</Label>
@@ -170,7 +178,7 @@ export const TrackedInvestmentForm = ({ initialValue = null, onSave }: TrackedIn
         <Textarea id="tracked-note" value={note} onChange={(event) => setNote(event.target.value)} rows={3} />
       </div>
 
-      <Button type="submit" className="w-full" disabled={saving}>
+      <Button type="submit" className="w-full sm:w-auto" disabled={saving}>
         {saving ? 'Ukladam...' : initialValue ? 'Ulozit zmeny' : 'Pridat evidovanou pozici'}
       </Button>
     </form>

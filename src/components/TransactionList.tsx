@@ -25,10 +25,9 @@ import {
 import { getCategoryName } from '@/utils/categoryNames';
 import { InstitutionAvatar } from '@/components/InstitutionAvatar';
 import { YearOverview } from '@/components/transactions/YearOverview';
-import { QuickAddInput } from '@/components/transactions/QuickAddInput';
 import { MonthlyWorkflowChecklist } from '@/components/MonthlyWorkflowChecklist';
 import { transactionToDraft, validateTransactionDraft } from '@/utils/transactionWorkflow';
-import { useToast } from '@/hooks/use-toast';
+import { appStorage } from '@/lib/appStorage';
 
 type TransactionFilter = 'all' | 'income' | 'expense' | 'transfer' | 'investments';
 
@@ -71,6 +70,7 @@ const monthLabel = (month: string) => {
 };
 
 const buildYearMonths = (year: string) => Array.from({ length: 12 }, (_, index) => `${year}-${String(index + 1).padStart(2, '0')}`);
+const TRANSACTION_UI_PREFS_KEY = 'finance_transaction_ui_prefs';
 
 export const TransactionList = ({
   transactions,
@@ -90,7 +90,6 @@ export const TransactionList = ({
   onToggleMonthClosure,
   onFillRecurringForMonth,
 }: TransactionListProps) => {
-  const { toast } = useToast();
   const [showTransactions, setShowTransactions] = useState(true);
   const [editingSnapshot, setEditingSnapshot] = useState<AccountMonthlySnapshot | null>(null);
   const [editedBalance, setEditedBalance] = useState('');
@@ -103,6 +102,8 @@ export const TransactionList = ({
   });
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [selectedMonth, setSelectedMonth] = useState('');
+  const [showYearOverview, setShowYearOverview] = useState(true);
+  const [showMonthlyChecklist, setShowMonthlyChecklist] = useState(false);
   const [showWorkflowTip, setShowWorkflowTip] = useState(() => {
     if (typeof window === 'undefined') return true;
     return window.localStorage.getItem('finance_transaction_workflow_tip_hidden') !== 'true';
@@ -132,6 +133,42 @@ export const TransactionList = ({
     if (stored.accountFilter) setAccountFilter(stored.accountFilter);
     if (typeof stored.searchTerm === 'string') setSearchTerm(stored.searchTerm);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      const loaded = await appStorage.getMany([TRANSACTION_UI_PREFS_KEY]);
+      if (cancelled) return;
+
+      try {
+        const parsed = JSON.parse(loaded[TRANSACTION_UI_PREFS_KEY] || '{}') as {
+          showYearOverview?: boolean;
+          showMonthlyChecklist?: boolean;
+        };
+
+        if (typeof parsed.showYearOverview === 'boolean') setShowYearOverview(parsed.showYearOverview);
+        if (typeof parsed.showMonthlyChecklist === 'boolean') setShowMonthlyChecklist(parsed.showMonthlyChecklist);
+      } catch {
+        // ignore malformed UI prefs
+      }
+    };
+
+    void load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    void appStorage.setMany({
+      [TRANSACTION_UI_PREFS_KEY]: JSON.stringify({
+        showYearOverview,
+        showMonthlyChecklist,
+      }),
+    });
+  }, [showMonthlyChecklist, showYearOverview]);
 
   const filteredTransactions = useMemo(
     () => transactions.filter((transaction) => transaction.month.startsWith(selectedYear)),
@@ -260,7 +297,9 @@ export const TransactionList = ({
   const selectedMonthData = monthlyDataMap.get(selectedMonth);
   const selectedMonthSnapshots = monthlyAccountSnapshots[selectedMonth] || [];
   const monthLocked = closedMonths.has(selectedMonth);
-  const largestExpense = selectedMonthData?.expenses.slice().sort((a, b) => b.amount - a.amount)[0];
+  const largestExpense = selectedMonthData?.expenses
+    .slice()
+    .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))[0];
   const importedSnapshotsCount = selectedMonthSnapshots.filter((snapshot) => snapshot.source === 'import').length;
 
   const openSnapshotEditor = (snapshot: AccountMonthlySnapshot) => {
@@ -347,7 +386,7 @@ export const TransactionList = ({
                 Investice
               </span>
             )}
-            {transaction.amount >= 10000 && (
+            {Math.abs(transaction.amount) >= 10000 && (
               <span className="rounded-full bg-warning/10 px-2 py-0.5 text-[11px] font-medium text-warning">
                 Vyšší částka
               </span>
@@ -454,7 +493,36 @@ export const TransactionList = ({
   return (
     <>
       <div className="space-y-6" id="month-workflow">
-        <YearOverview months={yearOverviewMonths} selectedMonth={selectedMonth} onSelectMonth={setSelectedMonth} />
+        <div className="rounded-2xl border border-border bg-card/60 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-lg font-semibold sm:text-xl">Roční přehled měsíců</h3>
+              <p className="text-sm text-muted-foreground">
+                Vyber měsíc v kompaktním gridu. Detail se zobrazí hned pod přehledem.
+              </p>
+            </div>
+
+            <Button variant="outline" size="sm" onClick={() => setShowYearOverview((current) => !current)} className="gap-2">
+              {showYearOverview ? (
+                <>
+                  <ChevronUp className="h-4 w-4" />
+                  Skrýt roční přehled
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-4 w-4" />
+                  Zobrazit roční přehled
+                </>
+              )}
+            </Button>
+          </div>
+
+          {showYearOverview ? (
+            <div className="mt-4">
+              <YearOverview months={yearOverviewMonths} selectedMonth={selectedMonth} onSelectMonth={setSelectedMonth} />
+            </div>
+          ) : null}
+        </div>
 
         <div className="rounded-2xl border border-border bg-card/70 p-4 sm:p-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -485,22 +553,6 @@ export const TransactionList = ({
             </Button>
           </div>
 
-          <div className="mt-4">
-            <QuickAddInput
-              month={selectedMonth}
-              transactions={transactions}
-              resolveAccountLabel={(accountId) => accountLabelById.get(accountId || '') || ''}
-              onCreateDraft={onCreateTransactionDraft}
-              onSaveDraft={(draft) => {
-                onSaveTransactionDraft(draft);
-                toast({
-                  title: 'Transakce přidána',
-                  description: draft.name,
-                });
-              }}
-            />
-          </div>
-
           {showWorkflowTip ? (
             <div className="mt-4 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm">
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -513,21 +565,6 @@ export const TransactionList = ({
               </div>
             </div>
           ) : null}
-
-          <div className="mt-4">
-            <MonthlyWorkflowChecklist
-              month={selectedMonth}
-              monthLocked={monthLocked}
-              transactions={transactions}
-              recurringTransactions={recurringTransactions}
-              accountSnapshots={selectedMonthSnapshots}
-              budgetAllocation={budgetAllocation}
-              budgetLimits={budgetLimits}
-              subcategories={subcategories}
-              onFillRecurringForMonth={onFillRecurringForMonth}
-              onToggleMonthClosure={onToggleMonthClosure}
-            />
-          </div>
 
           <div className="mt-4 grid gap-3 rounded-2xl border border-border bg-card/70 p-3 md:grid-cols-[minmax(0,1fr)_220px] xl:grid-cols-[auto_minmax(0,1fr)_220px]">
             <div className="flex flex-wrap gap-2">
@@ -736,11 +773,11 @@ export const TransactionList = ({
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
                 {(Object.entries(selectedMonthData?.categoryBreakdown || {}) as [ExpenseCategory, number][])
-                  .filter(([, amount]) => amount > 0)
+                  .filter(([, amount]) => amount !== 0)
                   .map(([category, amount]) => (
                     <div key={category} className="rounded-lg bg-card/70 p-3 text-sm">
                       <p className="text-muted-foreground">{getCategoryName(category)}</p>
-                      <p className="font-semibold">{formatCurrency(amount)}</p>
+                      <p className={`font-semibold ${amount >= 0 ? 'text-foreground' : 'text-warning'}`}>{formatCurrency(amount)}</p>
                       <p className="text-xs text-muted-foreground">
                         {getCategoryPercentage(amount, selectedMonthData?.totalIncome || 0).toFixed(1)} % příjmů
                       </p>
@@ -749,6 +786,48 @@ export const TransactionList = ({
               </div>
             </div>
           )}
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card/60 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-lg font-semibold">WF měsíční uzávěrky</h3>
+              <p className="text-sm text-muted-foreground">
+                Checklist uzávěrky, plán vs. realita, trvalé platby a přehled toho, co ještě chybí.
+              </p>
+            </div>
+
+            <Button variant="outline" size="sm" onClick={() => setShowMonthlyChecklist((current) => !current)} className="gap-2">
+              {showMonthlyChecklist ? (
+                <>
+                  <ChevronUp className="h-4 w-4" />
+                  Skrýt uzávěrky
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-4 w-4" />
+                  Zobrazit uzávěrky
+                </>
+              )}
+            </Button>
+          </div>
+
+          {showMonthlyChecklist ? (
+            <div className="mt-4">
+              <MonthlyWorkflowChecklist
+                month={selectedMonth}
+                monthLocked={monthLocked}
+                transactions={transactions}
+                recurringTransactions={recurringTransactions}
+                accountSnapshots={selectedMonthSnapshots}
+                budgetAllocation={budgetAllocation}
+                budgetLimits={budgetLimits}
+                subcategories={subcategories}
+                onFillRecurringForMonth={onFillRecurringForMonth}
+                onToggleMonthClosure={onToggleMonthClosure}
+              />
+            </div>
+          ) : null}
         </div>
       </div>
 

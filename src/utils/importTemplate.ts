@@ -6,10 +6,78 @@ const validTypes: TransactionType[] = ['income', 'expense', 'transfer'];
 const validCategories: ExpenseCategory[] = ['necessities', 'whims', 'investments', 'savings', 'selfInvestment'];
 const validTransferCategories: TransferCategory[] = ['savings', 'transfer'];
 
+const typeLabels: Record<TransactionType, string> = {
+  income: 'Příjem',
+  expense: 'Výdaj',
+  transfer: 'Převod',
+};
+
+const categoryLabels: Record<ExpenseCategory, string> = {
+  necessities: 'Nutnosti',
+  whims: 'Rozmary',
+  investments: 'Investice',
+  savings: 'Spoření',
+  selfInvestment: 'Vlastní rozvoj',
+};
+
+const transferTypeLabels: Record<TransferCategory, string> = {
+  savings: 'Spoření',
+  transfer: 'Převod',
+};
+
+const typeAliases: Record<string, TransactionType> = {
+  income: 'income',
+  prijem: 'income',
+  'příjem': 'income',
+  expense: 'expense',
+  vydaj: 'expense',
+  'výdaj': 'expense',
+  transfer: 'transfer',
+  prevod: 'transfer',
+  'převod': 'transfer',
+};
+
+const categoryAliases: Record<string, ExpenseCategory> = {
+  necessities: 'necessities',
+  nutnosti: 'necessities',
+  whims: 'whims',
+  rozmary: 'whims',
+  investments: 'investments',
+  investice: 'investments',
+  savings: 'savings',
+  sporeni: 'savings',
+  'spoření': 'savings',
+  selfinvestment: 'selfInvestment',
+  vlastnirozvoj: 'selfInvestment',
+  'vlastnírozvoj': 'selfInvestment',
+};
+
+const transferTypeAliases: Record<string, TransferCategory> = {
+  transfer: 'transfer',
+  prevod: 'transfer',
+  'převod': 'transfer',
+  savings: 'savings',
+  sporeni: 'savings',
+  'spoření': 'savings',
+};
+
 type ImportableTransaction = Omit<Transaction, 'id' | 'createdAt'>;
 
 const normalize = (value: unknown) => String(value ?? '').trim();
 const normalizeLower = (value: unknown) => normalize(value).toLowerCase();
+
+const normalizeHeaderKey = (value: unknown) =>
+  normalize(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '');
+
+const resolveType = (value: unknown) => typeAliases[normalizeHeaderKey(value)] ?? null;
+
+const resolveCategory = (value: unknown) => categoryAliases[normalizeHeaderKey(value)] ?? null;
+
+const resolveTransferType = (value: unknown) => transferTypeAliases[normalizeHeaderKey(value)] ?? null;
 
 const toBool = (value: unknown) => {
   const normalized = normalizeLower(value);
@@ -17,8 +85,18 @@ const toBool = (value: unknown) => {
 };
 
 const parseAmount = (value: unknown) => {
-  const amount = parseFloat(normalize(value).replace(/[^\d.,-]/g, '').replace(',', '.'));
-  return Number.isFinite(amount) ? amount : NaN;
+  const normalized = normalize(value);
+  if (!normalized) return Number.NaN;
+
+  const amount = Number.parseFloat(
+    normalized
+      .replace(/[^\d.,-]/g, '')
+      .replace(/\.(?=\d{3}\b)/g, '')
+      .replace(/,(?=\d{3}\b)/g, '')
+      .replace(',', '.')
+  );
+
+  return Number.isFinite(amount) ? amount : Number.NaN;
 };
 
 const getAccountTypeLabel = (account: BankAccount) => (account.isSavings ? 'spořicí účet' : 'běžný účet');
@@ -44,22 +122,31 @@ const resolveAccountId = (value: unknown, accounts: BankAccount[]) => {
   const raw = normalize(value);
   if (!raw) return undefined;
 
+  const normalizedRaw = raw.toLowerCase();
   const labelMap = buildImportAccountLabels(accounts);
 
   const exactId = accounts.find((account) => account.id === raw);
   if (exactId) return exactId.id;
 
-  const byImportLabel = accounts.find((account) => labelMap.get(account.id)?.toLowerCase() === raw.toLowerCase());
+  const byImportLabel = accounts.find((account) => labelMap.get(account.id)?.toLowerCase() === normalizedRaw);
   if (byImportLabel) return byImportLabel.id;
 
-  const byName = accounts.find((account) => account.name.trim().toLowerCase() === raw.toLowerCase());
+  const byName = accounts.find((account) => account.name.trim().toLowerCase() === normalizedRaw);
   return byName?.id;
 };
 
 const getCell = (row: Record<string, unknown>, ...keys: string[]) => {
+  const normalizedRow = Object.fromEntries(
+    Object.entries(row).map(([key, value]) => [normalizeHeaderKey(key), value])
+  );
+
   for (const key of keys) {
-    if (key in row) return row[key];
+    const normalizedKey = normalizeHeaderKey(key);
+    if (normalizedKey in normalizedRow) {
+      return normalizedRow[normalizedKey];
+    }
   }
+
   return '';
 };
 
@@ -97,17 +184,17 @@ export const exportImportTemplate = async (
   listsSheet.state = 'veryHidden';
 
   const headers = [
-    'month',
-    'type',
-    'name',
-    'amount',
-    'account',
-    'category',
-    'sourceAccount',
-    'transferAccount',
-    'transferCategory',
-    'investmentAccount',
-    'includeInInvestmentTotals',
+    'Měsíc',
+    'Typ',
+    'Název',
+    'Částka',
+    'Účet',
+    'Kategorie',
+    'Zdrojový účet',
+    'Cílový účet',
+    'Typ převodu',
+    'Investiční účet',
+    'Zahrnout do investic',
   ];
 
   importSheet.addRow(headers);
@@ -131,39 +218,39 @@ export const exportImportTemplate = async (
   const firstBrokerLabel = brokerAccounts[0] ? accountLabelMap.get(brokerAccounts[0].id) || '' : '';
 
   const templateRows = [
-    ['2026-04', 'income', 'Mzda', 45000, firstBankLabel, '', '', '', '', '', ''],
+    ['2026-04', 'Příjem', 'Mzda', 45000, firstBankLabel, '', '', '', '', '', ''],
     [
       '2026-04',
-      'expense',
+      'Výdaj',
       'ETF investice',
       10000,
       firstBankLabel,
-      'investments',
+      'Investice',
       '',
       '',
       '',
       firstBrokerLabel,
-      'true',
+      'Ano',
     ],
-    ['2026-04', 'transfer', 'Přesun na broker', 5000, '', '', firstBankLabel, firstBrokerLabel, 'transfer', '', ''],
+    ['2026-04', 'Převod', 'Přesun na brokera', 5000, '', '', firstBankLabel, firstBrokerLabel, 'Převod', '', ''],
   ];
   templateRows.forEach((row) => importSheet.addRow(row));
 
-  const typeList = validTypes;
-  const categoryList = ['', ...validCategories];
-  const transferList = ['', ...validTransferCategories];
-  const boolList = ['', 'true', 'false'];
+  const typeList = validTypes.map((type) => typeLabels[type]);
+  const categoryList = ['', ...validCategories.map((category) => categoryLabels[category])];
+  const transferList = ['', ...validTransferCategories.map((type) => transferTypeLabels[type])];
+  const boolList = ['', 'Ano', 'Ne'];
   const accountNames = ['', ...allAccounts.map((account) => accountLabelMap.get(account.id) || account.name)];
   const brokerNames = ['', ...brokerAccounts.map((account) => accountLabelMap.get(account.id) || account.name)];
 
   [
-    ['A', ['Měsíc', 'YYYY-MM, např. 2026-04']],
+    ['A', ['Měsíce', 'YYYY-MM, např. 2026-04']],
     ['B', ['Typy', ...typeList]],
     ['C', ['Kategorie', ...categoryList]],
-    ['D', ['Transfery', ...transferList]],
+    ['D', ['Převody', ...transferList]],
     ['E', ['AnoNe', ...boolList]],
     ['F', ['Účty', ...accountNames]],
-    ['G', ['BrokerskéÚčty', ...brokerNames]],
+    ['G', ['Brokerské účty', ...brokerNames]],
   ].forEach(([column, values]) => {
     (values as string[]).forEach((value, index) => {
       listsSheet.getCell(`${column}${index + 1}`).value = value;
@@ -182,42 +269,42 @@ export const exportImportTemplate = async (
     importSheet.getCell(`B${row}`).dataValidation = {
       type: 'list',
       allowBlank: false,
-      formulae: ['=Číselníky!$B$2:$B$4'],
+      formulae: ["='Číselníky'!$B$2:$B$4"],
     };
     importSheet.getCell(`E${row}`).dataValidation = {
       type: 'list',
       allowBlank: true,
-      formulae: [`=Číselníky!$F$2:$F$${accountNames.length + 1}`],
+      formulae: [`='Číselníky'!$F$2:$F$${accountNames.length + 1}`],
     };
     importSheet.getCell(`F${row}`).dataValidation = {
       type: 'list',
       allowBlank: true,
-      formulae: ['=Číselníky!$C$2:$C$7'],
+      formulae: ["='Číselníky'!$C$2:$C$7"],
     };
     importSheet.getCell(`G${row}`).dataValidation = {
       type: 'list',
       allowBlank: true,
-      formulae: [`=Číselníky!$F$2:$F$${accountNames.length + 1}`],
+      formulae: [`='Číselníky'!$F$2:$F$${accountNames.length + 1}`],
     };
     importSheet.getCell(`H${row}`).dataValidation = {
       type: 'list',
       allowBlank: true,
-      formulae: [`=Číselníky!$F$2:$F$${accountNames.length + 1}`],
+      formulae: [`='Číselníky'!$F$2:$F$${accountNames.length + 1}`],
     };
     importSheet.getCell(`I${row}`).dataValidation = {
       type: 'list',
       allowBlank: true,
-      formulae: ['=Číselníky!$D$2:$D$4'],
+      formulae: ["='Číselníky'!$D$2:$D$4"],
     };
     importSheet.getCell(`J${row}`).dataValidation = {
       type: 'list',
       allowBlank: true,
-      formulae: [`=Číselníky!$G$2:$G$${brokerNames.length + 1}`],
+      formulae: [`='Číselníky'!$G$2:$G$${brokerNames.length + 1}`],
     };
     importSheet.getCell(`K${row}`).dataValidation = {
       type: 'list',
       allowBlank: true,
-      formulae: ['=Číselníky!$E$2:$E$4'],
+      formulae: ["='Číselníky'!$E$2:$E$4"],
     };
   }
 
@@ -228,17 +315,17 @@ export const exportImportTemplate = async (
   ];
   [
     ['Sloupec', 'Popis', 'Povolené hodnoty / příklad'],
-    ['month', 'Měsíc transakce', 'YYYY-MM, např. 2026-04'],
-    ['type', 'Typ transakce', 'income | expense | transfer'],
-    ['name', 'Název transakce', 'např. Nájem, Mzda, ETF investice'],
-    ['amount', 'Kladná částka', 'např. 1500 nebo 1500.50'],
-    ['account', 'U příjmů a výdajů účet', 'Vyber z dropdownu podle importního označení účtu'],
-    ['category', 'Kategorie výdaje', 'necessities | whims | investments | savings | selfInvestment'],
-    ['sourceAccount', 'Zdrojový účet u převodu', 'Vyber z dropdownu podle importního označení'],
-    ['transferAccount', 'Cílový účet u převodu', 'Vyber z dropdownu podle importního označení'],
-    ['transferCategory', 'Typ převodu', 'transfer | savings'],
-    ['investmentAccount', 'Volitelný cílový investiční účet', 'Vyber z brokerských účtů'],
-    ['includeInInvestmentTotals', 'Zahrnout do investované částky', 'true | false'],
+    ['Měsíc', 'Měsíc transakce', 'YYYY-MM, např. 2026-04'],
+    ['Typ', 'Typ transakce', 'Příjem | Výdaj | Převod'],
+    ['Název', 'Název transakce', 'např. Nájem, Mzda, ETF investice'],
+    ['Částka', 'Částka se znaménkem', 'např. 1500, -1500 nebo 1500.50'],
+    ['Účet', 'U příjmů a výdajů účet', 'Vyber z dropdownu podle importního označení účtu'],
+    ['Kategorie', 'Kategorie výdaje', 'Nutnosti | Rozmary | Investice | Spoření | Vlastní rozvoj'],
+    ['Zdrojový účet', 'Zdrojový účet u převodu', 'Vyber z dropdownu podle importního označení'],
+    ['Cílový účet', 'Cílový účet u převodu', 'Vyber z dropdownu podle importního označení'],
+    ['Typ převodu', 'Typ převodu', 'Převod | Spoření'],
+    ['Investiční účet', 'Volitelný cílový investiční účet', 'Vyber z brokerských účtů'],
+    ['Zahrnout do investic', 'Zahrnout do investované částky', 'Ano | Ne'],
     [],
     [
       'Poznámka',
@@ -283,7 +370,7 @@ export const exportImportTemplate = async (
     { width: 18 },
   ];
   [
-    ['month', 'account', 'balance'],
+    ['Měsíc', 'Účet', 'Zůstatek'],
     ['2026-04', firstBankLabel || firstBrokerLabel, 125000],
   ].forEach((row) => balancesSheet.addRow(row));
   balancesSheet.getRow(1).font = { bold: true };
@@ -325,7 +412,7 @@ export const parseImportedTransactionsFile = async (
 
     const line = index + 2;
     const month = normalize(getCell(row, 'month', 'mesic', 'měsíc'));
-    const type = normalizeLower(getCell(row, 'type', 'typ')) as TransactionType;
+    const type = resolveType(getCell(row, 'type', 'typ'));
     const name = normalize(getCell(row, 'name', 'nazev', 'název'));
     const amount = parseAmount(getCell(row, 'amount', 'castka', 'částka'));
 
@@ -333,7 +420,7 @@ export const parseImportedTransactionsFile = async (
       errors.push(`Řádek ${line}: neplatný měsíc.`);
       return;
     }
-    if (!validTypes.includes(type)) {
+    if (!type || !validTypes.includes(type)) {
       errors.push(`Řádek ${line}: neplatný typ transakce.`);
       return;
     }
@@ -341,7 +428,7 @@ export const parseImportedTransactionsFile = async (
       errors.push(`Řádek ${line}: chybí název.`);
       return;
     }
-    if (!Number.isFinite(amount) || amount <= 0) {
+    if (!Number.isFinite(amount) || amount === 0) {
       errors.push(`Řádek ${line}: neplatná částka.`);
       return;
     }
@@ -365,18 +452,20 @@ export const parseImportedTransactionsFile = async (
       }
       transaction.account = account;
 
-      const category = normalizeLower(getCell(row, 'category', 'kategorie')) as ExpenseCategory;
-      transaction.category = validCategories.includes(category) ? category : 'necessities';
+      const category = resolveCategory(getCell(row, 'category', 'kategorie'));
+      transaction.category = category && validCategories.includes(category) ? category : 'necessities';
 
       const investmentAccount = resolveAccountId(
-        getCell(row, 'investmentAccount', 'investicniUcet', 'investičníÚčet'),
+        getCell(row, 'investmentAccount', 'investicniUcet', 'investiční účet'),
         brokerAccounts
       );
       if (investmentAccount) {
         transaction.investmentAccount = investmentAccount;
       }
 
-      const includeInTotals = normalize(getCell(row, 'includeInInvestmentTotals', 'zahrnoutDoInvestic'));
+      const includeInTotals = normalize(
+        getCell(row, 'includeInInvestmentTotals', 'zahrnoutDoInvestic', 'zahrnout do investic')
+      );
       if (includeInTotals) {
         transaction.includeInInvestmentTotals = toBool(includeInTotals);
       }
@@ -384,11 +473,11 @@ export const parseImportedTransactionsFile = async (
 
     if (type === 'transfer') {
       const sourceAccount = resolveAccountId(
-        getCell(row, 'sourceAccount', 'zdrojovyUcet', 'zdrojovýÚčet'),
+        getCell(row, 'sourceAccount', 'zdrojovyUcet', 'zdrojový účet'),
         allAccounts
       );
       const transferAccount = resolveAccountId(
-        getCell(row, 'transferAccount', 'cilovyUcet', 'cílovýÚčet'),
+        getCell(row, 'transferAccount', 'cilovyUcet', 'cílový účet'),
         allAccounts
       );
       if (!sourceAccount || !transferAccount) {
@@ -397,7 +486,9 @@ export const parseImportedTransactionsFile = async (
       }
       transaction.sourceAccount = sourceAccount;
       transaction.transferAccount = transferAccount;
-      const transferCategory = normalizeLower(getCell(row, 'transferCategory', 'typPrevodu')) as TransferCategory;
+      const transferCategory = resolveTransferType(
+        getCell(row, 'transferCategory', 'typPrevodu', 'typ převodu')
+      );
       transaction.transferCategory = validTransferCategories.includes(transferCategory)
         ? transferCategory
         : 'transfer';
@@ -406,10 +497,9 @@ export const parseImportedTransactionsFile = async (
     transactions.push(transaction);
   });
 
-  const balancesSheetName = workbook.SheetNames.find((name) => {
-    const normalizedName = normalizeLower(name);
-    return normalizedName === 'stavyuctu' || normalizedName === 'stavyúčtů';
-  });
+  const balancesSheetName = workbook.SheetNames.find(
+    (name) => normalizeHeaderKey(name) === normalizeHeaderKey('StavyÚčtů')
+  );
 
   if (balancesSheetName) {
     const balancesRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[balancesSheetName], {

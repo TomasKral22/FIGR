@@ -128,10 +128,10 @@ export const RecurringTransactions = ({
     }
 
     const numericAmount = parseFloat(form.amount);
-    if (Number.isNaN(numericAmount) || numericAmount <= 0) {
+    if (Number.isNaN(numericAmount) || numericAmount === 0) {
       toast({
         title: 'Chyba',
-        description: 'Zadejte platnou castku.',
+        description: 'Zadejte castku ruznou od 0.',
         variant: 'destructive',
       });
       return false;
@@ -509,3 +509,4 @@ export const RecurringTransactions = ({
     </div>
   );
 };
+
