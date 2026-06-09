@@ -881,7 +881,7 @@ export const TransactionForm = ({
                         <option value="necessities">Nutnosti</option>
                         <option value="investments">Investice</option>
                         <option value="savings">Spoření</option>
-                        <option value="whims">Kraviny</option>
+                        <option value="whims">Rozmary</option>
                         <option value="selfInvestment">Investice do sebe</option>
                       </select>
                       {errors.category ? <p className="text-xs text-destructive">{errors.category}</p> : null}

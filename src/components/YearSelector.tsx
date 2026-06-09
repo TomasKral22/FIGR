@@ -64,7 +64,7 @@ export const YearSelector = ({
     });
 
     Object.values(years).forEach((yearData) => {
-      yearData.balance = yearData.totalIncome + yearData.totalTransfers - yearData.totalExpenses;
+      yearData.balance = yearData.totalIncome - yearData.totalExpenses;
     });
 
     return Object.values(years).sort((a, b) => b.year.localeCompare(a.year));

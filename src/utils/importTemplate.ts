@@ -42,6 +42,7 @@ const categoryAliases: Record<string, ExpenseCategory> = {
   nutnosti: 'necessities',
   whims: 'whims',
   rozmary: 'whims',
+  kraviny: 'whims',
   investments: 'investments',
   investice: 'investments',
   savings: 'savings',

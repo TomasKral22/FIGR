@@ -47,9 +47,9 @@ export const groupTransactionsByMonth = (transactions: Transaction[]): MonthlyDa
     return acc;
   }, {} as Record<string, MonthlyData>);
 
-  // Calculate balances
+  // Balance reflects only new money in/out, not transfers between owned accounts.
   Object.values(grouped).forEach((monthData) => {
-    monthData.balance = monthData.totalIncome + monthData.totalTransfers - monthData.totalExpenses;
+    monthData.balance = monthData.totalIncome - monthData.totalExpenses;
   });
 
   // Sort by month (newest first)

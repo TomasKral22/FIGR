@@ -23,7 +23,7 @@ const TRANSACTION_TYPE_LABELS: Record<TransactionDraftType, string> = {
 
 const CATEGORY_LABELS: Record<ExpenseCategory, string> = {
   necessities: 'Nutnosti',
-  whims: 'Kraviny',
+  whims: 'Rozmary',
   investments: 'Investice',
   savings: 'Spoření',
   selfInvestment: 'Investice do sebe',
@@ -33,6 +33,7 @@ const CATEGORY_LOOKUP = new Map<string, ExpenseCategory>(
   Object.entries(CATEGORY_LABELS).flatMap(([key, value]) => [
     [normalizeSearchString(key), key as ExpenseCategory],
     [normalizeSearchString(value), key as ExpenseCategory],
+    ...(key === 'whims' ? [['kraviny', 'whims' as ExpenseCategory]] : []),
   ])
 );
 
