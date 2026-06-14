@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -33,9 +33,7 @@ const formatPercent = (value: number): string =>
   }).format(value / 100);
 
 const formatQuantity = (value: number): string => {
-  if (value < 1) {
-    return value.toFixed(8);
-  }
+  if (value < 1) return value.toFixed(8);
   return value.toLocaleString('cs-CZ', { maximumFractionDigits: 4 });
 };
 
@@ -65,7 +63,7 @@ export const AssetTable = ({
   const [breakdown, setBreakdown] = useState<'type' | 'provider' | 'currency' | 'sector'>('type');
   const isMobile = useIsMobile();
 
-  const getBreakdownData = () => {
+  const pieData = useMemo(() => {
     const data =
       breakdown === 'type'
         ? assetsByType
@@ -85,18 +83,16 @@ export const AssetTable = ({
       invested,
       value: value || invested,
     }));
-  };
-
-  const pieData = getBreakdownData();
+  }, [assetsByCurrency, assetsByProvider, assetsBySector, assetsByType, breakdown]);
 
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between gap-3">
+          <div className={`flex gap-3 ${isMobile ? 'flex-col' : 'items-center justify-between'}`}>
             <CardTitle>Rozdělení portfolia</CardTitle>
             <Tabs value={breakdown} onValueChange={(value) => setBreakdown(value as typeof breakdown)}>
-              <TabsList>
+              <TabsList className="flex h-auto flex-wrap gap-1">
                 <TabsTrigger value="type">Typ</TabsTrigger>
                 <TabsTrigger value="provider">Poskytovatel</TabsTrigger>
                 <TabsTrigger value="currency">Měna</TabsTrigger>
@@ -107,46 +103,67 @@ export const AssetTable = ({
         </CardHeader>
         <CardContent>
           {pieData.length > 0 ? (
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={100}
-                    dataKey="value"
-                    nameKey="name"
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
-                    labelLine={false}
-                  >
-                    {pieData.map((_, index) => (
-                      <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    content={({ active, payload }) => {
-                      if (!active || !payload?.length) return null;
-                      const data = payload[0].payload;
-                      return (
-                        <div className="rounded-lg border border-border bg-popover p-3 shadow-lg">
-                          <p className="font-medium">{data.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Investováno: {formatCurrency(data.invested, reportingCurrency)}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Hodnota: {formatCurrency(data.value, reportingCurrency)}
-                          </p>
-                        </div>
-                      );
-                    }}
-                  />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
+            isMobile ? (
+              <div className="space-y-3">
+                {pieData.map((item, index) => (
+                  <div key={`${item.name}-${index}`} className="rounded-xl border border-border/70 bg-background/60 p-3">
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="h-3 w-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                        <span className="font-medium">{item.name}</span>
+                      </div>
+                      <span className="text-sm text-muted-foreground">{formatCurrency(item.value, reportingCurrency)}</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-muted">
+                      <div
+                        className="h-2 rounded-full"
+                        style={{
+                          width: `${Math.max((item.value / Math.max(...pieData.map((entry) => entry.value || 0), 1)) * 100, 6)}%`,
+                          backgroundColor: COLORS[index % COLORS.length],
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={100}
+                      dataKey="value"
+                      nameKey="name"
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                      labelLine={false}
+                    >
+                      {pieData.map((_, index) => (
+                        <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        const data = payload[0].payload;
+                        return (
+                          <div className="rounded-lg border border-border bg-popover p-3 shadow-lg">
+                            <p className="font-medium">{data.name}</p>
+                            <p className="text-sm text-muted-foreground">Investováno: {formatCurrency(data.invested, reportingCurrency)}</p>
+                            <p className="text-sm text-muted-foreground">Hodnota: {formatCurrency(data.value, reportingCurrency)}</p>
+                          </div>
+                        );
+                      }}
+                    />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )
           ) : (
-            <p className="py-8 text-center text-muted-foreground">Zatím žádná aktiva</p>
+            <p className="py-8 text-center text-muted-foreground">Zatím žádná aktiva.</p>
           )}
         </CardContent>
       </Card>
@@ -156,7 +173,7 @@ export const AssetTable = ({
           <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
             <CardTitle>Přehled aktiv</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Vyber ticker pro externí AI analýzu a přes šipku otevři detail aktiva.
+              Vyber ticker pro externí AI analýzu a kliknutím na detail otevři historii pozice.
             </p>
           </div>
         </CardHeader>
@@ -240,120 +257,91 @@ export const AssetTable = ({
                 })}
               </div>
             ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-28">Prompt</TableHead>
-                  <TableHead>Ticker</TableHead>
-                  <TableHead>Název</TableHead>
-                  <TableHead>Poskytovatel</TableHead>
-                  <TableHead>Typ</TableHead>
-                  <TableHead className="text-right">Množství</TableHead>
-                  <TableHead className="text-right">Akt. cena</TableHead>
-                  <TableHead className="text-right">Hodnota</TableHead>
-                  <TableHead className="text-right">Investováno</TableHead>
-                  <TableHead className="text-right">Zisk / ztráta</TableHead>
-                  <TableHead className="w-20" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {assets.map((asset) => {
-                  const isProfit = (asset.profitLossInReportingCurrency ?? 0) >= 0;
-                  const isSelected = selectedAnalysisAssetId === asset.id;
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-28">Prompt</TableHead>
+                    <TableHead>Ticker</TableHead>
+                    <TableHead>Název</TableHead>
+                    <TableHead>Poskytovatel</TableHead>
+                    <TableHead>Typ</TableHead>
+                    <TableHead className="text-right">Množství</TableHead>
+                    <TableHead className="text-right">Akt. cena</TableHead>
+                    <TableHead className="text-right">Hodnota</TableHead>
+                    <TableHead className="text-right">Investováno</TableHead>
+                    <TableHead className="text-right">Zisk / ztráta</TableHead>
+                    <TableHead className="w-20" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {assets.map((asset) => {
+                    const isProfit = (asset.profitLossInReportingCurrency ?? 0) >= 0;
+                    const isSelected = selectedAnalysisAssetId === asset.id;
 
-                  return (
-                    <TableRow
-                      key={asset.id}
-                      className={isSelected ? 'bg-primary/5 ring-1 ring-inset ring-primary/30' : ''}
-                    >
-                      <TableCell>
-                        <button
-                          type="button"
-                          aria-pressed={isSelected}
-                          className={`flex items-center gap-2 rounded-md border px-2 py-1 text-xs transition-colors ${
-                            isSelected
-                              ? 'border-primary bg-primary/10 text-primary'
-                              : 'border-border bg-background/60 text-muted-foreground hover:border-primary/50'
-                          }`}
-                          onClick={(event) => {
-                            event.preventDefault();
-                            onSelectAnalysisAsset(asset.id);
-                          }}
-                        >
-                          <span
-                            className={`h-4 w-4 rounded-full border ${
-                              isSelected ? 'border-primary bg-primary ring-2 ring-primary/25' : 'border-border'
-                            }`}
-                          />
-                          <span>{isSelected ? 'Vybráno' : 'Vybrat'}</span>
-                        </button>
-                      </TableCell>
-                      <TableCell className="font-medium">{asset.ticker}</TableCell>
-                      <TableCell>{asset.name}</TableCell>
-                      <TableCell>{INVESTMENT_PROVIDER_LABELS[asset.provider] || asset.provider}</TableCell>
-                      <TableCell>
-                        {ASSET_TYPE_LABELS[asset.asset_type as keyof typeof ASSET_TYPE_LABELS] || asset.asset_type}
-                      </TableCell>
-                      <TableCell className="text-right">{formatQuantity(asset.quantity)}</TableCell>
-                      <TableCell className="text-right">
-                        {asset.currentPriceInReportingCurrency !== null
-                          ? formatCurrency(asset.currentPriceInReportingCurrency, reportingCurrency)
-                          : '-'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {asset.currentValueInReportingCurrency !== null
-                          ? formatCurrency(asset.currentValueInReportingCurrency, reportingCurrency)
-                          : '-'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(asset.totalInvestedInReportingCurrency, reportingCurrency)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {asset.profitLossInReportingCurrency !== null ? (
-                          <div
-                            className={`flex items-center justify-end gap-1 ${
-                              isProfit ? 'text-success' : 'text-destructive'
-                            }`}
-                          >
-                            {isProfit ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                            <span>{formatCurrency(asset.profitLossInReportingCurrency, reportingCurrency)}</span>
-                            <span className="text-xs">({formatPercent(asset.profitLossPercent || 0)})</span>
-                          </div>
-                        ) : (
-                          '-'
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
+                    return (
+                      <TableRow key={asset.id} className={isSelected ? 'bg-primary/5 ring-1 ring-inset ring-primary/30' : ''}>
+                        <TableCell>
+                          <button
                             type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            aria-label={`Otevřít detail aktiva ${asset.ticker}`}
-                            onClick={() => onSelectAsset(asset.id)}
-                          >
-                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            aria-label={`Smazat aktivum ${asset.ticker}`}
-                            onClick={async () => {
-                              await onDeleteAsset(asset.id);
+                            aria-pressed={isSelected}
+                            className={`flex items-center gap-2 rounded-md border px-2 py-1 text-xs transition-colors ${
+                              isSelected
+                                ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-border bg-background/60 text-muted-foreground hover:border-primary/50'
+                            }`}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              onSelectAnalysisAsset(asset.id);
                             }}
                           >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                            <span className={`h-4 w-4 rounded-full border ${isSelected ? 'border-primary bg-primary ring-2 ring-primary/25' : 'border-border'}`} />
+                            <span>{isSelected ? 'Vybráno' : 'Vybrat'}</span>
+                          </button>
+                        </TableCell>
+                        <TableCell className="font-medium">{asset.ticker}</TableCell>
+                        <TableCell>{asset.name}</TableCell>
+                        <TableCell>{INVESTMENT_PROVIDER_LABELS[asset.provider] || asset.provider}</TableCell>
+                        <TableCell>{ASSET_TYPE_LABELS[asset.asset_type as keyof typeof ASSET_TYPE_LABELS] || asset.asset_type}</TableCell>
+                        <TableCell className="text-right">{formatQuantity(asset.quantity)}</TableCell>
+                        <TableCell className="text-right">
+                          {asset.currentPriceInReportingCurrency !== null
+                            ? formatCurrency(asset.currentPriceInReportingCurrency, reportingCurrency)
+                            : '-'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {asset.currentValueInReportingCurrency !== null
+                            ? formatCurrency(asset.currentValueInReportingCurrency, reportingCurrency)
+                            : '-'}
+                        </TableCell>
+                        <TableCell className="text-right">{formatCurrency(asset.totalInvestedInReportingCurrency, reportingCurrency)}</TableCell>
+                        <TableCell className="text-right">
+                          {asset.profitLossInReportingCurrency !== null ? (
+                            <div className={`flex items-center justify-end gap-1 ${isProfit ? 'text-success' : 'text-destructive'}`}>
+                              {isProfit ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                              <span>{formatCurrency(asset.profitLossInReportingCurrency, reportingCurrency)}</span>
+                              <span className="text-xs">({formatPercent(asset.profitLossPercent || 0)})</span>
+                            </div>
+                          ) : (
+                            '-'
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-end gap-1">
+                            <Button type="button" variant="ghost" size="icon" className="h-8 w-8" aria-label={`Otevřít detail aktiva ${asset.ticker}`} onClick={() => onSelectAsset(asset.id)}>
+                              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                            <Button type="button" variant="ghost" size="icon" className="h-8 w-8" aria-label={`Smazat aktivum ${asset.ticker}`} onClick={async () => {
+                              await onDeleteAsset(asset.id);
+                            }}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             )
           ) : (
             <p className="py-8 text-center text-muted-foreground">Zatím žádná aktiva. Přidej transakci pro začátek.</p>

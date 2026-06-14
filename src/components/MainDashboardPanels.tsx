@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+﻿import { ReactNode } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { HiddenPanelsBar, ReorderablePanel } from '@/components/ReorderablePanel';
 import { usePanelLayout } from '@/hooks/usePanelLayout';
@@ -8,6 +8,7 @@ export type MainDashboardPanelId =
   | 'backupReminder'
   | 'supportPanels'
   | 'wealthOverview'
+  | 'goalSavings'
   | 'decisionDashboard'
   | 'yearSelector'
   | 'monthWorkflow';
@@ -17,6 +18,7 @@ const PANEL_LABELS: Record<MainDashboardPanelId, string> = {
   backupReminder: 'Připomínka zálohy',
   supportPanels: 'Rychlé akce a chytré souvislosti',
   wealthOverview: 'Celkový majetek',
+  goalSavings: 'Zbývá našetřit',
   decisionDashboard: 'Rozhodovací dashboard',
   yearSelector: 'Pohled po letech',
   monthWorkflow: 'Měsíční workflow',
@@ -27,6 +29,7 @@ const PANEL_DESCRIPTIONS: Record<MainDashboardPanelId, string> = {
   backupReminder: 'Upozornění na zálohy a bezpečí dat',
   supportPanels: 'Rychlé akce, tipy a chytré souvislosti',
   wealthOverview: 'Souhrn majetku včetně měnových přepočtů',
+  goalSavings: 'Kolik ještě chybí do aktivních finančních cílů',
   decisionDashboard: 'Signály pro kontrolu, limity a změny',
   yearSelector: 'Přepínání mezi roky a měsíčním pohledem',
   monthWorkflow: 'Transakce, uzávěrka a checklist měsíce',
@@ -56,6 +59,7 @@ export const MainDashboardPanels = ({ panels, editing = false }: MainDashboardPa
     'backupReminder',
     'supportPanels',
     'wealthOverview',
+    'goalSavings',
     'decisionDashboard',
     'yearSelector',
     'monthWorkflow',

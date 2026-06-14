@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, X } from 'lucide-react';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -14,6 +14,7 @@ import { InvestmentDashboard } from '@/components/investments';
 import { AnnualReports } from '@/components/reports/AnnualReports';
 import { BackupManager } from '@/components/BackupManager';
 import { GoalsPanel } from '@/components/GoalsPanel';
+import { GoalSavingsPanel } from '@/components/GoalSavingsPanel';
 import { AuditLogPanel } from '@/components/AuditLogPanel';
 import { WealthOverview } from '@/components/WealthOverview';
 import { BackupReminder } from '@/components/BackupReminder';
@@ -57,18 +58,20 @@ type DashboardPanelId =
   | 'backupReminder'
   | 'supportPanels'
   | 'wealthOverview'
+  | 'goalSavings'
   | 'decisionDashboard'
   | 'yearSelector'
   | 'monthWorkflow';
 
 const DASHBOARD_PANEL_LABELS: Record<DashboardPanelId, string> = {
-  gettingStarted: 'Začínáme',
-  backupReminder: 'Připomínka zálohy',
-  supportPanels: 'Rychlé akce a chytré souvislosti',
-  wealthOverview: 'Celkový majetek',
-  decisionDashboard: 'Rozhodovací dashboard',
+  gettingStarted: 'ZaÄŤĂ­nĂˇme',
+  backupReminder: 'PĹ™ipomĂ­nka zĂˇlohy',
+  supportPanels: 'RychlĂ© akce a chytrĂ© souvislosti',
+  wealthOverview: 'CelkovĂ˝ majetek',
+  goalSavings: 'Zbývá našetřit',
+  decisionDashboard: 'RozhodovacĂ­ dashboard',
   yearSelector: 'Pohled po letech',
-  monthWorkflow: 'Měsíční workflow',
+  monthWorkflow: 'MÄ›sĂ­ÄŤnĂ­ workflow',
 };
 
 const normalizeHiddenPanels = (value: unknown): DashboardPanelId[] => {
@@ -352,21 +355,21 @@ const Index = () => {
           ? newlyEscalatedAlerts[0]
           : newlyEscalatedAlerts.sort((left, right) => right.ratio - left.ratio)[0];
       const label = headline.subcategoryLabel
-        ? `${headline.categoryLabel} · ${headline.subcategoryLabel}`
+        ? `${headline.categoryLabel} Â· ${headline.subcategoryLabel}`
         : headline.categoryLabel;
       const moreCount = newlyEscalatedAlerts.length - 1;
 
       toast({
         title:
           headline.level === 'critical'
-            ? 'Limit je výrazně překročen'
+            ? 'Limit je vĂ˝raznÄ› pĹ™ekroÄŤen'
             : headline.level === 'exceeded'
-              ? 'Byl překročen rozpočtový limit'
-              : 'Blížíš se rozpočtovému limitu',
+              ? 'Byl pĹ™ekroÄŤen rozpoÄŤtovĂ˝ limit'
+              : 'BlĂ­ĹľĂ­Ĺˇ se rozpoÄŤtovĂ©mu limitu',
         description:
           `${label} v ${formatMonth(headline.month)}: ${formatCurrency(headline.spent)} z limitu ${formatCurrency(
             headline.limit.monthlyLimit
-          )}.` + (moreCount > 0 ? ` A další ${moreCount}.` : ''),
+          )}.` + (moreCount > 0 ? ` A dalĹˇĂ­ ${moreCount}.` : ''),
         variant: headline.level === 'warning' ? 'default' : 'destructive',
       });
     }
@@ -386,7 +389,7 @@ const Index = () => {
   const userDisplayName =
     typeof user?.user_metadata?.username === 'string' && user.user_metadata.username.trim().length > 0
       ? user.user_metadata.username.trim()
-      : user?.email?.split('@')[0] || 'Uživatel';
+      : user?.email?.split('@')[0] || 'UĹľivatel';
 
   const moveSidebarItem = (itemId: SidebarItemId, direction: 'up' | 'down') => {
     setSidebarOrder((current) => {
@@ -454,11 +457,11 @@ const Index = () => {
           onClick={() => setIsSupportPanelsOpen((current) => !current)}
         >
           <div>
-            <p className="text-sm font-semibold">Rychlé akce a chytré souvislosti</p>
+            <p className="text-sm font-semibold">RychlĂ© akce a chytrĂ© souvislosti</p>
             <p className="text-xs text-muted-foreground">
               {isSupportPanelsOpen
-                ? 'Skrýt pomocné panely a nechat víc místa pro grid měsíců.'
-                : 'Zobrazit pomocné panely nad ročním přehledem.'}
+                ? 'SkrĂ˝t pomocnĂ© panely a nechat vĂ­c mĂ­sta pro grid mÄ›sĂ­cĹŻ.'
+                : 'Zobrazit pomocnĂ© panely nad roÄŤnĂ­m pĹ™ehledem.'}
             </p>
           </div>
           {isSupportPanelsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -500,6 +503,15 @@ const Index = () => {
         bankAccounts={bankAccounts}
         brokerAccounts={brokerAccounts}
         exchangeRates={exchangeRates}
+      />
+    ),
+    goalSavings: (
+      <GoalSavingsPanel
+        goals={goals}
+        transactions={transactions}
+        bankAccounts={bankAccounts}
+        selectedYear={effectiveSelectedYear}
+        onOpenGoals={() => setIsGoalsOpen(true)}
       />
     ),
     decisionDashboard: (
@@ -606,7 +618,7 @@ const Index = () => {
           {hiddenPanels.length > 0 ? (
             <section className="rounded-2xl border border-border bg-card/40 px-4 py-3">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="text-sm font-medium">Skryté panely:</p>
+                <p className="text-sm font-medium">SkrytĂ© panely:</p>
                 {hiddenPanels.map((panelId) => (
                   <button
                     key={panelId}
@@ -627,7 +639,7 @@ const Index = () => {
                 type="button"
                 className="absolute right-3 top-3 z-10 rounded-full border border-border/70 bg-background/70 p-1.5 text-muted-foreground transition-colors hover:text-foreground"
                 onClick={() => hidePanel('gettingStarted')}
-                aria-label="Skrýt panel Začínáme"
+                aria-label="SkrĂ˝t panel ZaÄŤĂ­nĂˇme"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -653,7 +665,7 @@ const Index = () => {
                 type="button"
                 className="absolute right-3 top-3 z-10 rounded-full border border-border/70 bg-background/70 p-1.5 text-muted-foreground transition-colors hover:text-foreground"
                 onClick={() => hidePanel('backupReminder')}
-                aria-label="Skrýt panel Připomínka zálohy"
+                aria-label="SkrĂ˝t panel PĹ™ipomĂ­nka zĂˇlohy"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -667,7 +679,7 @@ const Index = () => {
               type="button"
               className="absolute right-3 top-3 z-10 rounded-full border border-border/70 bg-background/70 p-1.5 text-muted-foreground transition-colors hover:text-foreground"
               onClick={() => hidePanel('supportPanels')}
-              aria-label="SkrĂ˝t panel RychlĂ© akce a chytrĂ© souvislosti"
+              aria-label="SkrÄ‚Ëťt panel RychlÄ‚Â© akce a chytrÄ‚Â© souvislosti"
             >
               <X className="h-4 w-4" />
             </button>
@@ -677,9 +689,9 @@ const Index = () => {
               onClick={() => setIsSupportPanelsOpen((current) => !current)}
             >
               <div>
-                <p className="text-sm font-semibold">Rychlé akce a chytré souvislosti</p>
+                <p className="text-sm font-semibold">RychlĂ© akce a chytrĂ© souvislosti</p>
                 <p className="text-xs text-muted-foreground">
-                  {isSupportPanelsOpen ? 'Skrýt pomocné panely a nechat víc místa pro grid měsíců.' : 'Zobrazit pomocné panely nad ročním přehledem.'}
+                  {isSupportPanelsOpen ? 'SkrĂ˝t pomocnĂ© panely a nechat vĂ­c mĂ­sta pro grid mÄ›sĂ­cĹŻ.' : 'Zobrazit pomocnĂ© panely nad roÄŤnĂ­m pĹ™ehledem.'}
                 </p>
               </div>
               {isSupportPanelsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -721,7 +733,7 @@ const Index = () => {
               type="button"
               className="absolute right-3 top-3 z-10 rounded-full border border-border/70 bg-background/70 p-1.5 text-muted-foreground transition-colors hover:text-foreground"
               onClick={() => hidePanel('wealthOverview')}
-              aria-label="Skrýt panel Celkový majetek"
+              aria-label="SkrĂ˝t panel CelkovĂ˝ majetek"
             >
               <X className="h-4 w-4" />
             </button>
@@ -739,7 +751,7 @@ const Index = () => {
               type="button"
               className="absolute right-3 top-3 z-10 rounded-full border border-border/70 bg-background/70 p-1.5 text-muted-foreground transition-colors hover:text-foreground"
               onClick={() => hidePanel('decisionDashboard')}
-              aria-label="Skrýt panel Rozhodovací dashboard"
+              aria-label="SkrĂ˝t panel RozhodovacĂ­ dashboard"
             >
               <X className="h-4 w-4" />
             </button>
@@ -766,7 +778,7 @@ const Index = () => {
               type="button"
               className="absolute right-3 top-3 z-10 rounded-full border border-border/70 bg-background/70 p-1.5 text-muted-foreground transition-colors hover:text-foreground"
               onClick={() => hidePanel('yearSelector')}
-              aria-label="Skrýt panel Pohled po letech"
+              aria-label="SkrĂ˝t panel Pohled po letech"
             >
               <X className="h-4 w-4" />
             </button>
@@ -784,7 +796,7 @@ const Index = () => {
               type="button"
               className="absolute right-3 top-3 z-10 rounded-full border border-border/70 bg-background/70 p-1.5 text-muted-foreground transition-colors hover:text-foreground"
               onClick={() => hidePanel('monthWorkflow')}
-              aria-label="Skrýt panel Měsíční workflow"
+              aria-label="SkrĂ˝t panel MÄ›sĂ­ÄŤnĂ­ workflow"
             >
               <X className="h-4 w-4" />
             </button>
@@ -958,3 +970,5 @@ const Index = () => {
 };
 
 export default Index;
+
+

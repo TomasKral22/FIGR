@@ -19,6 +19,7 @@ import {
   ParsedInvestmentImportFile,
   readInvestmentImportFile,
 } from '@/utils/investmentImportTemplate';
+import { getInvestmentImportProfileConfig, normalizeBrokerTransactionType } from '@/utils/investmentImportProfiles';
 
 interface ImportRow {
   ticker: string;
@@ -125,87 +126,33 @@ export const InvestmentCSVImport = ({ onImport }: InvestmentCSVImportProps) => {
   const parseRows = (parsedFile: ParsedInvestmentImportFile) => {
     const parseErrors: string[] = [];
     const parsedRows: ImportRow[] = [];
+    const profileConfig = getInvestmentImportProfileConfig(parsedFile.detectedProfile.key);
 
     parsedFile.rows.forEach((values, index) => {
       const rowErrors: string[] = [];
-      const ticker = String(
-        firstNonEmpty(values, ['ticker', 'symbol', 'instrument', 'instrumentticker', 'product', 'asset', 'code'])
-      )
+      const ticker = String(firstNonEmpty(values, profileConfig.ticker))
         .trim()
         .toUpperCase();
-      const name = String(
-        firstNonEmpty(values, ['name', 'nazev', 'název', 'instrumentname', 'productname', 'description', 'product']) ||
-          ticker
-      ).trim();
-      const quantity = parseAmount(
-        firstNonEmpty(values, [
-          'quantity',
-          'qty',
-          'shares',
-          'units',
-          'amount',
-          'mnozstvi',
-          'množství',
-          'noofshares',
-          'executedquantity',
-          'volume',
-        ])
-      );
-      const pricePerUnit = parseAmount(
-        firstNonEmpty(values, [
-          'priceperunit',
-          'price',
-          'priceunit',
-          'fillprice',
-          'unitprice',
-          'cena',
-          'tradeprice',
-          'executionprice',
-          'openprice',
-        ])
-      );
-      const currency = String(firstNonEmpty(values, ['currency', 'currencycode', 'mena', 'měna']) || 'USD')
-        .trim()
-        .toUpperCase();
-      const sector =
-        String(firstNonEmpty(values, ['sector', 'sektor', 'group', 'assetgroup']) || '').trim() || undefined;
-      const exDividendDate =
-        String(
-          firstNonEmpty(values, [
-            'exdividenddate',
-            'exdividend',
-            'exdividenddateutc',
-            'exdividenddatum',
-            'datumexdividendy',
-          ]) || ''
-        ).trim() || undefined;
-      const payDate =
-        String(firstNonEmpty(values, ['paydate', 'dividendpaydate', 'paymentdate', 'datumvyplaty']) || '').trim() ||
-        undefined;
-      const expectedDividendAmountRaw = firstNonEmpty(
-        values,
-        ['expecteddividendamount', 'expectedamount', 'dividendamount', 'grossdividend', 'ocekavanadividenda']
-      );
+      const name = String(firstNonEmpty(values, profileConfig.name) || ticker).trim();
+      const quantity = parseAmount(firstNonEmpty(values, profileConfig.quantity));
+      const pricePerUnit = parseAmount(firstNonEmpty(values, profileConfig.price));
+      const currency = String(firstNonEmpty(values, profileConfig.currency) || 'USD').trim().toUpperCase();
+      const sector = String(firstNonEmpty(values, profileConfig.sector) || '').trim() || undefined;
+      const exDividendDate = String(firstNonEmpty(values, profileConfig.exDividendDate) || '').trim() || undefined;
+      const payDate = String(firstNonEmpty(values, profileConfig.payDate) || '').trim() || undefined;
+      const expectedDividendAmountRaw = firstNonEmpty(values, profileConfig.expectedDividendAmount);
       const expectedDividendAmount =
         expectedDividendAmountRaw !== '' ? parseAmount(expectedDividendAmountRaw) : undefined;
 
-      const transactionDate = parseDate(
-        firstNonEmpty(values, [
-          'transactiondate',
-          'date',
-          'datum',
-          'executiondate',
-          'tradetime',
-          'time',
-          'tradedate',
-          'opentime',
-        ])
-      );
+      const transactionDate = parseDate(firstNonEmpty(values, profileConfig.transactionDate));
 
       let transactionType: InvestmentTransactionType = 'buy';
-      const transactionTypeValue = normalizeText(
-        String(firstNonEmpty(values, ['transactiontype', 'type', 'typ', 'side', 'action']) || '')
-      );
+      const transactionTypeRaw = String(firstNonEmpty(values, profileConfig.transactionType) || '');
+      const brokerTransactionType = normalizeBrokerTransactionType(transactionTypeRaw, parsedFile.detectedProfile.key);
+      const transactionTypeValue = normalizeText(transactionTypeRaw);
+      if (brokerTransactionType === 'sell' || brokerTransactionType === 'buy' || brokerTransactionType === 'dividend') {
+        transactionType = brokerTransactionType;
+      }
       if (
         transactionTypeValue.includes('sell') ||
         transactionTypeValue.includes('prodej') ||

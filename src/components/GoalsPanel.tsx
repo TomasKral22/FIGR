@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+﻿import { useMemo, useState } from 'react';
 import { ArrowDownLeft, ArrowUpRight, Plus, Target, Trash2 } from 'lucide-react';
 import { AccountGoal, BankAccount, Transaction } from '@/types/finance';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { formatCurrency } from '@/utils/calculations';
+import { buildGoalSummaries } from '@/utils/goalSummaries';
 
 interface GoalsPanelProps {
   isOpen: boolean;
@@ -38,12 +39,18 @@ export const GoalsPanel = ({
   const [currentAmount, setCurrentAmount] = useState('');
   const [accountId, setAccountId] = useState('none');
 
+  const selectedYear = new Date().getFullYear().toString();
+  const goalSummaries = useMemo(
+    () => buildGoalSummaries(goals, transactions, bankAccounts, selectedYear),
+    [bankAccounts, goals, selectedYear, transactions]
+  );
+
   const sortedGoals = useMemo(
     () => ({
-      active: goals.filter((goal) => goal.status !== 'completed'),
-      completed: goals.filter((goal) => goal.status === 'completed'),
+      active: goalSummaries.filter((item) => item.goal.status !== 'completed'),
+      completed: goalSummaries.filter((item) => item.goal.status === 'completed'),
     }),
-    [goals]
+    [goalSummaries]
   );
 
   const goalTransactions = useMemo(
@@ -75,9 +82,8 @@ export const GoalsPanel = ({
     setAccountId('none');
   };
 
-  const renderGoalCard = (goal: AccountGoal) => {
-    const progress = goal.targetAmount > 0 ? Math.min((goal.currentAmount / goal.targetAmount) * 100, 100) : 0;
-    const linkedAccount = bankAccounts.find((account) => account.id === goal.accountId);
+  const renderGoalCard = (summary: (typeof goalSummaries)[number]) => {
+    const { goal, linkedAccount, progress, remainingAmount, contributedThisYear, monthlyPace, estimatedMonthsRemaining } = summary;
 
     return (
       <div key={goal.id} className="rounded-lg border border-border p-4">
@@ -94,14 +100,25 @@ export const GoalsPanel = ({
             <p className="mt-1 text-sm text-muted-foreground">
               {formatCurrency(goal.currentAmount)} z {formatCurrency(goal.targetAmount)}
             </p>
-            {linkedAccount && (
-              <p className="mt-1 text-xs text-muted-foreground">Navázaný účet: {linkedAccount.name}</p>
-            )}
+            {linkedAccount && <p className="mt-1 text-xs text-muted-foreground">Navázaný účet: {linkedAccount.name}</p>}
 
             <div className="mt-3 h-2 rounded-full bg-muted">
               <div className="h-2 rounded-full bg-primary" style={{ width: `${progress}%` }} />
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">{progress.toFixed(1)} % splněno</p>
+            <div className="mt-2 grid gap-2 text-xs text-muted-foreground md:grid-cols-3">
+              <p>Zbývá {formatCurrency(remainingAmount)}</p>
+              <p>Tempo {formatCurrency(monthlyPace)} / měsíc</p>
+              <p>
+                {goal.status === 'completed'
+                  ? 'Hotovo'
+                  : estimatedMonthsRemaining !== null
+                    ? `Odhad ${estimatedMonthsRemaining} měs.`
+                    : 'Odhad zatím není'}
+              </p>
+            </div>
+            <p className={`mt-2 text-xs ${contributedThisYear >= 0 ? 'text-success' : 'text-destructive'}`}>
+              Letos vůči cíli: {formatCurrency(contributedThisYear)}
+            </p>
 
             {goalTransactions[goal.id]?.length > 0 && (
               <div className="mt-4 space-y-2">
@@ -130,14 +147,31 @@ export const GoalsPanel = ({
     );
   };
 
+  const totalRemaining = sortedGoals.active.reduce((sum, item) => sum + item.remainingAmount, 0);
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>Finanční cíle</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6">
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-xl border border-border/70 bg-background/60 p-4">
+              <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Aktivní cíle</p>
+              <p className="mt-1 text-2xl font-semibold">{sortedGoals.active.length}</p>
+            </div>
+            <div className="rounded-xl border border-border/70 bg-background/60 p-4">
+              <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Celkem zbývá</p>
+              <p className="mt-1 text-2xl font-semibold">{formatCurrency(totalRemaining)}</p>
+            </div>
+            <div className="rounded-xl border border-border/70 bg-background/60 p-4">
+              <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Splněné cíle</p>
+              <p className="mt-1 text-2xl font-semibold">{sortedGoals.completed.length}</p>
+            </div>
+          </div>
+
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-2">
               <Label>Název cíle</Label>
