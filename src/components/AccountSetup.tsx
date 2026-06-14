@@ -50,12 +50,14 @@ const brokerInstitutions = getInstitutionsByKind('broker');
 const CurrencySelect = ({
   value,
   onChange,
+  className,
 }: {
   value: string;
   onChange: (value: string) => void;
+  className?: string;
 }) => (
   <Select value={value} onValueChange={onChange}>
-    <SelectTrigger>
+    <SelectTrigger className={className}>
       <SelectValue />
     </SelectTrigger>
     <SelectContent>
@@ -183,6 +185,16 @@ export const AccountSetup = ({
     setEditingBankId(null);
   };
 
+  const cancelEditBank = () => {
+    setEditingBankId(null);
+    setEditBankName('');
+    setEditBankInstitutionId('custom');
+    setEditBankBalance('');
+    setEditBankCurrency('CZK');
+    setEditBankIsSavings(false);
+    setEditBankInterestRate('');
+  };
+
   const startEditBroker = (account: BankAccount) => {
     setEditingBrokerId(account.id);
     setEditBrokerName(account.name);
@@ -210,11 +222,19 @@ export const AccountSetup = ({
     setEditingBrokerId(null);
   };
 
+  const cancelEditBroker = () => {
+    setEditingBrokerId(null);
+    setEditBrokerName('');
+    setEditBrokerInstitutionId('custom');
+    setEditBrokerBalance('');
+    setEditBrokerCurrency('CZK');
+  };
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
-      <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg border border-border bg-card shadow-2xl">
+      <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-lg border border-border bg-card shadow-2xl">
         <div className="sticky top-0 flex items-center justify-between rounded-t-lg border-b border-border bg-card px-4 py-4 sm:px-6">
           <h2 className="text-lg font-semibold sm:text-xl">Nastaveni uctu</h2>
           <Button variant="ghost" size="icon" onClick={onClose}>
@@ -227,11 +247,11 @@ export const AccountSetup = ({
             <h3 className="text-lg font-semibold">Bankovni ucty</h3>
 
             <div className="space-y-3 rounded-lg border border-border p-4">
-              <div className="grid gap-3 xl:grid-cols-[1.2fr_1fr_1fr_120px_auto]">
+              <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_120px_auto]">
                 <div className="space-y-2">
                   <Label>Instituce</Label>
                   <Select value={bankInstitutionId} onValueChange={setBankInstitutionId}>
-                    <SelectTrigger>
+                    <SelectTrigger className="min-w-0">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -248,6 +268,7 @@ export const AccountSetup = ({
                 <div className="space-y-2">
                   <Label>Nazev uctu</Label>
                   <Input
+                    className="min-w-0"
                     value={bankInstitutionId === 'custom' ? bankName : resolvedBankName}
                     onChange={(event) => setBankName(event.target.value)}
                     disabled={bankInstitutionId !== 'custom'}
@@ -258,6 +279,7 @@ export const AccountSetup = ({
                 <div className="space-y-2">
                   <Label>Pocatecni zustatek</Label>
                   <Input
+                    className="min-w-0"
                     type="number"
                     step="0.01"
                     value={bankBalance}
@@ -268,11 +290,11 @@ export const AccountSetup = ({
 
                 <div className="space-y-2">
                   <Label>Mena</Label>
-                  <CurrencySelect value={bankCurrency} onChange={setBankCurrency} />
+                  <CurrencySelect value={bankCurrency} onChange={setBankCurrency} className="min-w-0" />
                 </div>
 
-                <div className="flex items-end">
-                  <Button onClick={handleAddBank} size="icon" className="w-full xl:w-10">
+                <div className="flex items-end md:col-span-2 2xl:col-span-1">
+                  <Button onClick={handleAddBank} size="icon" className="w-full 2xl:w-10">
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
@@ -307,12 +329,17 @@ export const AccountSetup = ({
 
             <div className="flex flex-wrap gap-3">
               {bankAccounts.map((account) => (
-                <div key={account.id} className="w-full rounded-lg bg-muted/50 p-3 md:w-[calc(50%-0.375rem)]">
+                <div
+                  key={account.id}
+                  className={`w-full rounded-lg bg-muted/50 p-3 ${
+                    editingBankId === account.id ? 'md:basis-full' : 'md:w-[calc(50%-0.375rem)]'
+                  }`}
+                >
                   {editingBankId === account.id ? (
                     <div className="space-y-3">
-                      <div className="grid gap-3 xl:grid-cols-[1.1fr_1fr_1fr_120px_auto]">
+                      <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_120px_auto]">
                         <Select value={editBankInstitutionId} onValueChange={setEditBankInstitutionId}>
-                          <SelectTrigger>
+                          <SelectTrigger className="min-w-0">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -325,6 +352,7 @@ export const AccountSetup = ({
                           </SelectContent>
                         </Select>
                         <Input
+                          className="min-w-0"
                           value={
                             editBankInstitutionId === 'custom'
                               ? editBankName
@@ -334,15 +362,21 @@ export const AccountSetup = ({
                           disabled={editBankInstitutionId !== 'custom'}
                         />
                         <Input
+                          className="min-w-0"
                           type="number"
                           step="0.01"
                           value={editBankBalance}
                           onChange={(event) => setEditBankBalance(event.target.value)}
                         />
-                        <CurrencySelect value={editBankCurrency} onChange={setEditBankCurrency} />
-                        <Button onClick={saveEditBank} size="icon" variant="ghost" className="w-full xl:w-10">
-                          <Check className="h-4 w-4 text-primary" />
-                        </Button>
+                        <CurrencySelect value={editBankCurrency} onChange={setEditBankCurrency} className="min-w-0" />
+                        <div className="grid grid-cols-2 gap-2 md:col-span-2 2xl:col-span-1 2xl:grid-cols-1">
+                          <Button onClick={saveEditBank} size="icon" variant="ghost" className="w-full 2xl:w-10">
+                            <Check className="h-4 w-4 text-primary" />
+                          </Button>
+                          <Button onClick={cancelEditBank} size="icon" variant="ghost" className="w-full 2xl:w-10">
+                            <X className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                        </div>
                       </div>
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
                         <label className="flex cursor-pointer items-center gap-2">
@@ -352,7 +386,7 @@ export const AccountSetup = ({
                             onChange={(event) => setEditBankIsSavings(event.target.checked)}
                             className="rounded"
                           />
-                          <span className="text-sm">Sporici ucet</span>
+                          <span className="text-sm">Spořicí účet</span>
                         </label>
                         {editBankIsSavings && (
                           <Input
@@ -370,12 +404,12 @@ export const AccountSetup = ({
                       <div className="flex min-w-0 items-center gap-3">
                         <InstitutionAvatar institutionId={account.institutionId} fallback={account.name} />
                         <div className="min-w-0">
-                          <p className="break-words font-medium">
+                          <p className="break-words font-medium leading-snug">
                             {account.name}
-                            <span className="ml-2 text-xs text-muted-foreground">{account.currency}</span>
+                            <span className="ml-2 inline-block text-xs text-muted-foreground">{account.currency}</span>
                             {account.isSavings && (
-                              <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
-                                Sporici {account.interestRate}% p.a.
+                              <span className="ml-2 mt-1 inline-flex max-w-full break-words rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                                Spořicí {account.interestRate}% p.a.
                               </span>
                             )}
                           </p>
@@ -403,11 +437,11 @@ export const AccountSetup = ({
             <h3 className="text-lg font-semibold">Brokerske ucty</h3>
 
             <div className="space-y-3 rounded-lg border border-border p-4">
-              <div className="grid gap-3 xl:grid-cols-[1.2fr_1fr_1fr_120px_auto]">
+              <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_120px_auto]">
                 <div className="space-y-2">
                   <Label>Instituce</Label>
                   <Select value={brokerInstitutionId} onValueChange={setBrokerInstitutionId}>
-                    <SelectTrigger>
+                    <SelectTrigger className="min-w-0">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -424,6 +458,7 @@ export const AccountSetup = ({
                 <div className="space-y-2">
                   <Label>Nazev uctu</Label>
                   <Input
+                    className="min-w-0"
                     value={brokerInstitutionId === 'custom' ? brokerName : resolvedBrokerName}
                     onChange={(event) => setBrokerName(event.target.value)}
                     disabled={brokerInstitutionId !== 'custom'}
@@ -434,6 +469,7 @@ export const AccountSetup = ({
                 <div className="space-y-2">
                   <Label>Pocatecni zustatek</Label>
                   <Input
+                    className="min-w-0"
                     type="number"
                     step="0.01"
                     value={brokerBalance}
@@ -444,11 +480,11 @@ export const AccountSetup = ({
 
                 <div className="space-y-2">
                   <Label>Mena</Label>
-                  <CurrencySelect value={brokerCurrency} onChange={setBrokerCurrency} />
+                  <CurrencySelect value={brokerCurrency} onChange={setBrokerCurrency} className="min-w-0" />
                 </div>
 
-                <div className="flex items-end">
-                  <Button onClick={handleAddBroker} size="icon" className="w-full xl:w-10">
+                <div className="flex items-end md:col-span-2 2xl:col-span-1">
+                  <Button onClick={handleAddBroker} size="icon" className="w-full 2xl:w-10">
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
@@ -457,11 +493,16 @@ export const AccountSetup = ({
 
             <div className="flex flex-wrap gap-3">
               {brokerAccounts.map((account) => (
-                <div key={account.id} className="w-full rounded-lg bg-muted/50 p-3 md:w-[calc(50%-0.375rem)]">
+                <div
+                  key={account.id}
+                  className={`w-full rounded-lg bg-muted/50 p-3 ${
+                    editingBrokerId === account.id ? 'md:basis-full' : 'md:w-[calc(50%-0.375rem)]'
+                  }`}
+                >
                   {editingBrokerId === account.id ? (
-                    <div className="grid gap-3 xl:grid-cols-[1.1fr_1fr_1fr_120px_auto]">
+                    <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_120px_auto]">
                       <Select value={editBrokerInstitutionId} onValueChange={setEditBrokerInstitutionId}>
-                        <SelectTrigger>
+                        <SelectTrigger className="min-w-0">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -474,6 +515,7 @@ export const AccountSetup = ({
                         </SelectContent>
                       </Select>
                       <Input
+                        className="min-w-0"
                         value={
                           editBrokerInstitutionId === 'custom'
                             ? editBrokerName
@@ -483,24 +525,30 @@ export const AccountSetup = ({
                         disabled={editBrokerInstitutionId !== 'custom'}
                       />
                       <Input
+                        className="min-w-0"
                         type="number"
                         step="0.01"
                         value={editBrokerBalance}
                         onChange={(event) => setEditBrokerBalance(event.target.value)}
                       />
-                      <CurrencySelect value={editBrokerCurrency} onChange={setEditBrokerCurrency} />
-                      <Button onClick={saveEditBroker} size="icon" variant="ghost" className="w-full xl:w-10">
-                        <Check className="h-4 w-4 text-primary" />
-                      </Button>
+                      <CurrencySelect value={editBrokerCurrency} onChange={setEditBrokerCurrency} className="min-w-0" />
+                      <div className="grid grid-cols-2 gap-2 md:col-span-2 2xl:col-span-1 2xl:grid-cols-1">
+                        <Button onClick={saveEditBroker} size="icon" variant="ghost" className="w-full 2xl:w-10">
+                          <Check className="h-4 w-4 text-primary" />
+                        </Button>
+                        <Button onClick={cancelEditBroker} size="icon" variant="ghost" className="w-full 2xl:w-10">
+                          <X className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      </div>
                     </div>
                   ) : (
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex min-w-0 items-center gap-3">
                         <InstitutionAvatar institutionId={account.institutionId} fallback={account.name} />
                         <div className="min-w-0">
-                          <p className="break-words font-medium">
+                          <p className="break-words font-medium leading-snug">
                             {account.name}
-                            <span className="ml-2 text-xs text-muted-foreground">{account.currency}</span>
+                            <span className="ml-2 inline-block text-xs text-muted-foreground">{account.currency}</span>
                           </p>
                           <p className="text-sm text-muted-foreground">
                             Aktualni: {formatCurrency(account.currentBalance, account.currency)}

@@ -248,7 +248,7 @@ export function draftToTransactionInput(draft: TransactionDraft) {
     name: draft.name.trim(),
     amount: draft.amount ?? 0,
     goalId: draft.goalId || undefined,
-    goalImpact: draft.goalId ? draft.goalImpact : undefined,
+    goalImpact: draft.goalId ? draft.goalImpact || 'deposit' : undefined,
     note: draft.note?.trim() || undefined,
     attachments: draft.attachments?.map((attachment) => ({
       ...attachment,

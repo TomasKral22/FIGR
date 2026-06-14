@@ -157,6 +157,7 @@ const Index = () => {
     budgetLimits,
     featureToggles,
     addGoal,
+    updateGoal,
     deleteGoal,
     addSubcategory,
     updateSubcategory,
@@ -970,6 +971,7 @@ const Index = () => {
             transactions={transactions}
             bankAccounts={bankAccounts}
             onAddGoal={addGoal}
+            onUpdateGoal={updateGoal}
             onDeleteGoal={deleteGoal}
           />
         </Suspense>

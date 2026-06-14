@@ -967,7 +967,15 @@ export const TransactionForm = ({
                       <select
                         id="goal-id"
                         value={draft.goalId || ''}
-                        onChange={(event) => updateDraft({ goalId: event.target.value || undefined }, 'goalId')}
+                        onChange={(event) =>
+                          updateDraft(
+                            {
+                              goalId: event.target.value || undefined,
+                              goalImpact: event.target.value ? draft.goalImpact || 'deposit' : undefined,
+                            },
+                            'goalId'
+                          )
+                        }
                         className="h-10 w-full rounded-[var(--radius-control)] border border-input bg-card/70 px-3 text-sm"
                       >
                         <option value="">Bez cíle</option>

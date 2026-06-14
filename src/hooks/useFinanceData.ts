@@ -113,7 +113,10 @@ export const useFinanceData = () => {
   const [isHydrated, setIsHydrated] = useState(false);
 
   const decorateGoals = useCallback(
-    (rawGoals: AccountGoal[], sourceTransactions: Transaction[]) =>
+    (
+      rawGoals: AccountGoal[],
+      sourceTransactions: Transaction[]
+    ) =>
       rawGoals.map((goal) => {
         const linkedTransactions = sourceTransactions.filter(
           (transaction) =>
@@ -121,7 +124,7 @@ export const useFinanceData = () => {
             (!goal.createdAt || transaction.createdAt >= goal.createdAt)
         );
         const delta = linkedTransactions.reduce((sum, transaction) => {
-          if (transaction.goalImpact === 'deposit') return sum + transaction.amount;
+          if (!transaction.goalImpact || transaction.goalImpact === 'deposit') return sum + transaction.amount;
           if (transaction.goalImpact === 'withdrawal') return sum - transaction.amount;
           return sum;
         }, 0);
@@ -855,6 +858,25 @@ export const useFinanceData = () => {
     });
   }, [pushAudit]);
 
+  const updateGoal = useCallback((id: string, updates: Omit<AccountGoal, 'id' | 'createdAt'>) => {
+    setGoals((prev) =>
+      prev.map((goal) =>
+        goal.id === id
+          ? {
+              ...goal,
+              ...updates,
+              status: updates.currentAmount >= updates.targetAmount ? 'completed' : 'active',
+            }
+          : goal
+      )
+    );
+    pushAudit({
+      type: 'goal',
+      action: 'update',
+      detail: `Cil ${updates.name} byl upraven.`,
+    });
+  }, [pushAudit]);
+
   const deleteGoal = useCallback((id: string) => {
     setGoals((prev) => prev.filter((goal) => goal.id !== id));
   }, []);
@@ -1112,7 +1134,10 @@ export const useFinanceData = () => {
     [pushAudit]
   );
 
-  const visibleGoals = useMemo(() => decorateGoals(goals, transactions), [decorateGoals, goals, transactions]);
+  const visibleGoals = useMemo(
+    () => decorateGoals(goals, transactions),
+    [decorateGoals, goals, transactions]
+  );
 
   return {
     transactions,
@@ -1159,6 +1184,7 @@ export const useFinanceData = () => {
     deleteFolder,
     applyMonthlyInterest,
     addGoal,
+    updateGoal,
     deleteGoal,
     addSubcategory,
     updateSubcategory,

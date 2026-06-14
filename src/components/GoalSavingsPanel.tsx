@@ -24,7 +24,7 @@ export const GoalSavingsPanel = ({
   return (
     <section className="panel-card">
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+        <div className="min-w-0">
           <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
             <PiggyBank className="h-3.5 w-3.5" />
             Zbývá našetřit
@@ -34,9 +34,9 @@ export const GoalSavingsPanel = ({
             Souhrn cílové částky, aktuálního stavu a toho, kolik ještě zbývá doplnit.
           </p>
         </div>
-        <div className="rounded-2xl border border-border/70 bg-background/60 px-4 py-3 text-right">
+        <div className="shrink-0 rounded-2xl border border-border/70 bg-background/60 px-4 py-3 text-right">
           <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Celkem zbývá</p>
-          <p className="mt-1 text-2xl font-semibold">{formatCurrency(totalRemaining)}</p>
+          <p className="mt-1 break-words text-2xl font-semibold leading-tight">{formatCurrency(totalRemaining)}</p>
           <p className="text-xs text-muted-foreground">{activeSummaries.length} aktivních cílů</p>
         </div>
       </div>
@@ -50,52 +50,64 @@ export const GoalSavingsPanel = ({
           </Button>
         </div>
       ) : (
-        <div className="space-y-3">
-          {goalSummaries.slice(0, 4).map((item) => (
-            <div key={item.goal.id} className="rounded-2xl border border-border/70 bg-background/50 px-4 py-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium">{item.goal.name}</p>
-                    {item.goal.status === 'completed' ? (
-                      <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs text-success">Splněno</span>
+        <div className="space-y-4">
+          <div className="grid max-h-[46rem] gap-4 overflow-y-auto pr-1 lg:grid-cols-2">
+            {goalSummaries.map((item) => (
+              <div key={item.goal.id} className="rounded-2xl border border-border/70 bg-background/50 px-4 py-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="break-words font-medium">{item.goal.name}</p>
+                      {item.goal.status === 'completed' ? (
+                        <span className="shrink-0 rounded-full bg-success/10 px-2 py-0.5 text-xs text-success">
+                          Splněno
+                        </span>
+                      ) : null}
+                    </div>
+                    {item.linkedAccount ? (
+                      <p className="mt-1 break-words text-sm text-muted-foreground">Účet: {item.linkedAccount.name}</p>
+                    ) : null}
+                    {item.goal.targetDate ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Termín: {new Date(item.goal.targetDate).toLocaleDateString('cs-CZ')}
+                      </p>
                     ) : null}
                   </div>
-                  {item.linkedAccount ? (
-                    <p className="mt-1 text-sm text-muted-foreground">Účet: {item.linkedAccount.name}</p>
-                  ) : null}
-                  {item.goal.targetDate ? (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Termín: {new Date(item.goal.targetDate).toLocaleDateString('cs-CZ')}
+                  <div className="text-left sm:max-w-[42%] sm:text-right">
+                    <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Zbývá</p>
+                    <p className="break-words text-lg font-semibold leading-tight">
+                      {formatCurrency(item.remainingAmount)}
                     </p>
-                  ) : null}
+                  </div>
                 </div>
-                <div className="text-left sm:text-right">
-                  <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Zbývá</p>
-                  <p className="text-lg font-semibold">{formatCurrency(item.remainingAmount)}</p>
-                </div>
-              </div>
 
-              <div className="mt-4 grid gap-3 md:grid-cols-3">
-                <div className="rounded-xl border border-border/60 bg-card/70 px-3 py-3">
-                  <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Cílová částka</p>
-                  <p className="mt-1 font-semibold">{formatCurrency(item.goal.targetAmount)}</p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-xl border border-border/60 bg-card/70 px-3 py-3">
+                    <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Cílová částka</p>
+                    <p className="mt-1 break-words font-semibold leading-tight">
+                      {formatCurrency(item.goal.targetAmount)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-border/60 bg-card/70 px-3 py-3">
+                    <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Aktuální částka</p>
+                    <p className="mt-1 break-words font-semibold leading-tight">
+                      {formatCurrency(item.goal.currentAmount)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-border/60 bg-card/70 px-3 py-3">
+                    <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Zbývá</p>
+                    <p className="mt-1 break-words font-semibold leading-tight">
+                      {formatCurrency(item.remainingAmount)}
+                    </p>
+                  </div>
                 </div>
-                <div className="rounded-xl border border-border/60 bg-card/70 px-3 py-3">
-                  <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Aktuální částka</p>
-                  <p className="mt-1 font-semibold">{formatCurrency(item.goal.currentAmount)}</p>
-                </div>
-                <div className="rounded-xl border border-border/60 bg-card/70 px-3 py-3">
-                  <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Zbývá</p>
-                  <p className="mt-1 font-semibold">{formatCurrency(item.remainingAmount)}</p>
-                </div>
-              </div>
 
-              <div className="mt-3 h-2 rounded-full bg-muted">
-                <div className="h-2 rounded-full bg-primary" style={{ width: `${item.progress}%` }} />
+                <div className="mt-3 h-2 rounded-full bg-muted">
+                  <div className="h-2 rounded-full bg-primary" style={{ width: `${item.progress}%` }} />
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
 
           <div className="flex justify-end">
             <Button type="button" variant="outline" onClick={onOpenGoals}>
