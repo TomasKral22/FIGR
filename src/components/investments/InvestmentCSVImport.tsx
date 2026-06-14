@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+﻿import { useRef, useState } from 'react';
 import { AlertCircle, Check, Download, FileSpreadsheet, Upload, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -62,9 +62,7 @@ const firstNonEmpty = (row: Record<string, unknown>, aliases: string[]) => {
 };
 
 const parseAmount = (value: unknown): number => {
-  if (typeof value === 'number') {
-    return value;
-  }
+  if (typeof value === 'number') return value;
 
   const input = String(value || '').trim();
   if (!input) return Number.NaN;
@@ -95,7 +93,7 @@ const parseDate = (value: unknown): string => {
   }
 
   const source = String(value || '').trim();
-  if (!source) return new Date().toISOString().split('T')[0];
+  if (!source) return new Date().toISOString().slice(0, 10);
 
   const normalized = source.replace(/\s+/g, '');
   const dateMatch = normalized.match(/^(\d{1,4})[./-](\d{1,2})[./-](\d{1,4})$/);
@@ -131,29 +129,59 @@ export const InvestmentCSVImport = ({ onImport }: InvestmentCSVImportProps) => {
     parsedFile.rows.forEach((values, index) => {
       const rowErrors: string[] = [];
       const ticker = String(
-        firstNonEmpty(values, ['ticker', 'symbol', 'instrument', 'instrumentticker', 'product', 'asset'])
+        firstNonEmpty(values, ['ticker', 'symbol', 'instrument', 'instrumentticker', 'product', 'asset', 'code'])
       )
         .trim()
         .toUpperCase();
       const name = String(
-        firstNonEmpty(values, ['name', 'nazev', 'název', 'instrumentname', 'productname', 'description']) || ticker
+        firstNonEmpty(values, ['name', 'nazev', 'název', 'instrumentname', 'productname', 'description', 'product']) ||
+          ticker
       ).trim();
       const quantity = parseAmount(
-        firstNonEmpty(values, ['quantity', 'qty', 'shares', 'units', 'amount', 'mnozstvi', 'množství'])
+        firstNonEmpty(values, [
+          'quantity',
+          'qty',
+          'shares',
+          'units',
+          'amount',
+          'mnozstvi',
+          'množství',
+          'noofshares',
+          'executedquantity',
+          'volume',
+        ])
       );
       const pricePerUnit = parseAmount(
-        firstNonEmpty(values, ['priceperunit', 'price', 'priceunit', 'fillprice', 'unitprice', 'cena'])
+        firstNonEmpty(values, [
+          'priceperunit',
+          'price',
+          'priceunit',
+          'fillprice',
+          'unitprice',
+          'cena',
+          'tradeprice',
+          'executionprice',
+          'openprice',
+        ])
       );
-      const currency = String(
-        firstNonEmpty(values, ['currency', 'currencycode', 'mena', 'měna']) || 'USD'
-      )
+      const currency = String(firstNonEmpty(values, ['currency', 'currencycode', 'mena', 'měna']) || 'USD')
         .trim()
         .toUpperCase();
-      const sector = String(firstNonEmpty(values, ['sector', 'sektor', 'group', 'assetgroup']) || '').trim() || undefined;
-      const exDividendDate = String(
-        firstNonEmpty(values, ['exdividenddate', 'exdividend', 'exdividenddateutc', 'exdividenddatum', 'datumexdividendy']) || ''
-      ).trim() || undefined;
-      const payDate = String(firstNonEmpty(values, ['paydate', 'dividendpaydate', 'paymentdate', 'datumvyplaty']) || '').trim() || undefined;
+      const sector =
+        String(firstNonEmpty(values, ['sector', 'sektor', 'group', 'assetgroup']) || '').trim() || undefined;
+      const exDividendDate =
+        String(
+          firstNonEmpty(values, [
+            'exdividenddate',
+            'exdividend',
+            'exdividenddateutc',
+            'exdividenddatum',
+            'datumexdividendy',
+          ]) || ''
+        ).trim() || undefined;
+      const payDate =
+        String(firstNonEmpty(values, ['paydate', 'dividendpaydate', 'paymentdate', 'datumvyplaty']) || '').trim() ||
+        undefined;
       const expectedDividendAmountRaw = firstNonEmpty(
         values,
         ['expecteddividendamount', 'expectedamount', 'dividendamount', 'grossdividend', 'ocekavanadividenda']
@@ -162,7 +190,16 @@ export const InvestmentCSVImport = ({ onImport }: InvestmentCSVImportProps) => {
         expectedDividendAmountRaw !== '' ? parseAmount(expectedDividendAmountRaw) : undefined;
 
       const transactionDate = parseDate(
-        firstNonEmpty(values, ['transactiondate', 'date', 'datum', 'executiondate', 'tradetime', 'time'])
+        firstNonEmpty(values, [
+          'transactiondate',
+          'date',
+          'datum',
+          'executiondate',
+          'tradetime',
+          'time',
+          'tradedate',
+          'opentime',
+        ])
       );
 
       let transactionType: InvestmentTransactionType = 'buy';
@@ -175,10 +212,7 @@ export const InvestmentCSVImport = ({ onImport }: InvestmentCSVImportProps) => {
         transactionTypeValue.includes('vyber')
       ) {
         transactionType = 'sell';
-      } else if (
-        transactionTypeValue.includes('dividend') ||
-        transactionTypeValue.includes('dividenda')
-      ) {
+      } else if (transactionTypeValue.includes('dividend') || transactionTypeValue.includes('dividenda')) {
         transactionType = 'dividend';
       }
 
@@ -196,7 +230,7 @@ export const InvestmentCSVImport = ({ onImport }: InvestmentCSVImportProps) => {
       else if (assetTypeValue.includes('other') || assetTypeValue.includes('ostat')) assetType = 'other';
       else if (assetTypeValue.includes('stock') || assetTypeValue.includes('akci')) assetType = 'stock';
 
-      let provider: InvestmentProvider = defaultProvider;
+      let provider: InvestmentProvider = parsedFile.detectedProfile.provider || defaultProvider;
       const providerValue = normalizeText(
         String(firstNonEmpty(values, ['provider', 'platform', 'broker', 'brokername', 'poskytovatel']) || '')
       );
@@ -204,7 +238,14 @@ export const InvestmentCSVImport = ({ onImport }: InvestmentCSVImportProps) => {
       else if (providerValue.includes('fingood')) provider = 'fingood';
       else if (providerValue.includes('edward')) provider = 'edward';
       else if (providerValue.includes('conseq')) provider = 'conseq';
-      else if (providerValue.includes('trading212') || providerValue.includes('interactivebrokers') || providerValue.includes('ibkr') || providerValue.includes('xtb') || providerValue.includes('degiro') || providerValue.includes('broker')) provider = 'broker';
+      else if (
+        providerValue.includes('trading212') ||
+        providerValue.includes('interactivebrokers') ||
+        providerValue.includes('ibkr') ||
+        providerValue.includes('xtb') ||
+        providerValue.includes('degiro') ||
+        providerValue.includes('broker')
+      ) provider = 'broker';
       else if (providerValue.includes('other') || providerValue.includes('jin')) provider = 'other';
 
       if (!ticker) rowErrors.push('Chybí ticker');
@@ -287,8 +328,8 @@ export const InvestmentCSVImport = ({ onImport }: InvestmentCSVImportProps) => {
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            Můžeš importovat CSV i XLSX. FIGR umí svou šablonu i běžné broker exporty. Parser teď
-            toleruje rozdílné názvy sloupců, formáty datumu i částky s mezerami.
+            Můžeš importovat CSV i XLSX. FIGR umí vlastní šablonu i běžné broker exporty. Parser toleruje různé
+            názvy sloupců, datumy, částky s měnami a nově zkouší rozpoznat i konkrétního brokera.
           </AlertDescription>
         </Alert>
         <Button variant="outline" className="w-full lg:w-auto" onClick={() => void exportInvestmentImportTemplate()}>
@@ -338,8 +379,17 @@ export const InvestmentCSVImport = ({ onImport }: InvestmentCSVImportProps) => {
 
       {sourceInfo ? (
         <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
-          Zdroj: <span className="font-medium text-foreground">{sourceInfo.sourceLabel}</span> · Režim:{' '}
-          {sourceInfo.sourceKind === 'manual_template' ? 'šablona FIGR' : 'export brokera'}
+          <div>
+            Zdroj: <span className="font-medium text-foreground">{sourceInfo.sourceLabel}</span> · Režim:{' '}
+            {sourceInfo.sourceKind === 'manual_template' ? 'šablona FIGR' : 'export brokera'}
+          </div>
+          <div className="mt-1">
+            Rozpoznaný profil: <span className="font-medium text-foreground">{sourceInfo.detectedProfile.name}</span> ·
+            shoda {Math.round(sourceInfo.detectedProfile.confidence * 100)} %
+          </div>
+          {sourceInfo.detectedProfile.reasons.length > 0 ? (
+            <div className="mt-1 text-xs">{sourceInfo.detectedProfile.reasons.join(' · ')}</div>
+          ) : null}
         </div>
       ) : null}
 
@@ -364,9 +414,7 @@ export const InvestmentCSVImport = ({ onImport }: InvestmentCSVImportProps) => {
           <CardContent className="space-y-4">
             <div className="flex flex-wrap gap-3 text-sm">
               <span className="rounded-full bg-success/10 px-3 py-1 text-success">{validCount} platných</span>
-              <span className="rounded-full bg-destructive/10 px-3 py-1 text-destructive">
-                {invalidCount} neplatných
-              </span>
+              <span className="rounded-full bg-destructive/10 px-3 py-1 text-destructive">{invalidCount} neplatných</span>
             </div>
 
             <div className="max-h-96 overflow-auto">
@@ -388,11 +436,7 @@ export const InvestmentCSVImport = ({ onImport }: InvestmentCSVImportProps) => {
                   {rows.slice(0, 50).map((row, index) => (
                     <TableRow key={`${row.ticker}-${index}`} className={!row.valid ? 'bg-destructive/10' : ''}>
                       <TableCell>
-                        {row.valid ? (
-                          <Check className="h-4 w-4 text-success" />
-                        ) : (
-                          <X className="h-4 w-4 text-destructive" />
-                        )}
+                        {row.valid ? <Check className="h-4 w-4 text-success" /> : <X className="h-4 w-4 text-destructive" />}
                       </TableCell>
                       <TableCell>{row.transaction_date}</TableCell>
                       <TableCell className="font-medium">{row.ticker}</TableCell>
@@ -419,11 +463,9 @@ export const InvestmentCSVImport = ({ onImport }: InvestmentCSVImportProps) => {
       {rows.length === 0 && (
         <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 p-6 text-center text-sm text-muted-foreground">
           <FileSpreadsheet className="mx-auto mb-3 h-6 w-6" />
-          Stáhni si šablonu nebo export z brokera, zkontroluj nákupy, prodeje a dividendy a potom
-          soubor nahraj sem.
+          Stáhni si šablonu nebo export z brokera, zkontroluj nákupy, prodeje a dividendy a potom soubor nahraj sem.
         </div>
       )}
     </div>
   );
 };
-

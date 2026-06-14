@@ -1,6 +1,7 @@
-import ExcelJS from 'exceljs';
+ï»¿import ExcelJS from 'exceljs';
 import * as XLSX from 'xlsx';
 import { InvestmentAssetType, InvestmentProvider, InvestmentTransactionType } from '@/types/investment';
+import { detectBrokerProfile, DetectedBrokerProfile } from '@/utils/investmentBrokerDetection';
 
 export interface InvestmentImportRow {
   ticker: string;
@@ -23,6 +24,7 @@ export interface ParsedInvestmentImportFile {
   fileName: string;
   sourceLabel: string;
   sourceKind: 'manual_template' | 'broker_export';
+  detectedProfile: DetectedBrokerProfile;
 }
 
 const assetTypes: InvestmentAssetType[] = [
@@ -64,24 +66,24 @@ const downloadXlsx = (buffer: ArrayBuffer, filename: string) => {
 export const exportInvestmentImportTemplate = async (filename = 'figr-investice-sablona.xlsx') => {
   const workbook = new ExcelJS.Workbook();
   const importSheet = workbook.addWorksheet('Import');
-  const helpSheet = workbook.addWorksheet('NÃ¡povÄ›da');
-  const listSheet = workbook.addWorksheet('ÄŒÃ­selnÃ­ky');
+  const helpSheet = workbook.addWorksheet('Napoveda');
+  const listSheet = workbook.addWorksheet('Ciselniky');
   listSheet.state = 'veryHidden';
 
   const headers = [
     'Ticker',
-    'Název',
+    'NÃ¡zev',
     'Typ aktiva',
     'Poskytovatel',
     'Typ transakce',
-    'Množství',
+    'MnoÅ¾stvÃ­',
     'Cena za jednotku',
-    'Mìna',
+    'MÄ›na',
     'Datum transakce',
     'Sektor',
     'Ex-dividend datum',
-    'Datum výplaty',
-    'Oèekávaná dividenda',
+    'Datum vÃ½platy',
+    'OÄekÃ¡vanÃ¡ dividenda',
   ];
 
   importSheet.addRow(headers);
@@ -125,40 +127,40 @@ export const exportInvestmentImportTemplate = async (filename = 'figr-investice-
     importSheet.getCell(`C${row}`).dataValidation = {
       type: 'list',
       allowBlank: false,
-      formulae: ['=ÄŒÃ­selnÃ­ky!$A$2:$A$12'],
+      formulae: ['=Ciselniky!$A$2:$A$12'],
     };
     importSheet.getCell(`D${row}`).dataValidation = {
       type: 'list',
       allowBlank: false,
-      formulae: ['=ÄŒÃ­selnÃ­ky!$B$2:$B$7'],
+      formulae: ['=Ciselniky!$B$2:$B$7'],
     };
     importSheet.getCell(`E${row}`).dataValidation = {
       type: 'list',
       allowBlank: false,
-      formulae: ['=ÄŒÃ­selnÃ­ky!$C$2:$C$4'],
+      formulae: ['=Ciselniky!$C$2:$C$4'],
     };
     importSheet.getCell(`H${row}`).dataValidation = {
       type: 'list',
       allowBlank: false,
-      formulae: ['=ÄŒÃ­selnÃ­ky!$D$2:$D$6'],
+      formulae: ['=Ciselniky!$D$2:$D$6'],
     };
   }
 
   [
-    ['Sloupec', 'Popis', 'Pøíklad'],
-    ['Ticker', 'Ticker nebo interní oznaèení aktiva', 'VWCE, AAPL, INVESTOWN-BYT-1'],
-    ['Název', 'Název aktiva', 'Vanguard FTSE All-World'],
+    ['Sloupec', 'Popis', 'PÅ™Ã­klad'],
+    ['Ticker', 'Ticker nebo internÃ­ oznaÄenÃ­ aktiva', 'VWCE, AAPL, INVESTOWN-BYT-1'],
+    ['NÃ¡zev', 'NÃ¡zev aktiva', 'Vanguard FTSE All-World'],
     ['Typ aktiva', 'Typ aktiva', 'stock | etf | crypto | bond | commodity | p2p | private_credit | real_estate | managed_portfolio | fund | other'],
     ['Poskytovatel', 'Poskytovatel investice', 'broker | investown | fingood | edward | conseq | other'],
     ['Typ transakce', 'Typ transakce', 'buy | sell | dividend'],
-    ['Množství', 'Množství kusù / podílù / jednotek', 'u dividend poèet kusù pro odhad'],
+    ['MnoÅ¾stvÃ­', 'MnoÅ¾stvÃ­ kusÅ¯ / podÃ­lÅ¯ / jednotek', 'u dividend poÄet kusÅ¯ pro odhad'],
     ['Cena za jednotku', 'Cena za jednotku nebo dividenda na kus', '121.5 nebo 0.26'],
-    ['Mìna', 'Mìna transakce', 'CZK | USD | EUR | GBP | CHF'],
+    ['MÄ›na', 'MÄ›na transakce', 'CZK | USD | EUR | GBP | CHF'],
     ['Datum transakce', 'Datum transakce', 'YYYY-MM-DD'],
-    ['Sektor', 'Volitelný sektor nebo skupina', 'Technologie, Reality, Soukromý úvìr'],
+    ['Sektor', 'VolitelnÃ½ sektor nebo skupina', 'Technologie, Reality, SoukromÃ½ ÃºvÄ›r'],
     ['Ex-dividend datum', 'Datum ex-dividendy', 'YYYY-MM-DD'],
-    ['Datum výplaty', 'Datum výplaty dividendy', 'YYYY-MM-DD'],
-    ['Oèekávaná dividenda', 'Pøedpokládaná výplata dividendy', 'Volitelné pøepsání dopoètu'],
+    ['Datum vÃ½platy', 'Datum vÃ½platy dividendy', 'YYYY-MM-DD'],
+    ['OÄekÃ¡vanÃ¡ dividenda', 'PÅ™edpoklÃ¡danÃ¡ vÃ½plata dividendy', 'volitelnÃ© pÅ™epsÃ¡nÃ­ dopoÄtu'],
   ].forEach((row) => helpSheet.addRow(row));
   helpSheet.getRow(1).font = { bold: true };
 
@@ -187,21 +189,6 @@ const parseCsvLine = (line: string) => {
 const normalizeObjectKeys = (row: Record<string, unknown>) =>
   Object.fromEntries(Object.entries(row).map(([key, value]) => [normalizeKey(key), value]));
 
-const inferSourceKind = (fileName: string, firstRowKeys: string[]): 'manual_template' | 'broker_export' => {
-  const normalizedName = fileName.toLowerCase();
-  if (normalizedName.includes('figr') || normalizedName.includes('sablona') || normalizedName.includes('Å¡ablona')) {
-    return 'manual_template';
-  }
-
-  const isTemplateLike =
-    firstRowKeys.includes('assettype') ||
-    firstRowKeys.includes('transactiontype') ||
-    firstRowKeys.includes('priceperunit') ||
-    firstRowKeys.includes('expecteddividendamount');
-
-  return isTemplateLike ? 'manual_template' : 'broker_export';
-};
-
 export const readInvestmentImportFile = async (file: File): Promise<ParsedInvestmentImportFile> => {
   const extension = file.name.split('.').pop()?.toLowerCase();
   let rows: Record<string, unknown>[] = [];
@@ -225,12 +212,13 @@ export const readInvestmentImportFile = async (file: File): Promise<ParsedInvest
   }
 
   const firstRowKeys = rows[0] ? Object.keys(rows[0]) : [];
-  const sourceKind = inferSourceKind(file.name, firstRowKeys);
+  const detectedProfile = detectBrokerProfile(file.name, firstRowKeys);
 
   return {
     rows,
     fileName: file.name,
     sourceLabel: file.name.replace(/\.[^.]+$/, ''),
-    sourceKind,
+    sourceKind: detectedProfile.sourceKind,
+    detectedProfile,
   };
 };

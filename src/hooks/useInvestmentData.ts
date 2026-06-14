@@ -24,63 +24,21 @@ import { calculatePortfolioSummary } from '@/utils/investmentPortfolio';
 import { buildInvestmentValidationIssues } from '@/utils/investmentDiagnostics';
 import { appStorage } from '@/lib/appStorage';
 import { useAuth } from '@/contexts/AuthContext';
-
-const STORAGE_KEYS = {
-  ASSETS: 'investment_assets',
-  TRANSACTIONS: 'investment_transactions',
-  PRICES: 'investment_prices',
-  EXCHANGE_RATES: 'investment_exchange_rates',
-  IMPORT_BATCHES: 'investment_import_batches',
-  SETTINGS: 'investment_settings',
-  CONNECTORS: 'investment_broker_connectors',
-  CREDIT_INVESTMENTS: 'investment_credit_investments',
-  CREDIT_REPAYMENTS: 'investment_credit_repayments',
-  TRACKED_INVESTMENTS: 'investment_tracked_investments',
-  AUDIT_LOG: 'investment_audit_log',
-  META: 'investment_meta',
-};
-
-const FINANCE_AUDIT_KEYS = {
-  TRANSACTIONS: 'finance_transactions',
-  MONTH_CLOSURES: 'finance_month_closures',
-};
+import {
+  buildInvestmentSyncStatus,
+  DEFAULT_INVESTMENT_CONNECTORS,
+  DEFAULT_INVESTMENT_META,
+  FINANCE_AUDIT_STORAGE_KEYS,
+  INVESTMENT_STORAGE_KEYS,
+  loadInvestmentFinanceAuditState,
+  loadInvestmentState,
+  saveInvestmentEntries,
+} from '@/repositories/investmentRepository';
 
 const createTimestamp = () => new Date().toISOString();
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const getErrorMessage = (error: unknown) => (error instanceof Error ? error.message : undefined);
 const MAX_AUDIT_ITEMS = 300;
-
-const DEFAULT_CONNECTORS: BrokerConnector[] = [
-  {
-    id: 'connector-trading212',
-    broker_key: 'trading212',
-    name: 'Trading 212 API',
-    source_kind: 'api_sync',
-    status: 'planned',
-    description: 'Pripraveny konektor pro read-only synchronizaci uctu a historie z Trading 212 Public API.',
-    auth_type: 'api_key',
-    last_sync_at: null,
-    config_hint: 'Bude vyzadovat API klic vygenerovany primo v uctu Trading 212.',
-  },
-  {
-    id: 'connector-ibkr-flex',
-    broker_key: 'ibkr_flex',
-    name: 'IBKR Flex Web Service',
-    source_kind: 'api_sync',
-    status: 'planned',
-    description: 'Doporuceny oficialni konektor pro activity reporty a historii obchodu z Interactive Brokers.',
-    auth_type: 'flex_token',
-    last_sync_at: null,
-    config_hint: 'Bude vyzadovat Flex Query ID a Flex token z Client Portalu.',
-  },
-];
-
-const DEFAULT_META: InvestmentDataMeta = {
-  last_saved_at: null,
-  last_backup_at: null,
-  last_price_sync_at: null,
-  hydrated_at: null,
-};
 
 const isDuplicateInvestmentTransaction = (
   left: InvestmentTransaction,
@@ -131,7 +89,7 @@ export const useInvestmentData = () => {
   const [creditRepayments, setCreditRepayments] = useState<CreditInvestmentRepayment[]>([]);
   const [trackedInvestments, setTrackedInvestments] = useState<TrackedInvestment[]>([]);
   const [auditLog, setAuditLog] = useState<InvestmentAuditEntry[]>([]);
-  const [meta, setMeta] = useState<InvestmentDataMeta>(DEFAULT_META);
+  const [meta, setMeta] = useState<InvestmentDataMeta>(DEFAULT_INVESTMENT_META);
   const [dbPath, setDbPath] = useState<string | null>(null);
   const [validationIssues, setValidationIssues] = useState<InvestmentValidationIssue[]>([]);
   const [portfolioSummary, setPortfolioSummary] = useState<PortfolioSummary | null>(null);
@@ -167,72 +125,20 @@ export const useInvestmentData = () => {
     setLoading(true);
     setIsHydrated(false);
     try {
-      const loaded = await appStorage.getMany(Object.values(STORAGE_KEYS));
-      const now = createTimestamp();
-      const desktopDbPath = await appStorage.getDbPath();
-
-      const parse = <T,>(key: string, fallback: T): T => {
-        const raw = loaded[key];
-        return raw ? (JSON.parse(raw) as T) : fallback;
-      };
-
-      setAssets(
-        parse<InvestmentAsset[]>(STORAGE_KEYS.ASSETS, [])
-          .map((asset) => ({
-            ...asset,
-            provider: asset.provider || 'broker',
-          }))
-          .sort((a, b) => a.ticker.localeCompare(b.ticker))
-      );
-      setTransactions(
-        parse<InvestmentTransaction[]>(STORAGE_KEYS.TRANSACTIONS, []).sort((a, b) =>
-          b.transaction_date.localeCompare(a.transaction_date)
-        )
-      );
-      setPrices(
-        parse<AssetPrice[]>(STORAGE_KEYS.PRICES, []).sort((a, b) => b.price_date.localeCompare(a.price_date))
-      );
-      setExchangeRates(
-        parse<ExchangeRate[]>(STORAGE_KEYS.EXCHANGE_RATES, []).sort((a, b) => b.rate_date.localeCompare(a.rate_date))
-      );
-      setImportBatches(
-        parse<ImportBatch[]>(STORAGE_KEYS.IMPORT_BATCHES, []).sort((a, b) =>
-          b.imported_at.localeCompare(a.imported_at)
-        )
-      );
-      setSettings(
-        parse<PortfolioSettings | null>(STORAGE_KEYS.SETTINGS, null) || {
-          id: crypto.randomUUID(),
-          reporting_currency: 'CZK',
-          created_at: now,
-          updated_at: now,
-        }
-      );
-      setConnectors(parse<BrokerConnector[]>(STORAGE_KEYS.CONNECTORS, DEFAULT_CONNECTORS));
-      setCreditInvestments(
-        parse<CreditInvestment[]>(STORAGE_KEYS.CREDIT_INVESTMENTS, []).sort((a, b) => a.name.localeCompare(b.name))
-      );
-      setCreditRepayments(
-        parse<CreditInvestmentRepayment[]>(STORAGE_KEYS.CREDIT_REPAYMENTS, []).sort((a, b) =>
-          b.payment_date.localeCompare(a.payment_date)
-        )
-      );
-      setTrackedInvestments(
-        parse<TrackedInvestment[]>(STORAGE_KEYS.TRACKED_INVESTMENTS, []).sort((a, b) =>
-          a.ticker.localeCompare(b.ticker)
-        )
-      );
-      setAuditLog(
-        parse<InvestmentAuditEntry[]>(STORAGE_KEYS.AUDIT_LOG, []).sort((a, b) =>
-          b.created_at.localeCompare(a.created_at)
-        )
-      );
-      setMeta({
-        ...DEFAULT_META,
-        ...parse<InvestmentDataMeta>(STORAGE_KEYS.META, DEFAULT_META),
-        hydrated_at: now,
-      });
-      setDbPath(desktopDbPath);
+      const state = await loadInvestmentState();
+      setAssets(state.assets);
+      setTransactions(state.transactions);
+      setPrices(state.prices);
+      setExchangeRates(state.exchangeRates);
+      setImportBatches(state.importBatches);
+      setSettings(state.settings);
+      setConnectors(state.connectors);
+      setCreditInvestments(state.creditInvestments);
+      setCreditRepayments(state.creditRepayments);
+      setTrackedInvestments(state.trackedInvestments);
+      setAuditLog(state.auditLog);
+      setMeta(state.meta);
+      setDbPath(state.dbPath);
       setIsHydrated(true);
     } catch (error: unknown) {
       console.error('Error fetching investment data:', error);
@@ -274,13 +180,7 @@ export const useInvestmentData = () => {
   }, [assets, transactions, prices, exchangeRates, creditInvestments, trackedInvestments, settings, toast]);
 
   const refreshValidationIssues = useCallback(async () => {
-    const financeLoaded = await appStorage.getMany(Object.values(FINANCE_AUDIT_KEYS));
-    const financeTransactions = financeLoaded[FINANCE_AUDIT_KEYS.TRANSACTIONS]
-      ? (JSON.parse(financeLoaded[FINANCE_AUDIT_KEYS.TRANSACTIONS] as string) as Array<{ month: string }>)
-      : [];
-    const monthClosures = financeLoaded[FINANCE_AUDIT_KEYS.MONTH_CLOSURES]
-      ? (JSON.parse(financeLoaded[FINANCE_AUDIT_KEYS.MONTH_CLOSURES] as string) as Array<{ month: string }>)
-      : [];
+    const { financeTransactions, monthClosures } = await loadInvestmentFinanceAuditState();
 
     const latestFinanceMonth =
       financeTransactions.length > 0
@@ -1065,7 +965,7 @@ export const useInvestmentData = () => {
 
   const exportAccountBackup = async () => {
     const exportedAt = createTimestamp();
-    const financeLoaded = await appStorage.getMany(Object.values(FINANCE_AUDIT_KEYS));
+    const financeLoaded = await appStorage.getMany(Object.values(FINANCE_AUDIT_STORAGE_KEYS));
     const backup = {
       exportedAt,
       user: {
@@ -1090,11 +990,11 @@ export const useInvestmentData = () => {
         },
       },
       finance: {
-        transactions: financeLoaded[FINANCE_AUDIT_KEYS.TRANSACTIONS]
-          ? JSON.parse(financeLoaded[FINANCE_AUDIT_KEYS.TRANSACTIONS] as string)
+        transactions: financeLoaded[FINANCE_AUDIT_STORAGE_KEYS.TRANSACTIONS]
+          ? JSON.parse(financeLoaded[FINANCE_AUDIT_STORAGE_KEYS.TRANSACTIONS] as string)
           : [],
-        monthClosures: financeLoaded[FINANCE_AUDIT_KEYS.MONTH_CLOSURES]
-          ? JSON.parse(financeLoaded[FINANCE_AUDIT_KEYS.MONTH_CLOSURES] as string)
+        monthClosures: financeLoaded[FINANCE_AUDIT_STORAGE_KEYS.MONTH_CLOSURES]
+          ? JSON.parse(financeLoaded[FINANCE_AUDIT_STORAGE_KEYS.MONTH_CLOSURES] as string)
           : [],
       },
     };
@@ -1113,21 +1013,8 @@ export const useInvestmentData = () => {
     });
   };
 
-  const persistEntries = useCallback(async (entries: Record<string, string>) => {
-    await appStorage.setMany(entries);
-  }, []);
-
   const syncStatus = useMemo<InvestmentSyncStatus>(
-    () => ({
-      mode: session?.user ? 'cloud' : 'local',
-      userEmail: session?.user.email ?? null,
-      userId: session?.user.id ?? null,
-      hydratedAt: meta.hydrated_at,
-      lastSavedAt: meta.last_saved_at,
-      lastBackupAt: meta.last_backup_at,
-      lastPriceSyncAt: meta.last_price_sync_at,
-      dbPath,
-    }),
+    () => buildInvestmentSyncStatus(session, meta, dbPath),
     [dbPath, meta, session?.user]
   );
 
@@ -1137,63 +1024,63 @@ export const useInvestmentData = () => {
 
   useEffect(() => {
     if (!isHydrated) return;
-    void persistEntries({ [STORAGE_KEYS.ASSETS]: JSON.stringify(assets) });
-  }, [assets, isHydrated, persistEntries]);
+    void saveInvestmentEntries({ [INVESTMENT_STORAGE_KEYS.ASSETS]: JSON.stringify(assets) });
+  }, [assets, isHydrated]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    void persistEntries({ [STORAGE_KEYS.TRANSACTIONS]: JSON.stringify(transactions) });
-  }, [transactions, isHydrated, persistEntries]);
+    void saveInvestmentEntries({ [INVESTMENT_STORAGE_KEYS.TRANSACTIONS]: JSON.stringify(transactions) });
+  }, [transactions, isHydrated]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    void persistEntries({ [STORAGE_KEYS.PRICES]: JSON.stringify(prices) });
-  }, [prices, isHydrated, persistEntries]);
+    void saveInvestmentEntries({ [INVESTMENT_STORAGE_KEYS.PRICES]: JSON.stringify(prices) });
+  }, [prices, isHydrated]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    void persistEntries({ [STORAGE_KEYS.EXCHANGE_RATES]: JSON.stringify(exchangeRates) });
-  }, [exchangeRates, isHydrated, persistEntries]);
+    void saveInvestmentEntries({ [INVESTMENT_STORAGE_KEYS.EXCHANGE_RATES]: JSON.stringify(exchangeRates) });
+  }, [exchangeRates, isHydrated]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    void persistEntries({ [STORAGE_KEYS.IMPORT_BATCHES]: JSON.stringify(importBatches) });
-  }, [importBatches, isHydrated, persistEntries]);
+    void saveInvestmentEntries({ [INVESTMENT_STORAGE_KEYS.IMPORT_BATCHES]: JSON.stringify(importBatches) });
+  }, [importBatches, isHydrated]);
 
   useEffect(() => {
     if (!isHydrated || !settings) return;
-    void persistEntries({ [STORAGE_KEYS.SETTINGS]: JSON.stringify(settings) });
-  }, [settings, isHydrated, persistEntries]);
+    void saveInvestmentEntries({ [INVESTMENT_STORAGE_KEYS.SETTINGS]: JSON.stringify(settings) });
+  }, [settings, isHydrated]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    void persistEntries({ [STORAGE_KEYS.CONNECTORS]: JSON.stringify(connectors) });
-  }, [connectors, isHydrated, persistEntries]);
+    void saveInvestmentEntries({ [INVESTMENT_STORAGE_KEYS.CONNECTORS]: JSON.stringify(connectors) });
+  }, [connectors, isHydrated]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    void persistEntries({ [STORAGE_KEYS.CREDIT_INVESTMENTS]: JSON.stringify(creditInvestments) });
-  }, [creditInvestments, isHydrated, persistEntries]);
+    void saveInvestmentEntries({ [INVESTMENT_STORAGE_KEYS.CREDIT_INVESTMENTS]: JSON.stringify(creditInvestments) });
+  }, [creditInvestments, isHydrated]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    void persistEntries({ [STORAGE_KEYS.CREDIT_REPAYMENTS]: JSON.stringify(creditRepayments) });
-  }, [creditRepayments, isHydrated, persistEntries]);
+    void saveInvestmentEntries({ [INVESTMENT_STORAGE_KEYS.CREDIT_REPAYMENTS]: JSON.stringify(creditRepayments) });
+  }, [creditRepayments, isHydrated]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    void persistEntries({ [STORAGE_KEYS.TRACKED_INVESTMENTS]: JSON.stringify(trackedInvestments) });
-  }, [trackedInvestments, isHydrated, persistEntries]);
+    void saveInvestmentEntries({ [INVESTMENT_STORAGE_KEYS.TRACKED_INVESTMENTS]: JSON.stringify(trackedInvestments) });
+  }, [trackedInvestments, isHydrated]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    void persistEntries({ [STORAGE_KEYS.AUDIT_LOG]: JSON.stringify(auditLog) });
-  }, [auditLog, isHydrated, persistEntries]);
+    void saveInvestmentEntries({ [INVESTMENT_STORAGE_KEYS.AUDIT_LOG]: JSON.stringify(auditLog) });
+  }, [auditLog, isHydrated]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    void persistEntries({ [STORAGE_KEYS.META]: JSON.stringify(meta) });
-  }, [meta, isHydrated, persistEntries]);
+    void saveInvestmentEntries({ [INVESTMENT_STORAGE_KEYS.META]: JSON.stringify(meta) });
+  }, [meta, isHydrated]);
 
   useEffect(() => {
     if (!isHydrated) return;

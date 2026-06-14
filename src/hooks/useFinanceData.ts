@@ -25,45 +25,13 @@ import {
   mergeAutoCategorizationRules,
   mergeSubcategories,
 } from '@/utils/categoryAutomation';
-
-const STORAGE_KEYS = {
-  TRANSACTIONS: 'finance_transactions',
-  BANK_ACCOUNTS: 'finance_bank_accounts',
-  BROKER_ACCOUNTS: 'finance_broker_accounts',
-  BUDGET: 'finance_budget',
-  PORTFOLIO: 'finance_portfolio',
-  THEME: 'finance_theme',
-  LAST_TRANSACTION: 'finance_last_transaction',
-  RECURRING_TRANSACTIONS: 'finance_recurring_transactions',
-  FOLDERS: 'finance_folders',
-  GOALS: 'finance_goals',
-  AUDIT_LOG: 'finance_audit_log',
-  SNAPSHOTS: 'finance_snapshots',
-  ACCOUNT_SNAPSHOTS: 'finance_account_snapshots',
-  IMPORTED_ACCOUNT_BALANCES: 'finance_imported_account_balances',
-  VISUAL_THEME: 'finance_visual_theme',
-  MONTH_CLOSURES: 'finance_month_closures',
-  SUBCATEGORIES: 'finance_subcategories',
-  AUTO_CATEGORIZATION_RULES: 'finance_auto_categorization_rules',
-  BUDGET_LIMITS: 'finance_budget_limits',
-  FEATURE_TOGGLES: 'finance_feature_toggles',
-  INVESTMENT_EXCHANGE_RATES: 'investment_exchange_rates',
-};
-const DEFAULT_BUDGET: BudgetAllocation = {
-  necessities: 50,
-  investments: 20,
-  savings: 20,
-  whims: 10,
-};
-const DEFAULT_PORTFOLIO_SETTINGS: PortfolioSettings = {
-  annualReturn: 7,
-  currentAge: 30,
-};
-
-const normalizeAccount = (account: BankAccount): BankAccount => ({
-  ...account,
-  currency: normalizeCurrencyCode(account.currency, 'CZK'),
-});
+import {
+  DEFAULT_FINANCE_BUDGET,
+  DEFAULT_FINANCE_PORTFOLIO_SETTINGS,
+  loadFinanceExchangeRates,
+  loadFinanceState,
+  saveFinanceState,
+} from '@/repositories/financeRepository';
 
 const createTimestamp = () => new Date().toISOString();
 const monthStamp = (isoDate: string) => isoDate.slice(0, 7);
@@ -133,10 +101,10 @@ export const useFinanceData = () => {
     ...DEFAULT_FINANCE_FEATURE_TOGGLES,
   });
   const [budgetAllocation, setBudgetAllocation] = useState<BudgetAllocation>({
-    ...DEFAULT_BUDGET,
+    ...DEFAULT_FINANCE_BUDGET,
   });
   const [portfolioSettings, setPortfolioSettings] = useState<PortfolioSettings>({
-    ...DEFAULT_PORTFOLIO_SETTINGS,
+    ...DEFAULT_FINANCE_PORTFOLIO_SETTINGS,
   });
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [visualTheme, setVisualTheme] = useState('dark-blue');
@@ -185,56 +153,31 @@ export const useFinanceData = () => {
   useEffect(() => {
     const hydrate = async () => {
       setIsHydrated(false);
-      const loaded = await appStorage.getMany(Object.values(STORAGE_KEYS));
+      const state = await loadFinanceState();
 
-      const parse = <T,>(key: string, fallback: T): T => {
-        const value = loaded[key];
-        return value ? (JSON.parse(value) as T) : fallback;
-      };
-
-      setTransactions(parse<Transaction[]>(STORAGE_KEYS.TRANSACTIONS, []));
-      setBankAccounts(parse<BankAccount[]>(STORAGE_KEYS.BANK_ACCOUNTS, []).map(normalizeAccount));
-      setBrokerAccounts(parse<BankAccount[]>(STORAGE_KEYS.BROKER_ACCOUNTS, []).map(normalizeAccount));
-      setBudgetAllocation(parse<BudgetAllocation>(STORAGE_KEYS.BUDGET, DEFAULT_BUDGET));
-      setPortfolioSettings(parse<PortfolioSettings>(STORAGE_KEYS.PORTFOLIO, DEFAULT_PORTFOLIO_SETTINGS));
-      setRecurringTransactions(parse<RecurringTransaction[]>(STORAGE_KEYS.RECURRING_TRANSACTIONS, []));
-      setFolders(parse<string[]>(STORAGE_KEYS.FOLDERS, []));
-      setGoals(parse<AccountGoal[]>(STORAGE_KEYS.GOALS, []));
-      setAuditLog(parse<AuditLogEntry[]>(STORAGE_KEYS.AUDIT_LOG, []));
-      setWealthSnapshots(parse<WealthSnapshot[]>(STORAGE_KEYS.SNAPSHOTS, []));
-      setAccountSnapshots(parse<AccountMonthlySnapshot[]>(STORAGE_KEYS.ACCOUNT_SNAPSHOTS, []));
-      setImportedAccountBalances(parse<ImportedAccountMonthBalance[]>(STORAGE_KEYS.IMPORTED_ACCOUNT_BALANCES, []));
-      setMonthClosures(parse<MonthClosure[]>(STORAGE_KEYS.MONTH_CLOSURES, []));
-      setSubcategories(mergeSubcategories(parse<Subcategory[]>(STORAGE_KEYS.SUBCATEGORIES, [])));
-      setAutoCategorizationRules(
-        mergeAutoCategorizationRules(parse<AutoCategorizationRule[]>(STORAGE_KEYS.AUTO_CATEGORIZATION_RULES, []))
-      );
-      setBudgetLimits(parse<BudgetLimit[]>(STORAGE_KEYS.BUDGET_LIMITS, []));
-      setFeatureToggles({
-        ...DEFAULT_FINANCE_FEATURE_TOGGLES,
-        ...parse<FinanceFeatureToggles>(STORAGE_KEYS.FEATURE_TOGGLES, DEFAULT_FINANCE_FEATURE_TOGGLES),
-      });
-      setLastTransaction(parse<Omit<Transaction, 'id' | 'createdAt'> | null>(STORAGE_KEYS.LAST_TRANSACTION, null));
-      setExchangeRates(parse<ExchangeRateLike[]>(STORAGE_KEYS.INVESTMENT_EXCHANGE_RATES, []).sort((a, b) => b.rate_date.localeCompare(a.rate_date)));
-
-      const legacyTheme = loaded[STORAGE_KEYS.THEME] ?? localStorage.getItem(STORAGE_KEYS.THEME);
-      const rawVisualTheme =
-        loaded[STORAGE_KEYS.VISUAL_THEME] ?? localStorage.getItem(STORAGE_KEYS.VISUAL_THEME) ?? 'dark-blue';
-      const normalizeVisualTheme = (value: string) => {
-        if (['light', 'dark-blue', 'warm-orange'].includes(value)) return value;
-        if (['classic', 'studio', 'metal'].includes(value)) return 'light';
-        if (value === 'sunset') return 'warm-orange';
-        if (value === 'neon') return 'dark-blue';
-        if (legacyTheme === 'light') return 'light';
-        return 'dark-blue';
-      };
-
-      const nextVisualTheme = normalizeVisualTheme(rawVisualTheme);
-      const darkMode = nextVisualTheme !== 'light';
-      setIsDarkMode(darkMode);
-      setVisualTheme(nextVisualTheme);
-      document.documentElement.classList.toggle('dark', darkMode);
-      document.documentElement.dataset.surface = nextVisualTheme;
+      setTransactions(state.transactions);
+      setBankAccounts(state.bankAccounts);
+      setBrokerAccounts(state.brokerAccounts);
+      setBudgetAllocation(state.budgetAllocation);
+      setPortfolioSettings(state.portfolioSettings);
+      setRecurringTransactions(state.recurringTransactions);
+      setFolders(state.folders);
+      setGoals(state.goals);
+      setAuditLog(state.auditLog);
+      setWealthSnapshots(state.wealthSnapshots);
+      setAccountSnapshots(state.accountSnapshots);
+      setImportedAccountBalances(state.importedAccountBalances);
+      setMonthClosures(state.monthClosures);
+      setSubcategories(state.subcategories);
+      setAutoCategorizationRules(state.autoCategorizationRules);
+      setBudgetLimits(state.budgetLimits);
+      setFeatureToggles(state.featureToggles);
+      setLastTransaction(state.lastTransaction);
+      setExchangeRates(state.exchangeRates);
+      setIsDarkMode(state.isDarkMode);
+      setVisualTheme(state.visualTheme);
+      document.documentElement.classList.toggle('dark', state.isDarkMode);
+      document.documentElement.dataset.surface = state.visualTheme;
       setIsHydrated(true);
     };
 
@@ -243,27 +186,27 @@ export const useFinanceData = () => {
 
   useEffect(() => {
     if (!isHydrated) return;
-    void appStorage.setMany({
-      [STORAGE_KEYS.TRANSACTIONS]: JSON.stringify(transactions),
-      [STORAGE_KEYS.BANK_ACCOUNTS]: JSON.stringify(bankAccounts),
-      [STORAGE_KEYS.BROKER_ACCOUNTS]: JSON.stringify(brokerAccounts),
-      [STORAGE_KEYS.BUDGET]: JSON.stringify(budgetAllocation),
-      [STORAGE_KEYS.PORTFOLIO]: JSON.stringify(portfolioSettings),
-      [STORAGE_KEYS.RECURRING_TRANSACTIONS]: JSON.stringify(recurringTransactions),
-      [STORAGE_KEYS.FOLDERS]: JSON.stringify(folders),
-      [STORAGE_KEYS.GOALS]: JSON.stringify(goals),
-      [STORAGE_KEYS.AUDIT_LOG]: JSON.stringify(auditLog),
-      [STORAGE_KEYS.SNAPSHOTS]: JSON.stringify(wealthSnapshots),
-      [STORAGE_KEYS.ACCOUNT_SNAPSHOTS]: JSON.stringify(accountSnapshots),
-      [STORAGE_KEYS.IMPORTED_ACCOUNT_BALANCES]: JSON.stringify(importedAccountBalances),
-      [STORAGE_KEYS.MONTH_CLOSURES]: JSON.stringify(monthClosures),
-      [STORAGE_KEYS.SUBCATEGORIES]: JSON.stringify(subcategories),
-      [STORAGE_KEYS.AUTO_CATEGORIZATION_RULES]: JSON.stringify(autoCategorizationRules),
-      [STORAGE_KEYS.BUDGET_LIMITS]: JSON.stringify(budgetLimits),
-      [STORAGE_KEYS.FEATURE_TOGGLES]: JSON.stringify(featureToggles),
-      [STORAGE_KEYS.THEME]: isDarkMode ? 'dark' : 'light',
-      [STORAGE_KEYS.VISUAL_THEME]: visualTheme,
-      [STORAGE_KEYS.LAST_TRANSACTION]: JSON.stringify(lastTransaction),
+    void saveFinanceState({
+      transactions,
+      bankAccounts,
+      brokerAccounts,
+      budgetAllocation,
+      portfolioSettings,
+      recurringTransactions,
+      folders,
+      goals,
+      auditLog,
+      wealthSnapshots,
+      accountSnapshots,
+      importedAccountBalances,
+      monthClosures,
+      subcategories,
+      autoCategorizationRules,
+      budgetLimits,
+      featureToggles,
+      isDarkMode,
+      visualTheme,
+      lastTransaction,
     });
   }, [
     transactions,
@@ -295,12 +238,10 @@ export const useFinanceData = () => {
     let cancelled = false;
 
     const loadExchangeRates = async () => {
-      const loaded = await appStorage.getMany([STORAGE_KEYS.INVESTMENT_EXCHANGE_RATES]);
       if (cancelled) return;
-      const parsed = loaded[STORAGE_KEYS.INVESTMENT_EXCHANGE_RATES]
-        ? (JSON.parse(loaded[STORAGE_KEYS.INVESTMENT_EXCHANGE_RATES]!) as ExchangeRateLike[])
-        : [];
-      setExchangeRates(parsed.sort((a, b) => b.rate_date.localeCompare(a.rate_date)));
+      const loadedRates = await loadFinanceExchangeRates();
+      if (cancelled) return;
+      setExchangeRates(loadedRates);
     };
 
     void loadExchangeRates();
