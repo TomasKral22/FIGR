@@ -1,29 +1,19 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, X } from 'lucide-react';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useToast } from '@/hooks/use-toast';
 import { Header } from '@/components/Header';
 import { Sidebar } from '@/components/Sidebar';
-import { TransactionForm } from '@/components/TransactionForm';
-import { AccountSetup } from '@/components/AccountSetup';
 import { TransactionList } from '@/components/TransactionList';
 import { YearSelector } from '@/components/YearSelector';
-import { RecurringTransactions } from '@/components/RecurringTransactions';
-import { InvestmentDashboard } from '@/components/investments';
-import { AnnualReports } from '@/components/reports/AnnualReports';
-import { BackupManager } from '@/components/BackupManager';
-import { GoalsPanel } from '@/components/GoalsPanel';
 import { GoalSavingsPanel } from '@/components/GoalSavingsPanel';
-import { AuditLogPanel } from '@/components/AuditLogPanel';
 import { WealthOverview } from '@/components/WealthOverview';
 import { BackupReminder } from '@/components/BackupReminder';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { GettingStartedPanel } from '@/components/GettingStartedPanel';
 import { QuickActionsPanel } from '@/components/QuickActionsPanel';
 import { SmartInsightsPanel } from '@/components/SmartInsightsPanel';
-import { CategoryAutomationPanel } from '@/components/CategoryAutomationPanel';
-import { SettingsPanel } from '@/components/SettingsPanel';
 import { DecisionDashboardPanel } from '@/components/DecisionDashboardPanel';
 import { MainDashboardPanels } from '@/components/MainDashboardPanels';
 import { Transaction, TransactionDraft } from '@/types/finance';
@@ -34,6 +24,36 @@ import { appStorage } from '@/lib/appStorage';
 import { useAuth } from '@/contexts/AuthContext';
 import { SidebarItemId } from '@/components/Sidebar';
 
+const TransactionForm = lazy(() =>
+  import('@/components/TransactionForm').then((module) => ({ default: module.TransactionForm }))
+);
+const AccountSetup = lazy(() =>
+  import('@/components/AccountSetup').then((module) => ({ default: module.AccountSetup }))
+);
+const RecurringTransactions = lazy(() =>
+  import('@/components/RecurringTransactions').then((module) => ({ default: module.RecurringTransactions }))
+);
+const InvestmentDashboard = lazy(() =>
+  import('@/components/investments').then((module) => ({ default: module.InvestmentDashboard }))
+);
+const AnnualReports = lazy(() =>
+  import('@/components/reports/AnnualReports').then((module) => ({ default: module.AnnualReports }))
+);
+const BackupManager = lazy(() =>
+  import('@/components/BackupManager').then((module) => ({ default: module.BackupManager }))
+);
+const GoalsPanel = lazy(() =>
+  import('@/components/GoalsPanel').then((module) => ({ default: module.GoalsPanel }))
+);
+const AuditLogPanel = lazy(() =>
+  import('@/components/AuditLogPanel').then((module) => ({ default: module.AuditLogPanel }))
+);
+const CategoryAutomationPanel = lazy(() =>
+  import('@/components/CategoryAutomationPanel').then((module) => ({ default: module.CategoryAutomationPanel }))
+);
+const SettingsPanel = lazy(() =>
+  import('@/components/SettingsPanel').then((module) => ({ default: module.SettingsPanel }))
+);
 const DEFAULT_SIDEBAR_ORDER: SidebarItemId[] = [
   'overview',
   'accounts',
@@ -64,14 +84,14 @@ type DashboardPanelId =
   | 'monthWorkflow';
 
 const DASHBOARD_PANEL_LABELS: Record<DashboardPanelId, string> = {
-  gettingStarted: 'ZaÄŤĂ­nĂˇme',
-  backupReminder: 'PĹ™ipomĂ­nka zĂˇlohy',
-  supportPanels: 'RychlĂ© akce a chytrĂ© souvislosti',
-  wealthOverview: 'CelkovĂ˝ majetek',
+  gettingStarted: 'Začínáme',
+  backupReminder: 'Připomínka zálohy',
+  supportPanels: 'Rychlé akce a chytré souvislosti',
+  wealthOverview: 'Celkový majetek',
   goalSavings: 'Zbývá našetřit',
-  decisionDashboard: 'RozhodovacĂ­ dashboard',
+  decisionDashboard: 'Rozhodovací dashboard',
   yearSelector: 'Pohled po letech',
-  monthWorkflow: 'MÄ›sĂ­ÄŤnĂ­ workflow',
+  monthWorkflow: 'Měsíční workflow',
 };
 
 const normalizeHiddenPanels = (value: unknown): DashboardPanelId[] => {
@@ -92,6 +112,13 @@ const normalizeSidebarOrder = (value: unknown): SidebarItemId[] => {
   return [...ordered, ...DEFAULT_SIDEBAR_ORDER.filter((item) => !seen.has(item))];
 };
 
+const LazyPanelFallback = ({ label }: { label: string }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-sm">
+    <div className="rounded-xl border border-border/70 bg-card px-4 py-3 text-sm text-muted-foreground">
+      Nacitam {label}...
+    </div>
+  </div>
+);
 const Index = () => {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
@@ -355,21 +382,21 @@ const Index = () => {
           ? newlyEscalatedAlerts[0]
           : newlyEscalatedAlerts.sort((left, right) => right.ratio - left.ratio)[0];
       const label = headline.subcategoryLabel
-        ? `${headline.categoryLabel} Â· ${headline.subcategoryLabel}`
+        ? `${headline.categoryLabel} · ${headline.subcategoryLabel}`
         : headline.categoryLabel;
       const moreCount = newlyEscalatedAlerts.length - 1;
 
       toast({
         title:
           headline.level === 'critical'
-            ? 'Limit je vĂ˝raznÄ› pĹ™ekroÄŤen'
+            ? 'Limit je výrazně překročen'
             : headline.level === 'exceeded'
-              ? 'Byl pĹ™ekroÄŤen rozpoÄŤtovĂ˝ limit'
-              : 'BlĂ­ĹľĂ­Ĺˇ se rozpoÄŤtovĂ©mu limitu',
+              ? 'Byl překročen rozpočtový limit'
+              : 'Blížíš se rozpočtovému limitu',
         description:
           `${label} v ${formatMonth(headline.month)}: ${formatCurrency(headline.spent)} z limitu ${formatCurrency(
             headline.limit.monthlyLimit
-          )}.` + (moreCount > 0 ? ` A dalĹˇĂ­ ${moreCount}.` : ''),
+          )}.` + (moreCount > 0 ? ` A další ${moreCount}.` : ''),
         variant: headline.level === 'warning' ? 'default' : 'destructive',
       });
     }
@@ -389,7 +416,7 @@ const Index = () => {
   const userDisplayName =
     typeof user?.user_metadata?.username === 'string' && user.user_metadata.username.trim().length > 0
       ? user.user_metadata.username.trim()
-      : user?.email?.split('@')[0] || 'UĹľivatel';
+      : user?.email?.split('@')[0] || 'Uživatel';
 
   const moveSidebarItem = (itemId: SidebarItemId, direction: 'up' | 'down') => {
     setSidebarOrder((current) => {
@@ -457,11 +484,11 @@ const Index = () => {
           onClick={() => setIsSupportPanelsOpen((current) => !current)}
         >
           <div>
-            <p className="text-sm font-semibold">RychlĂ© akce a chytrĂ© souvislosti</p>
+            <p className="text-sm font-semibold">Rychlé akce a chytré souvislosti</p>
             <p className="text-xs text-muted-foreground">
               {isSupportPanelsOpen
-                ? 'SkrĂ˝t pomocnĂ© panely a nechat vĂ­c mĂ­sta pro grid mÄ›sĂ­cĹŻ.'
-                : 'Zobrazit pomocnĂ© panely nad roÄŤnĂ­m pĹ™ehledem.'}
+                ? 'Skrýt pomocné panely a nechat víc místa pro grid měsíců.'
+                : 'Zobrazit pomocné panely nad ročním přehledem.'}
             </p>
           </div>
           {isSupportPanelsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -510,7 +537,6 @@ const Index = () => {
         goals={goals}
         transactions={transactions}
         bankAccounts={bankAccounts}
-        selectedYear={effectiveSelectedYear}
         onOpenGoals={() => setIsGoalsOpen(true)}
       />
     ),
@@ -618,7 +644,7 @@ const Index = () => {
           {hiddenPanels.length > 0 ? (
             <section className="rounded-2xl border border-border bg-card/40 px-4 py-3">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="text-sm font-medium">SkrytĂ© panely:</p>
+                <p className="text-sm font-medium">Skryté panely:</p>
                 {hiddenPanels.map((panelId) => (
                   <button
                     key={panelId}
@@ -639,7 +665,7 @@ const Index = () => {
                 type="button"
                 className="absolute right-3 top-3 z-10 rounded-full border border-border/70 bg-background/70 p-1.5 text-muted-foreground transition-colors hover:text-foreground"
                 onClick={() => hidePanel('gettingStarted')}
-                aria-label="SkrĂ˝t panel ZaÄŤĂ­nĂˇme"
+                aria-label="Skrýt panel Začínáme"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -665,7 +691,7 @@ const Index = () => {
                 type="button"
                 className="absolute right-3 top-3 z-10 rounded-full border border-border/70 bg-background/70 p-1.5 text-muted-foreground transition-colors hover:text-foreground"
                 onClick={() => hidePanel('backupReminder')}
-                aria-label="SkrĂ˝t panel PĹ™ipomĂ­nka zĂˇlohy"
+                aria-label="Skrýt panel Připomínka zálohy"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -679,7 +705,7 @@ const Index = () => {
               type="button"
               className="absolute right-3 top-3 z-10 rounded-full border border-border/70 bg-background/70 p-1.5 text-muted-foreground transition-colors hover:text-foreground"
               onClick={() => hidePanel('supportPanels')}
-              aria-label="SkrÄ‚Ëťt panel RychlÄ‚Â© akce a chytrÄ‚Â© souvislosti"
+              aria-label="Skrýt panel Rychlé akce a chytré souvislosti"
             >
               <X className="h-4 w-4" />
             </button>
@@ -689,9 +715,9 @@ const Index = () => {
               onClick={() => setIsSupportPanelsOpen((current) => !current)}
             >
               <div>
-                <p className="text-sm font-semibold">RychlĂ© akce a chytrĂ© souvislosti</p>
+                <p className="text-sm font-semibold">Rychlé akce a chytré souvislosti</p>
                 <p className="text-xs text-muted-foreground">
-                  {isSupportPanelsOpen ? 'SkrĂ˝t pomocnĂ© panely a nechat vĂ­c mĂ­sta pro grid mÄ›sĂ­cĹŻ.' : 'Zobrazit pomocnĂ© panely nad roÄŤnĂ­m pĹ™ehledem.'}
+                  {isSupportPanelsOpen ? 'Skrýt pomocné panely a nechat víc místa pro grid měsíců.' : 'Zobrazit pomocné panely nad ročním přehledem.'}
                 </p>
               </div>
               {isSupportPanelsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -733,7 +759,7 @@ const Index = () => {
               type="button"
               className="absolute right-3 top-3 z-10 rounded-full border border-border/70 bg-background/70 p-1.5 text-muted-foreground transition-colors hover:text-foreground"
               onClick={() => hidePanel('wealthOverview')}
-              aria-label="SkrĂ˝t panel CelkovĂ˝ majetek"
+              aria-label="Skrýt panel Celkový majetek"
             >
               <X className="h-4 w-4" />
             </button>
@@ -751,7 +777,7 @@ const Index = () => {
               type="button"
               className="absolute right-3 top-3 z-10 rounded-full border border-border/70 bg-background/70 p-1.5 text-muted-foreground transition-colors hover:text-foreground"
               onClick={() => hidePanel('decisionDashboard')}
-              aria-label="SkrĂ˝t panel RozhodovacĂ­ dashboard"
+              aria-label="Skrýt panel Rozhodovací dashboard"
             >
               <X className="h-4 w-4" />
             </button>
@@ -778,7 +804,7 @@ const Index = () => {
               type="button"
               className="absolute right-3 top-3 z-10 rounded-full border border-border/70 bg-background/70 p-1.5 text-muted-foreground transition-colors hover:text-foreground"
               onClick={() => hidePanel('yearSelector')}
-              aria-label="SkrĂ˝t panel Pohled po letech"
+              aria-label="Skrýt panel Pohled po letech"
             >
               <X className="h-4 w-4" />
             </button>
@@ -796,7 +822,7 @@ const Index = () => {
               type="button"
               className="absolute right-3 top-3 z-10 rounded-full border border-border/70 bg-background/70 p-1.5 text-muted-foreground transition-colors hover:text-foreground"
               onClick={() => hidePanel('monthWorkflow')}
-              aria-label="SkrĂ˝t panel MÄ›sĂ­ÄŤnĂ­ workflow"
+              aria-label="Skrýt panel Měsíční workflow"
             >
               <X className="h-4 w-4" />
             </button>
@@ -843,132 +869,167 @@ const Index = () => {
         </main>
       </div>
 
-      <TransactionForm
-        isOpen={isTransactionFormOpen}
-        onClose={() => {
-          setIsTransactionFormOpen(false);
-          setEditingTransaction(null);
-          setDraftTransaction(null);
-        }}
-        onSubmit={(transaction) => {
-          if (editingTransaction) {
-            updateTransaction(editingTransaction.id, transaction);
-          } else {
-            addTransaction(transaction);
-          }
-        }}
-        bankAccounts={bankAccounts}
-        brokerAccounts={brokerAccounts}
-        goals={goals}
-        subcategories={subcategories}
-        autoCategorizationRules={autoCategorizationRules}
-        featureToggles={featureToggles}
-        onCreateAutoCategorizationRule={addAutoCategorizationRule}
-        getLastTransaction={getLastTransaction}
-        onFillRecurringForMonth={fillRecurringTransactions}
-        initialTransaction={editingTransaction}
-        initialDraft={draftTransaction}
-        initialMode={transactionFormMode}
-        transactions={transactions}
-        isMonthClosed={isMonthClosed}
-      />
+      {isTransactionFormOpen ? (
+        <Suspense fallback={<LazyPanelFallback label="transakcniho formulare" />}>
+          <TransactionForm
+            isOpen={isTransactionFormOpen}
+            onClose={() => {
+              setIsTransactionFormOpen(false);
+              setEditingTransaction(null);
+              setDraftTransaction(null);
+            }}
+            onSubmit={(transaction) => {
+              if (editingTransaction) {
+                updateTransaction(editingTransaction.id, transaction);
+              } else {
+                addTransaction(transaction);
+              }
+            }}
+            bankAccounts={bankAccounts}
+            brokerAccounts={brokerAccounts}
+            goals={goals}
+            subcategories={subcategories}
+            autoCategorizationRules={autoCategorizationRules}
+            featureToggles={featureToggles}
+            onCreateAutoCategorizationRule={addAutoCategorizationRule}
+            getLastTransaction={getLastTransaction}
+            onFillRecurringForMonth={fillRecurringTransactions}
+            initialTransaction={editingTransaction}
+            initialDraft={draftTransaction}
+            initialMode={transactionFormMode}
+            transactions={transactions}
+            isMonthClosed={isMonthClosed}
+          />
+        </Suspense>
+      ) : null}
 
-      <AccountSetup
-        isOpen={isAccountSetupOpen}
-        onClose={() => setIsAccountSetupOpen(false)}
-        bankAccounts={bankAccounts}
-        brokerAccounts={brokerAccounts}
-        onAddBankAccount={addBankAccount}
-        onUpdateBankAccount={updateBankAccount}
-        onDeleteBankAccount={deleteBankAccount}
-        onAddBrokerAccount={addBrokerAccount}
-        onUpdateBrokerAccount={updateBrokerAccount}
-        onDeleteBrokerAccount={deleteBrokerAccount}
-      />
+      {isAccountSetupOpen ? (
+        <Suspense fallback={<LazyPanelFallback label="nastaveni uctu" />}>
+          <AccountSetup
+            isOpen={isAccountSetupOpen}
+            onClose={() => setIsAccountSetupOpen(false)}
+            bankAccounts={bankAccounts}
+            brokerAccounts={brokerAccounts}
+            onAddBankAccount={addBankAccount}
+            onUpdateBankAccount={updateBankAccount}
+            onDeleteBankAccount={deleteBankAccount}
+            onAddBrokerAccount={addBrokerAccount}
+            onUpdateBrokerAccount={updateBrokerAccount}
+            onDeleteBrokerAccount={deleteBrokerAccount}
+          />
+        </Suspense>
+      ) : null}
 
-      <RecurringTransactions
-        isOpen={isRecurringOpen}
-        onClose={() => setIsRecurringOpen(false)}
-        recurringTransactions={recurringTransactions}
-        bankAccounts={bankAccounts}
-        brokerAccounts={brokerAccounts}
-        onAdd={addRecurringTransaction}
-        onUpdate={updateRecurringTransaction}
-        onDelete={deleteRecurringTransaction}
-        onToggle={toggleRecurringTransaction}
-        onFillTransactions={fillRecurringTransactions}
-      />
+      {isRecurringOpen ? (
+        <Suspense fallback={<LazyPanelFallback label="trvalych prikazu" />}>
+          <RecurringTransactions
+            isOpen={isRecurringOpen}
+            onClose={() => setIsRecurringOpen(false)}
+            recurringTransactions={recurringTransactions}
+            bankAccounts={bankAccounts}
+            brokerAccounts={brokerAccounts}
+            onAdd={addRecurringTransaction}
+            onUpdate={updateRecurringTransaction}
+            onDelete={deleteRecurringTransaction}
+            onToggle={toggleRecurringTransaction}
+            onFillTransactions={fillRecurringTransactions}
+          />
+        </Suspense>
+      ) : null}
 
-      <InvestmentDashboard
-        isOpen={isInvestmentsOpen}
-        onClose={() => setIsInvestmentsOpen(false)}
-      />
+      {isInvestmentsOpen ? (
+        <Suspense fallback={<LazyPanelFallback label="investicni sekce" />}>
+          <InvestmentDashboard isOpen={isInvestmentsOpen} onClose={() => setIsInvestmentsOpen(false)} />
+        </Suspense>
+      ) : null}
 
-      <AnnualReports
-        isOpen={isAnnualReportsOpen}
-        onClose={() => setIsAnnualReportsOpen(false)}
-        transactions={transactions}
-        snapshots={wealthSnapshots}
-        accountSnapshots={accountSnapshots}
-      />
+      {isAnnualReportsOpen ? (
+        <Suspense fallback={<LazyPanelFallback label="reportu" />}>
+          <AnnualReports
+            isOpen={isAnnualReportsOpen}
+            onClose={() => setIsAnnualReportsOpen(false)}
+            transactions={transactions}
+            snapshots={wealthSnapshots}
+            accountSnapshots={accountSnapshots}
+          />
+        </Suspense>
+      ) : null}
 
-      <BackupManager
-        isOpen={isBackupManagerOpen}
-        onClose={() => setIsBackupManagerOpen(false)}
-      />
+      {isBackupManagerOpen ? (
+        <Suspense fallback={<LazyPanelFallback label="zaloh" />}>
+          <BackupManager isOpen={isBackupManagerOpen} onClose={() => setIsBackupManagerOpen(false)} />
+        </Suspense>
+      ) : null}
 
-      <GoalsPanel
-        isOpen={isGoalsOpen}
-        onClose={() => setIsGoalsOpen(false)}
-        goals={goals}
-        transactions={transactions}
-        bankAccounts={bankAccounts}
-        onAddGoal={addGoal}
-        onDeleteGoal={deleteGoal}
-      />
+      {isGoalsOpen ? (
+        <Suspense fallback={<LazyPanelFallback label="financnich cilu" />}>
+          <GoalsPanel
+            isOpen={isGoalsOpen}
+            onClose={() => setIsGoalsOpen(false)}
+            goals={goals}
+            transactions={transactions}
+            bankAccounts={bankAccounts}
+            onAddGoal={addGoal}
+            onDeleteGoal={deleteGoal}
+          />
+        </Suspense>
+      ) : null}
 
-      <CategoryAutomationPanel
-        isOpen={isCategoryAutomationOpen}
-        onClose={() => setIsCategoryAutomationOpen(false)}
-        subcategories={subcategories}
-        rules={autoCategorizationRules}
-        budgetLimits={budgetLimits}
-        featureToggles={featureToggles}
-        transactions={transactions}
-        activeMonth={activeBudgetMonth}
-        onAddSubcategory={addSubcategory}
-        onUpdateSubcategory={updateSubcategory}
-        onArchiveSubcategory={archiveSubcategory}
-        onDeleteSubcategory={deleteSubcategory}
-        onAddRule={addAutoCategorizationRule}
-        onUpdateRule={updateAutoCategorizationRule}
-        onDeleteRule={deleteAutoCategorizationRule}
-        onAddBudgetLimit={addBudgetLimit}
-        onUpdateBudgetLimit={updateBudgetLimit}
-        onDeleteBudgetLimit={deleteBudgetLimit}
-        onUpdateFeatureToggles={updateFeatureToggles}
-      />
+      {isCategoryAutomationOpen ? (
+        <Suspense fallback={<LazyPanelFallback label="oblasti transakci" />}>
+          <CategoryAutomationPanel
+            isOpen={isCategoryAutomationOpen}
+            onClose={() => setIsCategoryAutomationOpen(false)}
+            subcategories={subcategories}
+            rules={autoCategorizationRules}
+            budgetLimits={budgetLimits}
+            featureToggles={featureToggles}
+            transactions={transactions}
+            activeMonth={activeBudgetMonth}
+            onAddSubcategory={addSubcategory}
+            onUpdateSubcategory={updateSubcategory}
+            onArchiveSubcategory={archiveSubcategory}
+            onDeleteSubcategory={deleteSubcategory}
+            onAddRule={addAutoCategorizationRule}
+            onUpdateRule={updateAutoCategorizationRule}
+            onDeleteRule={deleteAutoCategorizationRule}
+            onAddBudgetLimit={addBudgetLimit}
+            onUpdateBudgetLimit={updateBudgetLimit}
+            onDeleteBudgetLimit={deleteBudgetLimit}
+            onUpdateFeatureToggles={updateFeatureToggles}
+          />
+        </Suspense>
+      ) : null}
 
-      <AuditLogPanel
-        isOpen={isAuditOpen}
-        onClose={() => setIsAuditOpen(false)}
-        entries={auditLog}
-      />
+      {isAuditOpen ? (
+        <Suspense fallback={<LazyPanelFallback label="historie" />}>
+          <AuditLogPanel isOpen={isAuditOpen} onClose={() => setIsAuditOpen(false)} entries={auditLog} />
+        </Suspense>
+      ) : null}
 
-      <SettingsPanel
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        currentTheme={visualTheme}
-        onSelectTheme={changeVisualTheme}
-        sidebarOrder={sidebarOrder}
-        onMoveSidebarItem={moveSidebarItem}
-        isDashboardLayoutEditing={isLayoutEditing}
-        onToggleDashboardLayoutEditing={() => setIsLayoutEditing((current) => !current)}
-      />
+      {isSettingsOpen ? (
+        <Suspense fallback={<LazyPanelFallback label="nastaveni" />}>
+          <SettingsPanel
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
+            currentTheme={visualTheme}
+            onSelectTheme={changeVisualTheme}
+            sidebarOrder={sidebarOrder}
+            onMoveSidebarItem={moveSidebarItem}
+            isDashboardLayoutEditing={isLayoutEditing}
+            onToggleDashboardLayoutEditing={() => setIsLayoutEditing((current) => !current)}
+          />
+        </Suspense>
+      ) : null}
     </div>
   );
 };
 
 export default Index;
+
+
+
+
+
 
 

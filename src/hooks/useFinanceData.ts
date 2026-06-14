@@ -115,7 +115,11 @@ export const useFinanceData = () => {
   const decorateGoals = useCallback(
     (rawGoals: AccountGoal[], sourceTransactions: Transaction[]) =>
       rawGoals.map((goal) => {
-        const linkedTransactions = sourceTransactions.filter((transaction) => transaction.goalId === goal.id);
+        const linkedTransactions = sourceTransactions.filter(
+          (transaction) =>
+            transaction.goalId === goal.id &&
+            (!goal.createdAt || transaction.createdAt >= goal.createdAt)
+        );
         const delta = linkedTransactions.reduce((sum, transaction) => {
           if (transaction.goalImpact === 'deposit') return sum + transaction.amount;
           if (transaction.goalImpact === 'withdrawal') return sum - transaction.amount;

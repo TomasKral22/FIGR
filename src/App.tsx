@@ -1,15 +1,28 @@
+import { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HashRouter, Routes, Route } from "react-router-dom";
 import { LoaderCircle } from "lucide-react";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { AuthScreen } from "./components/auth/AuthScreen";
+
+const Index = lazy(() => import("./pages/Index"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const AuthScreen = lazy(() =>
+  import("./components/auth/AuthScreen").then((module) => ({ default: module.AuthScreen }))
+);
 
 const queryClient = new QueryClient();
+
+const RouteFallback = ({ label }: { label: string }) => (
+  <div className="flex min-h-screen items-center justify-center">
+    <div className="flex items-center gap-3 text-sm text-muted-foreground">
+      <LoaderCircle className="h-4 w-4 animate-spin" />
+      {label}
+    </div>
+  </div>
+);
 
 const AppRoutes = () => {
   const { isCloudEnabled, isLoading, authError, session } = useAuth();
@@ -30,15 +43,21 @@ const AppRoutes = () => {
   }
 
   if (isCloudEnabled && !authBypassEnabled && !session) {
-    return <AuthScreen visualTheme={visualTheme} initialError={authError} />;
+    return (
+      <Suspense fallback={<RouteFallback label="Načítám přihlášení…" />}>
+        <AuthScreen visualTheme={visualTheme} initialError={authError} />
+      </Suspense>
+    );
   }
 
   return (
     <HashRouter>
-      <Routes>
-        <Route path="/" element={<Index />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      <Suspense fallback={<RouteFallback label="Načítám aplikaci…" />}>
+        <Routes>
+          <Route path="/" element={<Index />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
     </HashRouter>
   );
 };

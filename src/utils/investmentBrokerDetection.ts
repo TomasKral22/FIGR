@@ -1,6 +1,16 @@
-import { InvestmentProvider } from '@/types/investment';
+﻿import { InvestmentProvider } from '@/types/investment';
 
-export type BrokerProfileKey = 'figr_template' | 'trading212' | 'ibkr' | 'degiro' | 'xtb' | 'generic';
+export type BrokerProfileKey =
+  | 'figr_template'
+  | 'trading212'
+  | 'ibkr'
+  | 'degiro'
+  | 'xtb'
+  | 'portu'
+  | 'revolut'
+  | 'etoro'
+  | 'binance'
+  | 'generic';
 
 export interface DetectedBrokerProfile {
   key: BrokerProfileKey;
@@ -41,7 +51,7 @@ const PROFILE_DEFINITIONS: Array<{
     provider: 'broker',
     sourceKind: 'broker_export',
     filePatterns: [/interactive[\s_-]?brokers/i, /\bibkr\b/i, /flex/i],
-    requiredHeaderGroups: [['symbol', 'underlyingsymbol'], ['date', 'tradedate'], ['quantity'], ['proceeds', 'tradeprice', 'price']],
+    requiredHeaderGroups: [['symbol', 'underlyingsymbol'], ['date', 'tradedate'], ['quantity'], ['tradeprice', 'price']],
   },
   {
     key: 'degiro',
@@ -58,6 +68,38 @@ const PROFILE_DEFINITIONS: Array<{
     sourceKind: 'broker_export',
     filePatterns: [/\bxtb\b/i],
     requiredHeaderGroups: [['symbol'], ['volume', 'quantity'], ['opentime', 'date'], ['openprice', 'price']],
+  },
+  {
+    key: 'portu',
+    name: 'Portu',
+    provider: 'broker',
+    sourceKind: 'broker_export',
+    filePatterns: [/\bportu\b/i],
+    requiredHeaderGroups: [['isin', 'ticker', 'symbol'], ['datum', 'date'], ['mnozstvi', 'quantity'], ['cena', 'price']],
+  },
+  {
+    key: 'revolut',
+    name: 'Revolut',
+    provider: 'broker',
+    sourceKind: 'broker_export',
+    filePatterns: [/revolut/i],
+    requiredHeaderGroups: [['ticker', 'symbol'], ['date', 'completeddate'], ['quantity', 'shares'], ['price', 'priceperunit']],
+  },
+  {
+    key: 'etoro',
+    name: 'eToro',
+    provider: 'broker',
+    sourceKind: 'broker_export',
+    filePatterns: [/etoro/i],
+    requiredHeaderGroups: [['positionid', 'ticker', 'symbol'], ['opendate', 'date'], ['units', 'quantity'], ['openrate', 'price']],
+  },
+  {
+    key: 'binance',
+    name: 'Binance',
+    provider: 'broker',
+    sourceKind: 'broker_export',
+    filePatterns: [/binance/i],
+    requiredHeaderGroups: [['market', 'symbol'], ['date', 'time'], ['amount', 'executedquantity'], ['price']],
   },
 ];
 

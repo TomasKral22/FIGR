@@ -302,13 +302,13 @@ export const INVESTMENT_PROVIDER_LABELS: Record<InvestmentProvider, string> = {
 export const COMMON_CURRENCIES = ['CZK', 'USD', 'EUR', 'GBP', 'CHF'];
 
 export const CREDIT_INVESTMENT_KIND_LABELS: Record<CreditInvestmentKind, string> = {
-  p2p: 'P2P pĹŻjÄŤka',
-  b2b: 'B2B pĹŻjÄŤka',
+  p2p: 'P2P půjčka',
+  b2b: 'B2B půjčka',
 };
 
 export const CREDIT_INVESTMENT_STATUS_LABELS: Record<CreditInvestmentStatus, string> = {
-  repaying: 'SplĂˇcĂ­ se',
-  pending: 'ÄŚekĂˇ se',
-  recovery: 'VymĂˇhĂˇnĂ­',
+  repaying: 'Splácí se',
+  pending: 'Čeká se',
+  recovery: 'Vymáhání',
   repaid: 'Splaceno',
 };

@@ -251,6 +251,7 @@ export interface AccountGoal {
   targetAmount: number;
   currentAmount: number;
   accountId?: string;
+  targetDate?: string;
   status?: 'active' | 'completed';
   folder?: string;
   createdAt: string;

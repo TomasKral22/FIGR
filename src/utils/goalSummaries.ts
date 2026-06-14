@@ -5,48 +5,68 @@ export interface GoalSummary {
   linkedAccount?: BankAccount;
   progress: number;
   remainingAmount: number;
-  contributedThisYear: number;
-  monthlyPace: number;
-  estimatedMonthsRemaining: number | null;
+  requiredMonthlyContribution: number | null;
+  monthsToTarget: number | null;
   latestMovementAt: string | null;
 }
+
+const toMonthStart = (value: string | Date) => {
+  const date = value instanceof Date ? value : new Date(value);
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+};
+
+const getInclusiveMonthSpan = (from: string | Date, to: string | Date) => {
+  const fromMonth = toMonthStart(from);
+  const toMonth = toMonthStart(to);
+
+  return Math.max(
+    1,
+    (toMonth.getFullYear() - fromMonth.getFullYear()) * 12 +
+      (toMonth.getMonth() - fromMonth.getMonth()) +
+      1
+  );
+};
 
 export const buildGoalSummaries = (
   goals: AccountGoal[],
   transactions: Transaction[],
-  bankAccounts: BankAccount[],
-  selectedYear: string
+  bankAccounts: BankAccount[]
 ): GoalSummary[] => {
-  const monthsElapsed = Math.max(new Date().getMonth() + 1, 1);
+  const now = new Date();
 
   return goals
     .map((goal) => {
       const linkedAccount = bankAccounts.find((account) => account.id === goal.accountId);
       const relatedTransactions = transactions
-        .filter((transaction) => transaction.goalId === goal.id)
+        .filter(
+          (transaction) =>
+            transaction.goalId === goal.id && (!goal.createdAt || transaction.createdAt >= goal.createdAt)
+        )
         .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 
-      const contributedThisYear = relatedTransactions
-        .filter((transaction) => transaction.month.startsWith(selectedYear))
-        .reduce((sum, transaction) => {
-          if (transaction.goalImpact === 'withdrawal') return sum - transaction.amount;
-          return sum + transaction.amount;
-        }, 0);
-
-      const progress = goal.targetAmount > 0 ? Math.min((goal.currentAmount / goal.targetAmount) * 100, 100) : 0;
+      const progress =
+        goal.targetAmount > 0 ? Math.min((goal.currentAmount / goal.targetAmount) * 100, 100) : 0;
       const remainingAmount = Math.max(goal.targetAmount - goal.currentAmount, 0);
-      const monthlyPace = contributedThisYear > 0 ? contributedThisYear / monthsElapsed : 0;
-      const estimatedMonthsRemaining =
-        remainingAmount > 0 && monthlyPace > 0 ? Number((remainingAmount / monthlyPace).toFixed(1)) : null;
+
+      let monthsToTarget: number | null = null;
+      let requiredMonthlyContribution: number | null = null;
+
+      if (goal.targetDate) {
+        const targetDate = new Date(goal.targetDate);
+        if (!Number.isNaN(targetDate.getTime())) {
+          monthsToTarget = getInclusiveMonthSpan(now, targetDate);
+          requiredMonthlyContribution =
+            remainingAmount > 0 ? Number((remainingAmount / monthsToTarget).toFixed(2)) : 0;
+        }
+      }
 
       return {
         goal,
         linkedAccount,
         progress,
         remainingAmount,
-        contributedThisYear,
-        monthlyPace,
-        estimatedMonthsRemaining,
+        requiredMonthlyContribution,
+        monthsToTarget,
         latestMovementAt: relatedTransactions[0]?.createdAt || null,
       };
     })

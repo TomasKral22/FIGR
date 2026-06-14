@@ -8,7 +8,6 @@ interface GoalSavingsPanelProps {
   goals: AccountGoal[];
   transactions: Transaction[];
   bankAccounts: BankAccount[];
-  selectedYear: string;
   onOpenGoals: () => void;
 }
 
@@ -16,10 +15,9 @@ export const GoalSavingsPanel = ({
   goals,
   transactions,
   bankAccounts,
-  selectedYear,
   onOpenGoals,
 }: GoalSavingsPanelProps) => {
-  const goalSummaries = buildGoalSummaries(goals, transactions, bankAccounts, selectedYear);
+  const goalSummaries = buildGoalSummaries(goals, transactions, bankAccounts);
   const activeSummaries = goalSummaries.filter((item) => item.goal.status !== 'completed');
   const totalRemaining = activeSummaries.reduce((sum, item) => sum + item.remainingAmount, 0);
 
@@ -33,7 +31,7 @@ export const GoalSavingsPanel = ({
           </div>
           <h2 className="mt-3 text-section">Přehled finančních cílů</h2>
           <p className="section-description">
-            Rychlý souhrn toho, kolik ještě chybí do jednotlivých cílů a jakým tempem se plní.
+            Souhrn cílové částky, aktuálního stavu a toho, kolik ještě zbývá doplnit.
           </p>
         </div>
         <div className="rounded-2xl border border-border/70 bg-background/60 px-4 py-3 text-right">
@@ -63,10 +61,14 @@ export const GoalSavingsPanel = ({
                       <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs text-success">Splněno</span>
                     ) : null}
                   </div>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {formatCurrency(item.goal.currentAmount)} z {formatCurrency(item.goal.targetAmount)}
-                    {item.linkedAccount ? ` · účet ${item.linkedAccount.name}` : ''}
-                  </p>
+                  {item.linkedAccount ? (
+                    <p className="mt-1 text-sm text-muted-foreground">Účet: {item.linkedAccount.name}</p>
+                  ) : null}
+                  {item.goal.targetDate ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Termín: {new Date(item.goal.targetDate).toLocaleDateString('cs-CZ')}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="text-left sm:text-right">
                   <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Zbývá</p>
@@ -74,31 +76,23 @@ export const GoalSavingsPanel = ({
                 </div>
               </div>
 
-              <div className="mt-3 h-2 rounded-full bg-muted">
-                <div className="h-2 rounded-full bg-primary" style={{ width: `${item.progress}%` }} />
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <div className="rounded-xl border border-border/60 bg-card/70 px-3 py-3">
+                  <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Cílová částka</p>
+                  <p className="mt-1 font-semibold">{formatCurrency(item.goal.targetAmount)}</p>
+                </div>
+                <div className="rounded-xl border border-border/60 bg-card/70 px-3 py-3">
+                  <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Aktuální částka</p>
+                  <p className="mt-1 font-semibold">{formatCurrency(item.goal.currentAmount)}</p>
+                </div>
+                <div className="rounded-xl border border-border/60 bg-card/70 px-3 py-3">
+                  <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Zbývá</p>
+                  <p className="mt-1 font-semibold">{formatCurrency(item.remainingAmount)}</p>
+                </div>
               </div>
 
-              <div className="mt-3 grid gap-3 text-sm md:grid-cols-3">
-                <div className="rounded-xl border border-border/60 bg-card/70 px-3 py-2">
-                  <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Tempo letos</p>
-                  <p className={`mt-1 font-semibold ${item.contributedThisYear >= 0 ? 'text-success' : 'text-destructive'}`}>
-                    {formatCurrency(item.contributedThisYear)}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-border/60 bg-card/70 px-3 py-2">
-                  <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Průměr / měsíc</p>
-                  <p className="mt-1 font-semibold">{formatCurrency(item.monthlyPace)}</p>
-                </div>
-                <div className="rounded-xl border border-border/60 bg-card/70 px-3 py-2">
-                  <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Odhad doplnění</p>
-                  <p className="mt-1 font-semibold">
-                    {item.goal.status === 'completed'
-                      ? 'Hotovo'
-                      : item.estimatedMonthsRemaining !== null
-                        ? `${item.estimatedMonthsRemaining} měs.`
-                        : 'Bez tempa'}
-                  </p>
-                </div>
+              <div className="mt-3 h-2 rounded-full bg-muted">
+                <div className="h-2 rounded-full bg-primary" style={{ width: `${item.progress}%` }} />
               </div>
             </div>
           ))}

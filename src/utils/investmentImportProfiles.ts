@@ -63,6 +63,38 @@ const PROFILE_CONFIGS: Record<BrokerProfileKey, Partial<InvestmentImportProfileC
     transactionDate: ['opentime', 'date', 'transactiondate'],
     transactionType: ['cmd', 'type', 'action'],
   },
+  portu: {
+    ticker: ['ticker', 'symbol', 'isin'],
+    name: ['name', 'nazev', 'description'],
+    quantity: ['mnozstvi', 'množství', 'quantity'],
+    price: ['cena', 'price', 'priceperunit'],
+    transactionDate: ['datum', 'date', 'transactiondate'],
+    transactionType: ['typ', 'type', 'transactiontype'],
+  },
+  revolut: {
+    ticker: ['ticker', 'symbol'],
+    name: ['name', 'description'],
+    quantity: ['shares', 'quantity', 'qty'],
+    price: ['price', 'priceperunit'],
+    transactionDate: ['completeddate', 'date', 'transactiondate'],
+    transactionType: ['type', 'action'],
+  },
+  etoro: {
+    ticker: ['ticker', 'symbol', 'positionid'],
+    name: ['name', 'description'],
+    quantity: ['units', 'quantity'],
+    price: ['openrate', 'price', 'priceperunit'],
+    transactionDate: ['opendate', 'date', 'transactiondate'],
+    transactionType: ['type', 'action'],
+  },
+  binance: {
+    ticker: ['symbol', 'market', 'ticker'],
+    name: ['symbol', 'name', 'description'],
+    quantity: ['executedquantity', 'amount', 'quantity'],
+    price: ['price', 'avgprice', 'priceperunit'],
+    transactionDate: ['time', 'date', 'transactiondate'],
+    transactionType: ['side', 'type', 'action'],
+  },
 };
 
 export const getInvestmentImportProfileConfig = (profileKey: BrokerProfileKey): InvestmentImportProfileConfig => {
@@ -101,6 +133,12 @@ export const normalizeBrokerTransactionType = (rawValue: string, profileKey: Bro
   if (profileKey === 'xtb') {
     if (value.includes('sell')) return 'sell';
     if (value.includes('buy')) return 'buy';
+  }
+
+  if (profileKey === 'revolut' || profileKey === 'etoro' || profileKey === 'binance' || profileKey === 'portu') {
+    if (value.includes('dividend')) return 'dividend';
+    if (value.includes('sell') || value.includes('prodej')) return 'sell';
+    if (value.includes('buy') || value.includes('nakup')) return 'buy';
   }
 
   return null;
