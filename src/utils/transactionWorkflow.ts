@@ -387,9 +387,6 @@ export function applySuggestionToDraft(
   if (!touchedFields.category && suggestion.category && !draft.category) {
     nextDraft.category = suggestion.category;
   }
-  if (!touchedFields.subcategoryId && suggestion.subcategoryId && !draft.subcategoryId) {
-    nextDraft.subcategoryId = suggestion.subcategoryId;
-  }
   if (!touchedFields.transferCategory && suggestion.transferCategory && !draft.transferCategory) {
     nextDraft.transferCategory = suggestion.transferCategory;
   }
@@ -465,7 +462,6 @@ export function createBulkRow(
         sourceAccount: previousDraft.sourceAccount,
         transferAccount: previousDraft.transferAccount,
         category: previousDraft.category,
-        subcategoryId: previousDraft.subcategoryId,
         transferCategory: previousDraft.transferCategory,
         investmentAccount: previousDraft.investmentAccount,
         includeInInvestmentTotals: previousDraft.includeInInvestmentTotals,

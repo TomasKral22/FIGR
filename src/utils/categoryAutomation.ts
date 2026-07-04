@@ -223,11 +223,6 @@ export const applyRuleToDraft = (
     applied = true;
   }
 
-  if (!touchedFields.subcategoryId) {
-    nextDraft.subcategoryId = rule.targetSubcategoryId;
-    applied = true;
-  }
-
   if (applied) {
     nextDraft.autoAssigned = true;
     nextDraft.ruleId = rule.id;
