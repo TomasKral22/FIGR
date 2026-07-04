@@ -139,6 +139,37 @@ export const BulkTransactionTable = ({
     );
   };
 
+  const handleTypeChange = (row: BulkTransactionRow, type: TransactionDraft['type']) => {
+    const draft = row.draft;
+    const patch: Partial<TransactionDraft> = { type };
+
+    if (type === 'transfer') {
+      patch.sourceAccount = draft.sourceAccount || draft.account;
+      patch.transferAccount = draft.transferAccount || draft.investmentAccount;
+      patch.account = undefined;
+      patch.investmentAccount = undefined;
+      patch.transferCategory = draft.transferCategory || 'transfer';
+    } else if (type === 'expense') {
+      patch.account = draft.account || draft.sourceAccount;
+      patch.sourceAccount = undefined;
+      patch.transferAccount = undefined;
+      patch.investmentAccount = undefined;
+    } else if (type === 'income') {
+      patch.account = draft.account || draft.transferAccount;
+      patch.sourceAccount = undefined;
+      patch.transferAccount = undefined;
+      patch.investmentAccount = undefined;
+    } else if (type === 'investment') {
+      patch.sourceAccount = draft.sourceAccount || draft.account;
+      patch.investmentAccount = draft.investmentAccount || draft.transferAccount;
+      patch.account = undefined;
+      patch.transferAccount = undefined;
+      patch.category = 'investments';
+    }
+
+    updateRowDraft(row.id, patch, { type: true });
+  };
+
   const addRow = () => {
     const previousDraft = visibleRows.at(-1)?.draft;
     emitRows([...visibleRows, createBulkRow(previousDraft?.month || month, previousDraft, copyPrevious)]);
@@ -207,7 +238,7 @@ export const BulkTransactionTable = ({
       updateRowDraft(row.id, { account: nextValue }, { account: true });
       return;
     }
-    updateRowDraft(row.id, { sourceAccount: nextValue }, { sourceAccount: true });
+    updateRowDraft(row.id, { sourceAccount: nextValue }, { sourceAccount: true, type: row.draft.type !== 'expense' });
   };
 
   const handleTargetChange = (row: BulkTransactionRow, value: string) => {
@@ -217,11 +248,11 @@ export const BulkTransactionTable = ({
       return;
     }
     if (row.draft.type === 'transfer') {
-      updateRowDraft(row.id, { transferAccount: nextValue }, { transferAccount: true });
+      updateRowDraft(row.id, { transferAccount: nextValue }, { transferAccount: true, type: true });
       return;
     }
     if (row.draft.type === 'investment') {
-      updateRowDraft(row.id, { investmentAccount: nextValue }, { investmentAccount: true });
+      updateRowDraft(row.id, { investmentAccount: nextValue }, { investmentAccount: true, type: true });
     }
   };
 
@@ -358,7 +389,7 @@ export const BulkTransactionTable = ({
                       <label className="text-xs text-muted-foreground">Typ</label>
                       <select
                         value={draft.type}
-                        onChange={(event) => updateRowDraft(row.id, { type: event.target.value as TransactionDraft['type'] }, { type: true })}
+                        onChange={(event) => handleTypeChange(row, event.target.value as TransactionDraft['type'])}
                         className="h-10 w-full rounded-[var(--radius-control)] border border-input bg-card px-3 text-sm outline-none"
                       >
                         <option value="expense">Výdaj</option>
@@ -497,7 +528,7 @@ export const BulkTransactionTable = ({
                       <div className={`grid gap-px ${row.isValid ? 'bg-border/20' : 'bg-destructive/15'}`} style={{ gridTemplateColumns: GRID_TEMPLATE }}>
                         <Input data-row={rowIndex} data-col={0} value={draft.name} onFocus={() => setActiveCell({ row: rowIndex, col: 0 })} onChange={(event) => updateRowDraft(row.id, { name: event.target.value }, { name: true })} onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 0)} className={cellClass(rowIndex, 0)} />
                         <Input data-row={rowIndex} data-col={1} value={draft.amount ?? ''} onFocus={() => setActiveCell({ row: rowIndex, col: 1 })} onChange={(event) => updateRowDraft(row.id, { amount: normalizeAmount(event.target.value) }, { amount: true })} onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 1)} className={cellClass(rowIndex, 1)} />
-                        <select data-row={rowIndex} data-col={2} value={draft.type} onFocus={() => setActiveCell({ row: rowIndex, col: 2 })} onChange={(event) => updateRowDraft(row.id, { type: event.target.value as TransactionDraft['type'] }, { type: true })} onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 2)} className={`h-10 bg-card px-3 text-sm outline-none ${cellClass(rowIndex, 2)}`}>
+                        <select data-row={rowIndex} data-col={2} value={draft.type} onFocus={() => setActiveCell({ row: rowIndex, col: 2 })} onChange={(event) => handleTypeChange(row, event.target.value as TransactionDraft['type'])} onKeyDown={(event) => handleCellKeyDown(event, rowIndex, 2)} className={`h-10 bg-card px-3 text-sm outline-none ${cellClass(rowIndex, 2)}`}>
                           <option value="expense">Výdaj</option>
                           <option value="income">Příjem</option>
                           <option value="transfer">Převod</option>
