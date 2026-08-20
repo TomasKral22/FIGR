@@ -26,17 +26,14 @@ const invokeInvestmentIntelligence = async <T>(
   const {
     data: { session },
   } = await supabase.auth.getSession();
-
-  if (!session?.access_token) {
-    throw new Error('Chybí přihlášená uživatelská session pro volání investiční služby.');
-  }
+  const accessToken = session?.access_token || SUPABASE_PUBLISHABLE_KEY;
 
   const response = await fetch(`${SUPABASE_URL}/functions/v1/investment-intelligence`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       apikey: SUPABASE_PUBLISHABLE_KEY,
-      Authorization: `Bearer ${session.access_token}`,
+      Authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify(body),
   });
