@@ -10,6 +10,10 @@ type StorageSeed = {
   wealthSnapshots?: unknown[];
   accountSnapshots?: unknown[];
   importedAccountBalances?: unknown[];
+  investmentSourceAccounts?: unknown[];
+  investmentValueSnapshots?: unknown[];
+  investmentAssets?: unknown[];
+  investmentTransactions?: unknown[];
   theme?: 'light' | 'dark';
   visualTheme?: string;
   lastTransaction?: unknown | null;
@@ -45,6 +49,10 @@ export async function seedFinanceStorage(page: Page, seed: StorageSeed = {}) {
     write('finance_snapshots', data.wealthSnapshots ?? []);
     write('finance_account_snapshots', data.accountSnapshots ?? []);
     write('finance_imported_account_balances', data.importedAccountBalances ?? []);
+    write('investment_source_accounts', data.investmentSourceAccounts ?? []);
+    write('investment_value_snapshots', data.investmentValueSnapshots ?? []);
+    write('investment_assets', data.investmentAssets ?? []);
+    write('investment_transactions', data.investmentTransactions ?? []);
     window.localStorage.setItem('finance_theme', data.theme ?? 'dark');
     window.localStorage.setItem('finance_visual_theme', data.visualTheme ?? 'dark-blue');
     window.localStorage.setItem('figr_auth_bypass', 'true');

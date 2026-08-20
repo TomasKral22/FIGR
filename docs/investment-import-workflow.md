@@ -8,6 +8,40 @@
 - Workflow musí fungovat offline a bez externí databáze.
 - API synchronizace se bude používat jen tam, kde existuje oficiální a stabilní broker API.
 
+## Stav implementace
+
+FIGR nyní rozlišuje dvě úrovně investičních dat:
+
+- **investiční zdroj / účet** – například Investown, Edward, XTB nebo IBKR,
+- **ocenění** – buď součet jednotlivých pozic, nebo snapshot celkové hodnoty účtu.
+
+Investown a Edward používají ve výchozím nastavení snapshot. To je spolehlivější než vyrábět fiktivní veřejně obchodované pozice a umožňuje zahrnout také hotovost, úroky a spravované „kyblíky“. U brokerů se naopak používá součet pozic a jejich tržních cen.
+
+Součástí implementace je:
+
+- evidence zdrojů a jejich aktivace/deaktivace,
+- ruční snapshot hodnoty, hotovosti a vložené částky,
+- importní profily pro Investown a Edward,
+- vazba importovaných transakcí na konkrétní zdroj,
+- ochrana proti duplicitám mezi importy i uvnitř jednoho souboru,
+- souhrn majetku podle zdroje,
+- kontrola chybějících cen, kurzů, zastaralých zdrojů a neúplného výnosu,
+- skutečná historie portfolia ze snapshotů a historických cen.
+
+## Doporučený postup pro Investown a Edward
+
+1. V investicích otevřít panel **Investiční účty a zdroje**.
+2. Založit zdroj Investown nebo Edward; ponechat způsob ocenění **Celkový snapshot**.
+3. Zapsat aktuální celkovou hodnotu účtu, hotovost a pokud možno také celkem vloženou částku.
+4. Při dostupném CSV/XLSX exportu jej načíst přes import a přiřadit stejnému zdroji.
+5. Snapshot aktualizovat pravidelně, ideálně jednou měsíčně. Po 45 dnech FIGR zdroj označí jako zastaralý.
+
+Exportní transakce slouží pro audit a budoucí analytiku; celková hodnota snapshotového účtu se do portfolia započítá právě jednou, takže nedochází k dvojímu započítání importovaných položek.
+
+## Omezení konektorů
+
+Přímé přihlašování k Investownu nebo Edwardovi není součástí této fáze. Bez veřejného, stabilního a dokumentovaného read-only API by takové napojení bylo křehké a bezpečnostně problematické. Architektura má režim `api_sync` připravený, ale aktivuje se až pro oficiálně podporované konektory.
+
 ## Doporučený provozní model
 
 ### Priorita 1: Export brokera

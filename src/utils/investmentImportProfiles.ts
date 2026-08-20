@@ -12,6 +12,8 @@ export interface InvestmentImportProfileConfig {
   exDividendDate: string[];
   payDate: string[];
   expectedDividendAmount: string[];
+  totalValue: string[];
+  externalId: string[];
 }
 
 const GENERIC_PROFILE: InvestmentImportProfileConfig = {
@@ -26,6 +28,8 @@ const GENERIC_PROFILE: InvestmentImportProfileConfig = {
   exDividendDate: ['exdividenddate', 'exdividend', 'exdividenddateutc', 'exdividenddatum', 'datumexdividendy'],
   payDate: ['paydate', 'dividendpaydate', 'paymentdate', 'datumvyplaty'],
   expectedDividendAmount: ['expecteddividendamount', 'expectedamount', 'dividendamount', 'grossdividend', 'ocekavanadividenda'],
+  totalValue: ['totalvalue', 'amount', 'castka', 'hodnota', 'value', 'netamount', 'grossamount'],
+  externalId: ['externalid', 'transactionid', 'idtransakce', 'id', 'reference', 'referencniid'],
 };
 
 const PROFILE_CONFIGS: Record<BrokerProfileKey, Partial<InvestmentImportProfileConfig>> = {
@@ -71,6 +75,26 @@ const PROFILE_CONFIGS: Record<BrokerProfileKey, Partial<InvestmentImportProfileC
     transactionDate: ['datum', 'date', 'transactiondate'],
     transactionType: ['typ', 'type', 'transactiontype'],
   },
+  investown: {
+    ticker: ['idprojektu', 'projectid', 'projekt', 'nazevprojektu'],
+    name: ['nazevprojektu', 'projekt', 'project', 'name'],
+    quantity: ['mnozstvi', 'quantity', 'podil'],
+    price: ['cenajednotky', 'price', 'urok'],
+    totalValue: ['castka', 'hodnota', 'amount', 'vyse'],
+    transactionDate: ['datumtransakce', 'datum', 'date'],
+    transactionType: ['typtransakce', 'typ', 'type'],
+    externalId: ['idtransakce', 'transactionid', 'reference'],
+  },
+  edward: {
+    ticker: ['isin', 'ticker', 'portfolio', 'kyblik', 'strategie'],
+    name: ['nazev', 'instrument', 'portfolio', 'kyblik', 'strategie'],
+    quantity: ['mnozstvi', 'quantity', 'pocet'],
+    price: ['cena', 'price', 'kurz'],
+    totalValue: ['castka', 'hodnota', 'amount', 'value'],
+    transactionDate: ['datum', 'date', 'valutadate'],
+    transactionType: ['typpohybu', 'typtransakce', 'typ', 'type'],
+    externalId: ['idtransakce', 'transactionid', 'reference'],
+  },
   revolut: {
     ticker: ['ticker', 'symbol'],
     name: ['name', 'description'],
@@ -112,6 +136,8 @@ export const getInvestmentImportProfileConfig = (profileKey: BrokerProfileKey): 
     exDividendDate: [...(profile.exDividendDate || []), ...GENERIC_PROFILE.exDividendDate],
     payDate: [...(profile.payDate || []), ...GENERIC_PROFILE.payDate],
     expectedDividendAmount: [...(profile.expectedDividendAmount || []), ...GENERIC_PROFILE.expectedDividendAmount],
+    totalValue: [...(profile.totalValue || []), ...GENERIC_PROFILE.totalValue],
+    externalId: [...(profile.externalId || []), ...GENERIC_PROFILE.externalId],
   };
 };
 
@@ -139,6 +165,26 @@ export const normalizeBrokerTransactionType = (rawValue: string, profileKey: Bro
     if (value.includes('dividend')) return 'dividend';
     if (value.includes('sell') || value.includes('prodej')) return 'sell';
     if (value.includes('buy') || value.includes('nakup')) return 'buy';
+  }
+
+  if (profileKey === 'investown') {
+    if (value.includes('urok') || value.includes('vynos')) return 'interest';
+    if (value.includes('splaceni') || value.includes('jistina') || value.includes('vraceni')) return 'principal_repayment';
+    if (value.includes('poplatek')) return 'fee';
+    if (value.includes('vyber')) return 'withdrawal';
+    if (value.includes('vklad') || value.includes('dobiti')) return 'deposit';
+    if (value.includes('prodej')) return 'sell';
+    if (value.includes('investice') || value.includes('nakup')) return 'buy';
+  }
+
+  if (profileKey === 'edward') {
+    if (value.includes('dividend')) return 'dividend';
+    if (value.includes('poplatek')) return 'fee';
+    if (value.includes('dan')) return 'tax';
+    if (value.includes('vyber') || value.includes('odchozi')) return 'withdrawal';
+    if (value.includes('vklad') || value.includes('prichozi')) return 'deposit';
+    if (value.includes('prodej')) return 'sell';
+    if (value.includes('nakup')) return 'buy';
   }
 
   return null;

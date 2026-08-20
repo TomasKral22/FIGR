@@ -12,9 +12,11 @@ import {
   InvestmentAuditEntry,
   InvestmentDataMeta,
   InvestmentProvider,
+  InvestmentSourceAccount,
   InvestmentSyncStatus,
   InvestmentTransaction,
   InvestmentTransactionType,
+  InvestmentValueSnapshot,
   InvestmentValidationIssue,
   PortfolioSettings,
   PortfolioSummary,
@@ -51,16 +53,27 @@ const isDuplicateInvestmentTransaction = (
     currency: string;
     transaction_date: string;
     notes: string | null;
+    source_account_id?: string | null;
+    external_id?: string | null;
+    source_row_hash?: string | null;
   }
-) =>
-  left.asset_id === right.asset_id &&
+) => {
+  if (right.source_row_hash && left.source_row_hash === right.source_row_hash) return true;
+  if (
+    right.external_id &&
+    left.external_id === right.external_id &&
+    left.source_account_id === right.source_account_id
+  ) return true;
+  return left.asset_id === right.asset_id &&
   left.transaction_type === right.transaction_type &&
   left.quantity === right.quantity &&
   left.price_per_unit === right.price_per_unit &&
   left.currency === right.currency &&
   left.transaction_date === right.transaction_date &&
   left.total_value === right.total_value &&
-  left.notes === right.notes;
+  left.notes === right.notes &&
+  (left.source_account_id || null) === (right.source_account_id || null);
+};
 
 const downloadJson = (fileName: string, payload: unknown) => {
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
@@ -90,6 +103,8 @@ export const useInvestmentData = () => {
   const [trackedInvestments, setTrackedInvestments] = useState<TrackedInvestment[]>([]);
   const [auditLog, setAuditLog] = useState<InvestmentAuditEntry[]>([]);
   const [meta, setMeta] = useState<InvestmentDataMeta>(DEFAULT_INVESTMENT_META);
+  const [sourceAccounts, setSourceAccounts] = useState<InvestmentSourceAccount[]>([]);
+  const [valueSnapshots, setValueSnapshots] = useState<InvestmentValueSnapshot[]>([]);
   const [dbPath, setDbPath] = useState<string | null>(null);
   const [validationIssues, setValidationIssues] = useState<InvestmentValidationIssue[]>([]);
   const [portfolioSummary, setPortfolioSummary] = useState<PortfolioSummary | null>(null);
@@ -138,6 +153,8 @@ export const useInvestmentData = () => {
       setTrackedInvestments(state.trackedInvestments);
       setAuditLog(state.auditLog);
       setMeta(state.meta);
+      setSourceAccounts(state.sourceAccounts);
+      setValueSnapshots(state.valueSnapshots);
       setDbPath(state.dbPath);
       setIsHydrated(true);
     } catch (error: unknown) {
@@ -162,6 +179,8 @@ export const useInvestmentData = () => {
         exchangeRates,
         creditInvestments,
         trackedInvestments,
+        sourceAccounts,
+        valueSnapshots,
         reportingCurrency: settings?.reporting_currency || 'CZK',
       });
       setPortfolioSummary(summary);
@@ -177,7 +196,7 @@ export const useInvestmentData = () => {
     } finally {
       setCalculatingPortfolio(false);
     }
-  }, [assets, transactions, prices, exchangeRates, creditInvestments, trackedInvestments, settings, toast]);
+  }, [assets, transactions, prices, exchangeRates, creditInvestments, trackedInvestments, sourceAccounts, valueSnapshots, settings, toast]);
 
   const refreshValidationIssues = useCallback(async () => {
     const { financeTransactions, monthClosures } = await loadInvestmentFinanceAuditState();
@@ -758,6 +777,80 @@ export const useInvestmentData = () => {
     }
   };
 
+  const addSourceAccount = async (
+    account: Omit<InvestmentSourceAccount, 'id' | 'last_synced_at' | 'created_at' | 'updated_at'>
+  ) => {
+    const now = createTimestamp();
+    const nextAccount: InvestmentSourceAccount = {
+      ...account,
+      id: crypto.randomUUID(),
+      last_synced_at: null,
+      created_at: now,
+      updated_at: now,
+    };
+    setSourceAccounts((prev) => [...prev, nextAccount].sort((a, b) => a.name.localeCompare(b.name)));
+    touchMeta({ last_saved_at: now });
+    pushAudit({
+      action: 'source-account-create',
+      detail: `Přidán investiční zdroj ${nextAccount.name}.`,
+      scope: 'portfolio',
+      severity: 'info',
+    });
+    toast({ title: 'Investiční zdroj přidán', description: nextAccount.name });
+    return nextAccount;
+  };
+
+  const updateSourceAccount = async (
+    id: string,
+    updates: Partial<Omit<InvestmentSourceAccount, 'id' | 'created_at' | 'updated_at'>>
+  ) => {
+    const now = createTimestamp();
+    setSourceAccounts((prev) =>
+      prev
+        .map((account) => (account.id === id ? { ...account, ...updates, updated_at: now } : account))
+        .sort((a, b) => a.name.localeCompare(b.name))
+    );
+    touchMeta({ last_saved_at: now });
+  };
+
+  const addValueSnapshot = async (
+    snapshot: Omit<InvestmentValueSnapshot, 'id' | 'created_at'>
+  ) => {
+    const now = createTimestamp();
+    const existing = valueSnapshots.find(
+      (item) => item.source_account_id === snapshot.source_account_id && item.snapshot_date === snapshot.snapshot_date
+    );
+    const nextSnapshot: InvestmentValueSnapshot = {
+      ...snapshot,
+      id: existing?.id || crypto.randomUUID(),
+      created_at: existing?.created_at || now,
+    };
+    setValueSnapshots((prev) =>
+      [
+        nextSnapshot,
+        ...prev.filter(
+          (item) => !(item.source_account_id === snapshot.source_account_id && item.snapshot_date === snapshot.snapshot_date)
+        ),
+      ].sort((a, b) => b.snapshot_date.localeCompare(a.snapshot_date))
+    );
+    setSourceAccounts((prev) =>
+      prev.map((account) =>
+        account.id === snapshot.source_account_id
+          ? { ...account, last_synced_at: `${snapshot.snapshot_date}T00:00:00.000Z`, updated_at: now }
+          : account
+      )
+    );
+    touchMeta({ last_saved_at: now });
+    pushAudit({
+      action: 'value-snapshot-upsert',
+      detail: `Uložen snapshot investičního zdroje k ${snapshot.snapshot_date}.`,
+      scope: 'portfolio',
+      severity: 'info',
+    });
+    toast({ title: existing ? 'Snapshot aktualizován' : 'Snapshot přidán' });
+    return nextSnapshot;
+  };
+
   const importTransactions = async (
     importData: {
       ticker: string;
@@ -776,6 +869,9 @@ export const useInvestmentData = () => {
       source_label?: string;
       source_kind?: 'manual_template' | 'broker_export' | 'api_sync';
       broker_connector_id?: string;
+      source_account_id?: string;
+      external_id?: string;
+      source_row_hash?: string;
     }[]
   ) => {
     try {
@@ -787,15 +883,19 @@ export const useInvestmentData = () => {
         notes: null,
         source_label: importData[0]?.source_label || null,
         source_kind: importData[0]?.source_kind || 'manual_template',
+        source_account_id: importData[0]?.source_account_id || null,
       };
 
       const createdAssets: InvestmentAsset[] = [];
       const createdTransactions: InvestmentTransaction[] = [];
-      const assetMap = new Map(assets.map((asset) => [asset.ticker.toUpperCase(), asset]));
+      const assetMap = new Map(
+        assets.map((asset) => [`${asset.source_account_id || 'unassigned'}:${asset.ticker.toUpperCase()}`, asset])
+      );
 
       for (const item of importData) {
         const normalizedTicker = item.ticker.toUpperCase();
-        let asset = assetMap.get(normalizedTicker);
+        const assetKey = `${item.source_account_id || 'unassigned'}:${normalizedTicker}`;
+        let asset = assetMap.get(assetKey);
 
         if (!asset) {
           asset = {
@@ -806,10 +906,11 @@ export const useInvestmentData = () => {
             provider: item.provider,
             sector: item.sector || null,
             currency: item.currency,
+            source_account_id: item.source_account_id || null,
             created_at: now,
             updated_at: now,
           };
-          assetMap.set(normalizedTicker, asset);
+          assetMap.set(assetKey, asset);
           createdAssets.push(asset);
         }
 
@@ -828,13 +929,29 @@ export const useInvestmentData = () => {
           pay_date: item.pay_date || null,
           expected_dividend_amount: item.expected_dividend_amount ?? null,
           broker_connector_id: item.broker_connector_id || null,
+          source_account_id: item.source_account_id || null,
+          external_id: item.external_id || null,
+          source_row_hash: item.source_row_hash || null,
           created_at: now,
         });
       }
 
-      const deduplicatedTransactions = createdTransactions.filter(
-        (candidate) =>
-          !transactions.some((existing) =>
+      const incomingFingerprints = new Set<string>();
+      const deduplicatedTransactions = createdTransactions.filter((candidate) => {
+        const fingerprint =
+          candidate.source_row_hash ||
+          [
+            candidate.source_account_id || '',
+            candidate.asset_id,
+            candidate.transaction_type,
+            candidate.transaction_date,
+            candidate.quantity,
+            candidate.price_per_unit,
+            candidate.currency,
+          ].join('|');
+        if (incomingFingerprints.has(fingerprint)) return false;
+        incomingFingerprints.add(fingerprint);
+        return !transactions.some((existing) =>
             isDuplicateInvestmentTransaction(existing, {
               asset_id: candidate.asset_id,
               transaction_type: candidate.transaction_type,
@@ -844,9 +961,17 @@ export const useInvestmentData = () => {
               currency: candidate.currency,
               transaction_date: candidate.transaction_date,
               notes: candidate.notes,
+              source_account_id: candidate.source_account_id,
+              external_id: candidate.external_id,
+              source_row_hash: candidate.source_row_hash,
             })
-          )
-      );
+          );
+      });
+
+      batch.transaction_count = deduplicatedTransactions.length;
+      batch.imported_count = deduplicatedTransactions.length;
+      batch.duplicate_count = createdTransactions.length - deduplicatedTransactions.length;
+      batch.rejected_count = 0;
 
       if (createdAssets.length > 0) {
         setAssets((prev) => [...prev, ...createdAssets].sort((a, b) => a.ticker.localeCompare(b.ticker)));
@@ -855,6 +980,13 @@ export const useInvestmentData = () => {
         [...deduplicatedTransactions, ...prev].sort((a, b) => b.transaction_date.localeCompare(a.transaction_date))
       );
       setImportBatches((prev) => [batch, ...prev]);
+      if (batch.source_account_id) {
+        setSourceAccounts((prev) =>
+          prev.map((account) =>
+            account.id === batch.source_account_id ? { ...account, last_synced_at: now, updated_at: now } : account
+          )
+        );
+      }
       touchMeta({ last_saved_at: now });
       pushAudit({
         action: 'import',
@@ -864,7 +996,7 @@ export const useInvestmentData = () => {
       });
       toast({
         title: 'Import dokoncen',
-        description: `Importovano ${deduplicatedTransactions.length} transakci.`,
+        description: `Importováno ${deduplicatedTransactions.length} transakcí, ${batch.duplicate_count} duplicit přeskočeno.`,
       });
     } catch (error: unknown) {
       console.error('Error importing transactions:', error);
@@ -983,6 +1115,8 @@ export const useInvestmentData = () => {
         creditInvestments,
         creditRepayments,
         trackedInvestments,
+        sourceAccounts,
+        valueSnapshots,
         auditLog,
         meta: {
           ...meta,
@@ -1015,7 +1149,7 @@ export const useInvestmentData = () => {
 
   const syncStatus = useMemo<InvestmentSyncStatus>(
     () => buildInvestmentSyncStatus(session, meta, dbPath),
-    [dbPath, meta, session?.user]
+    [dbPath, meta, session]
   );
 
   useEffect(() => {
@@ -1084,8 +1218,18 @@ export const useInvestmentData = () => {
 
   useEffect(() => {
     if (!isHydrated) return;
+    void saveInvestmentEntries({ [INVESTMENT_STORAGE_KEYS.SOURCE_ACCOUNTS]: JSON.stringify(sourceAccounts) });
+  }, [sourceAccounts, isHydrated]);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+    void saveInvestmentEntries({ [INVESTMENT_STORAGE_KEYS.VALUE_SNAPSHOTS]: JSON.stringify(valueSnapshots) });
+  }, [valueSnapshots, isHydrated]);
+
+  useEffect(() => {
+    if (!isHydrated) return;
     void calculatePortfolio();
-  }, [assets, transactions, prices, exchangeRates, creditInvestments, trackedInvestments, settings, isHydrated, calculatePortfolio]);
+  }, [assets, transactions, prices, exchangeRates, creditInvestments, trackedInvestments, sourceAccounts, valueSnapshots, settings, isHydrated, calculatePortfolio]);
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -1099,6 +1243,8 @@ export const useInvestmentData = () => {
     creditInvestments,
     creditRepayments,
     trackedInvestments,
+    sourceAccounts,
+    valueSnapshots,
     isHydrated,
     refreshValidationIssues,
   ]);
@@ -1115,6 +1261,8 @@ export const useInvestmentData = () => {
     creditInvestments,
     creditRepayments,
     trackedInvestments,
+    sourceAccounts,
+    valueSnapshots,
     auditLog,
     meta,
     syncStatus,
@@ -1138,6 +1286,9 @@ export const useInvestmentData = () => {
     addTrackedInvestment,
     updateTrackedInvestment,
     deleteTrackedInvestment,
+    addSourceAccount,
+    updateSourceAccount,
+    addValueSnapshot,
     importTransactions,
     undoImport,
     updateSettings,

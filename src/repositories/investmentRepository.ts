@@ -9,8 +9,10 @@ import {
   InvestmentAsset,
   InvestmentAuditEntry,
   InvestmentDataMeta,
+  InvestmentSourceAccount,
   InvestmentSyncStatus,
   InvestmentTransaction,
+  InvestmentValueSnapshot,
   PortfolioSettings,
   TrackedInvestment,
 } from '@/types/investment';
@@ -28,6 +30,8 @@ export const INVESTMENT_STORAGE_KEYS = {
   TRACKED_INVESTMENTS: 'investment_tracked_investments',
   AUDIT_LOG: 'investment_audit_log',
   META: 'investment_meta',
+  SOURCE_ACCOUNTS: 'investment_source_accounts',
+  VALUE_SNAPSHOTS: 'investment_value_snapshots',
 } as const;
 
 export const FINANCE_AUDIT_STORAGE_KEYS = {
@@ -80,6 +84,8 @@ export interface LoadedInvestmentState {
   trackedInvestments: TrackedInvestment[];
   auditLog: InvestmentAuditEntry[];
   meta: InvestmentDataMeta;
+  sourceAccounts: InvestmentSourceAccount[];
+  valueSnapshots: InvestmentValueSnapshot[];
   dbPath: string | null;
 }
 
@@ -145,6 +151,16 @@ export const loadInvestmentState = async (): Promise<LoadedInvestmentState> => {
       ...parseStoredValue<InvestmentDataMeta>(loaded, INVESTMENT_STORAGE_KEYS.META, DEFAULT_INVESTMENT_META),
       hydrated_at: now,
     },
+    sourceAccounts: parseStoredValue<InvestmentSourceAccount[]>(
+      loaded,
+      INVESTMENT_STORAGE_KEYS.SOURCE_ACCOUNTS,
+      []
+    ).sort((a, b) => a.name.localeCompare(b.name)),
+    valueSnapshots: parseStoredValue<InvestmentValueSnapshot[]>(
+      loaded,
+      INVESTMENT_STORAGE_KEYS.VALUE_SNAPSHOTS,
+      []
+    ).sort((a, b) => b.snapshot_date.localeCompare(a.snapshot_date)),
     dbPath: desktopDbPath,
   };
 };

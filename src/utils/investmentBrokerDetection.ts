@@ -7,6 +7,8 @@ export type BrokerProfileKey =
   | 'degiro'
   | 'xtb'
   | 'portu'
+  | 'investown'
+  | 'edward'
   | 'revolut'
   | 'etoro'
   | 'binance'
@@ -76,6 +78,31 @@ const PROFILE_DEFINITIONS: Array<{
     sourceKind: 'broker_export',
     filePatterns: [/\bportu\b/i],
     requiredHeaderGroups: [['isin', 'ticker', 'symbol'], ['datum', 'date'], ['mnozstvi', 'quantity'], ['cena', 'price']],
+  },
+  {
+    key: 'investown',
+    name: 'Investown',
+    provider: 'investown',
+    sourceKind: 'broker_export',
+    filePatterns: [/investown/i, /vykaz[\s_-]?prijmu/i, /seznam[\s_-]?transakci/i],
+    requiredHeaderGroups: [
+      ['typtransakce', 'transactiontype', 'typ'],
+      ['datum', 'date'],
+      ['nazevprojektu', 'projekt', 'project'],
+      ['castka', 'amount', 'hodnota'],
+    ],
+  },
+  {
+    key: 'edward',
+    name: 'Edward',
+    provider: 'edward',
+    sourceKind: 'broker_export',
+    filePatterns: [/edward/i, /mesicni[\s_-]?vypis/i, /monthly[\s_-]?statement/i],
+    requiredHeaderGroups: [
+      ['datum', 'date'],
+      ['portfolio', 'kyblik', 'strategie', 'instrument'],
+      ['castka', 'amount', 'hodnota'],
+    ],
   },
   {
     key: 'revolut',

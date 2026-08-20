@@ -1,4 +1,14 @@
-export type InvestmentTransactionType = 'buy' | 'sell' | 'dividend';
+export type InvestmentTransactionType =
+  | 'buy'
+  | 'sell'
+  | 'dividend'
+  | 'deposit'
+  | 'withdrawal'
+  | 'interest'
+  | 'principal_repayment'
+  | 'fee'
+  | 'tax'
+  | 'cash_adjustment';
 
 export type InvestmentAssetType =
   | 'stock'
@@ -29,6 +39,46 @@ export type BrokerConnectorKind = 'manual_template' | 'broker_export' | 'api_syn
 
 export type BrokerConnectorStatus = 'planned' | 'configured' | 'ready';
 
+export type InvestmentSourceAccountType =
+  | 'brokerage'
+  | 'managed_portfolio'
+  | 'crowdfunding'
+  | 'p2p'
+  | 'crypto'
+  | 'other';
+
+export type InvestmentSourceSyncMode = 'manual' | 'file_import' | 'api_sync';
+
+export type InvestmentSourceValuationMode = 'positions' | 'snapshot';
+
+export interface InvestmentSourceAccount {
+  id: string;
+  name: string;
+  provider: InvestmentProvider;
+  account_type: InvestmentSourceAccountType;
+  currency: string;
+  sync_mode: InvestmentSourceSyncMode;
+  valuation_mode: InvestmentSourceValuationMode;
+  is_active: boolean;
+  last_synced_at: string | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InvestmentValueSnapshot {
+  id: string;
+  source_account_id: string;
+  snapshot_date: string;
+  total_value: number;
+  cash_balance: number;
+  invested_value: number | null;
+  currency: string;
+  source_kind: 'manual' | 'file_import' | 'api_sync';
+  note: string | null;
+  created_at: string;
+}
+
 export interface InvestmentAsset {
   id: string;
   ticker: string;
@@ -37,6 +87,7 @@ export interface InvestmentAsset {
   provider: InvestmentProvider;
   sector: string | null;
   currency: string;
+  source_account_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -50,6 +101,8 @@ export interface CreditInvestment {
   interest_rate: number;
   status: CreditInvestmentStatus;
   currency: string;
+  source_account_id?: string | null;
+  invested_value?: number | null;
   note: string | null;
   created_at: string;
   updated_at: string;
@@ -75,12 +128,14 @@ export interface TrackedInvestment {
   sector: string | null;
   currency: string;
   current_value: number;
+  invested_value?: number | null;
   quantity: number | null;
   current_price: number | null;
   include_in_portfolio: boolean;
   is_watchlist: boolean;
   note: string | null;
   last_price_synced_at: string | null;
+  source_account_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -144,6 +199,9 @@ export interface InvestmentTransaction {
   pay_date?: string | null;
   expected_dividend_amount?: number | null;
   broker_connector_id?: string | null;
+  source_account_id?: string | null;
+  external_id?: string | null;
+  source_row_hash?: string | null;
   created_at: string;
 }
 
@@ -172,6 +230,10 @@ export interface ImportBatch {
   notes: string | null;
   source_kind?: BrokerConnectorKind | null;
   source_label?: string | null;
+  source_account_id?: string | null;
+  imported_count?: number;
+  duplicate_count?: number;
+  rejected_count?: number;
 }
 
 export interface PortfolioSettings {
@@ -253,6 +315,30 @@ export interface PortfolioSummary {
   dividendCalendar: DividendCalendarMonth[];
   dividendDetails: DividendDetail[];
   dividendTaxEstimate: number;
+  sourceBreakdown: Array<{
+    sourceAccountId: string | null;
+    label: string;
+    provider: InvestmentProvider | 'unassigned';
+    value: number;
+    currency: string;
+    lastUpdatedAt: string | null;
+    valuationMode: InvestmentSourceValuationMode | 'positions';
+  }>;
+  performance: {
+    totalReturn: number | null;
+    totalReturnPercent: number | null;
+    twr: number | null;
+    twrStatus: 'available' | 'insufficient-data';
+  };
+  dataQuality: {
+    status: 'complete' | 'partial' | 'insufficient';
+    score: number;
+    missingPrices: number;
+    missingExchangeRates: number;
+    staleSources: number;
+    excludedValueCount: number;
+    messages: string[];
+  };
 }
 
 export type TickerAnalysisStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -311,4 +397,19 @@ export const CREDIT_INVESTMENT_STATUS_LABELS: Record<CreditInvestmentStatus, str
   pending: 'Čeká se',
   recovery: 'Vymáhání',
   repaid: 'Splaceno',
+};
+
+export const INVESTMENT_SOURCE_ACCOUNT_TYPE_LABELS: Record<InvestmentSourceAccountType, string> = {
+  brokerage: 'Brokerský účet',
+  managed_portfolio: 'Řízené portfolio',
+  crowdfunding: 'Crowdfunding',
+  p2p: 'P2P / úvěry',
+  crypto: 'Krypto účet',
+  other: 'Jiný zdroj',
+};
+
+export const INVESTMENT_SOURCE_SYNC_MODE_LABELS: Record<InvestmentSourceSyncMode, string> = {
+  manual: 'Ruční snapshot',
+  file_import: 'Import souboru',
+  api_sync: 'API synchronizace',
 };

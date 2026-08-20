@@ -27,6 +27,7 @@ import { BrokerConnectionsPanel } from './BrokerConnectionsPanel';
 import { CreditInvestmentsPanel } from './CreditInvestmentsPanel';
 import { TrackedInvestmentsPanel } from './TrackedInvestmentsPanel';
 import { InvestmentAuditPanel } from './InvestmentAuditPanel';
+import { InvestmentSourcesPanel } from './InvestmentSourcesPanel';
 import { InvestmentWorkspacePanels } from './InvestmentWorkspacePanels';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -57,6 +58,7 @@ interface InvestmentSavedView {
 const INVESTMENT_DASHBOARD_PREFS_KEY = 'finance_investment_dashboard_prefs';
 const INVESTMENT_DASHBOARD_VIEWS_KEY = 'finance_investment_dashboard_saved_views';
 const INVESTMENT_DASHBOARD_TIP_KEY = 'finance_investment_dashboard_tip_hidden';
+const LEGACY_INVESTMENT_LAYOUT_ENABLED = import.meta.env.VITE_SHOW_LEGACY_INVESTMENT_LAYOUT === 'true';
 
 const DEFAULT_INVESTMENT_VIEWS: InvestmentSavedView[] = [
   {
@@ -137,6 +139,8 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
     creditInvestments,
     creditRepayments,
     trackedInvestments,
+    sourceAccounts,
+    valueSnapshots,
     auditLog,
     syncStatus,
     validationIssues,
@@ -158,6 +162,9 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
     addTrackedInvestment,
     updateTrackedInvestment,
     deleteTrackedInvestment,
+    addSourceAccount,
+    updateSourceAccount,
+    addValueSnapshot,
     importTransactions,
     undoImport,
     updateSettings,
@@ -478,9 +485,18 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
     const failures: string[] = [];
     let updated = 0;
 
+    const marketAssetTypes = new Set(['stock', 'etf', 'crypto', 'bond', 'commodity']);
+    const positionSourceIds = new Set(
+      sourceAccounts.filter((source) => source.valuation_mode === 'positions').map((source) => source.id)
+    );
+    const refreshableAssets = assets.filter(
+      (asset) =>
+        marketAssetTypes.has(asset.asset_type) &&
+        (!asset.source_account_id || positionSourceIds.has(asset.source_account_id))
+    );
     const targetAssets = onlyStale
-      ? assets.filter((asset) => latestPriceDateByAsset.get(asset.id) !== today)
-      : assets;
+      ? refreshableAssets.filter((asset) => latestPriceDateByAsset.get(asset.id) !== today)
+      : refreshableAssets;
 
     const targetTracked = trackedInvestments.filter((investment) => {
       if (!investment.ticker) return false;
@@ -569,7 +585,7 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
         variant: 'destructive',
       });
     }
-  }, [addPrice, assets, latestPriceDateByAsset, recordPriceRefresh, toast, trackedInvestments, updateTrackedInvestment]);
+  }, [addPrice, assets, latestPriceDateByAsset, recordPriceRefresh, sourceAccounts, toast, trackedInvestments, updateTrackedInvestment]);
 
   const handleRefreshPrices = useCallback(async () => {
     await refreshPrices({ silent: false, onlyStale: false });
@@ -757,6 +773,15 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
       <div ref={portfolioSectionRef}>
         <PortfolioOverview portfolioSummary={portfolioSummary} loading={calculatingPortfolio} />
       </div>
+    ),
+    sources: (
+      <InvestmentSourcesPanel
+        sourceAccounts={sourceAccounts}
+        valueSnapshots={valueSnapshots}
+        onAddSourceAccount={addSourceAccount}
+        onUpdateSourceAccount={updateSourceAccount}
+        onAddValueSnapshot={addValueSnapshot}
+      />
     ),
     tracked: (
       <div ref={trackedSectionRef}>
@@ -976,7 +1001,7 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
 
           <InvestmentWorkspacePanels panels={investmentPanels} editing={isLayoutEditing} />
 
-          {false ? (
+          {LEGACY_INVESTMENT_LAYOUT_ENABLED ? (
             <>
 
           <SectionToggle
@@ -1330,6 +1355,7 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
               <DialogTitle>Import investicnich transakci</DialogTitle>
             </DialogHeader>
             <InvestmentCSVImport
+              sourceAccounts={sourceAccounts}
               onImport={async (data) => {
                 await importTransactions(data);
                 setIsImportOpen(false);

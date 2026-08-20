@@ -9,6 +9,7 @@ export type InvestmentWorkspacePanelId =
   | 'actions'
   | 'audit'
   | 'portfolio'
+  | 'sources'
   | 'tracked'
   | 'credit'
   | 'marketAssets';
@@ -19,6 +20,7 @@ const PANEL_LABELS: Record<InvestmentWorkspacePanelId, string> = {
   actions: 'Akce a nástroje',
   audit: 'Audit a kontrola',
   portfolio: 'Souhrn portfolia',
+  sources: 'Investiční účty a zdroje',
   tracked: 'Evidované pozice',
   credit: 'Úvěrové investice',
   marketAssets: 'Tržní aktiva a správa',
@@ -30,6 +32,7 @@ const PANEL_DESCRIPTIONS: Record<InvestmentWorkspacePanelId, string> = {
   actions: 'Import, přepočet a operace nad investicemi',
   audit: 'Stav dat, validace a export zálohy',
   portfolio: 'Vývoj, rozdělení a výkon portfolia',
+  sources: 'Brokeři, Investown, Edward a další platformy',
   tracked: 'Watchlist a ručně evidované pozice',
   credit: 'P2P, B2B a další úvěrové investice',
   marketAssets: 'Tickerové pozice, ceny, dividendy a importy',
@@ -60,6 +63,7 @@ export const InvestmentWorkspacePanels = ({ panels, editing = false }: Investmen
     'actions',
     'audit',
     'portfolio',
+    'sources',
     'tracked',
     'credit',
     'marketAssets',

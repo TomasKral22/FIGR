@@ -12,6 +12,7 @@ import {
   INVESTMENT_PROVIDER_LABELS,
   InvestmentAssetType,
   InvestmentProvider,
+  InvestmentSourceAccount,
   InvestmentTransactionType,
 } from '@/types/investment';
 import {
@@ -37,12 +38,16 @@ interface ImportRow {
   expected_dividend_amount?: number;
   source_label?: string;
   source_kind?: 'manual_template' | 'broker_export';
+  source_account_id?: string;
+  external_id?: string;
+  source_row_hash?: string;
   valid: boolean;
   errors: string[];
 }
 
 interface InvestmentCSVImportProps {
   onImport: (data: ImportRow[]) => Promise<void>;
+  sourceAccounts?: InvestmentSourceAccount[];
 }
 
 const normalizeText = (value: string) =>
@@ -114,7 +119,16 @@ const parseDate = (value: unknown): string => {
   return source;
 };
 
-export const InvestmentCSVImport = ({ onImport }: InvestmentCSVImportProps) => {
+const stableRowHash = (parts: Array<string | number>) => {
+  let hash = 2166136261;
+  for (const character of parts.join('|')) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `figr-${(hash >>> 0).toString(16)}`;
+};
+
+export const InvestmentCSVImport = ({ onImport, sourceAccounts = [] }: InvestmentCSVImportProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<ImportRow[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
@@ -122,6 +136,7 @@ export const InvestmentCSVImport = ({ onImport }: InvestmentCSVImportProps) => {
   const [defaultAssetType, setDefaultAssetType] = useState<InvestmentAssetType>('stock');
   const [defaultProvider, setDefaultProvider] = useState<InvestmentProvider>('broker');
   const [sourceInfo, setSourceInfo] = useState<ParsedInvestmentImportFile | null>(null);
+  const [selectedSourceAccountId, setSelectedSourceAccountId] = useState('unassigned');
 
   const parseRows = (parsedFile: ParsedInvestmentImportFile) => {
     const parseErrors: string[] = [];
@@ -130,13 +145,21 @@ export const InvestmentCSVImport = ({ onImport }: InvestmentCSVImportProps) => {
 
     parsedFile.rows.forEach((values, index) => {
       const rowErrors: string[] = [];
-      const ticker = String(firstNonEmpty(values, profileConfig.ticker))
+      const rawTicker = String(firstNonEmpty(values, profileConfig.ticker)).trim();
+      const rawName = String(firstNonEmpty(values, profileConfig.name) || rawTicker).trim();
+      const ticker = (rawTicker || `${parsedFile.detectedProfile.name}-${index + 1}`)
         .trim()
         .toUpperCase();
-      const name = String(firstNonEmpty(values, profileConfig.name) || ticker).trim();
-      const quantity = parseAmount(firstNonEmpty(values, profileConfig.quantity));
-      const pricePerUnit = parseAmount(firstNonEmpty(values, profileConfig.price));
-      const currency = String(firstNonEmpty(values, profileConfig.currency) || 'USD').trim().toUpperCase();
+      const name = rawName || ticker;
+      const quantityRaw = parseAmount(firstNonEmpty(values, profileConfig.quantity));
+      const totalValueRaw = parseAmount(firstNonEmpty(values, profileConfig.totalValue));
+      const quantity = Number.isNaN(quantityRaw) && ['investown', 'edward'].includes(parsedFile.detectedProfile.key) ? 1 : quantityRaw;
+      const priceRaw = parseAmount(firstNonEmpty(values, profileConfig.price));
+      const pricePerUnit = Number.isNaN(priceRaw) && !Number.isNaN(totalValueRaw) && quantity > 0 ? totalValueRaw / quantity : priceRaw;
+      const currency = String(
+        firstNonEmpty(values, profileConfig.currency) ||
+          (['investown', 'edward'].includes(parsedFile.detectedProfile.key) ? 'CZK' : 'USD')
+      ).trim().toUpperCase();
       const sector = String(firstNonEmpty(values, profileConfig.sector) || '').trim() || undefined;
       const exDividendDate = String(firstNonEmpty(values, profileConfig.exDividendDate) || '').trim() || undefined;
       const payDate = String(firstNonEmpty(values, profileConfig.payDate) || '').trim() || undefined;
@@ -150,20 +173,22 @@ export const InvestmentCSVImport = ({ onImport }: InvestmentCSVImportProps) => {
       const transactionTypeRaw = String(firstNonEmpty(values, profileConfig.transactionType) || '');
       const brokerTransactionType = normalizeBrokerTransactionType(transactionTypeRaw, parsedFile.detectedProfile.key);
       const transactionTypeValue = normalizeText(transactionTypeRaw);
-      if (brokerTransactionType === 'sell' || brokerTransactionType === 'buy' || brokerTransactionType === 'dividend') {
+      if (brokerTransactionType) {
         transactionType = brokerTransactionType;
-      }
-      if (
+      } else if (
         transactionTypeValue.includes('sell') ||
-        transactionTypeValue.includes('prodej') ||
-        transactionTypeValue.includes('vyber')
+        transactionTypeValue.includes('prodej')
       ) {
         transactionType = 'sell';
+      } else if (transactionTypeValue.includes('vyber')) {
+        transactionType = 'withdrawal';
       } else if (transactionTypeValue.includes('dividend') || transactionTypeValue.includes('dividenda')) {
         transactionType = 'dividend';
       }
 
       let assetType: InvestmentAssetType = defaultAssetType;
+      if (parsedFile.detectedProfile.key === 'investown') assetType = 'private_credit';
+      if (parsedFile.detectedProfile.key === 'edward') assetType = 'managed_portfolio';
       const assetTypeValue = normalizeText(String(firstNonEmpty(values, ['assettype', 'druh', 'category']) || ''));
       if (assetTypeValue.includes('etf')) assetType = 'etf';
       else if (assetTypeValue.includes('crypto') || assetTypeValue.includes('krypto')) assetType = 'crypto';
@@ -219,6 +244,18 @@ export const InvestmentCSVImport = ({ onImport }: InvestmentCSVImportProps) => {
         expected_dividend_amount: Number.isNaN(expectedDividendAmount) ? undefined : expectedDividendAmount,
         source_label: parsedFile.sourceLabel,
         source_kind: parsedFile.sourceKind,
+        source_account_id: selectedSourceAccountId === 'unassigned' ? undefined : selectedSourceAccountId,
+        external_id: String(firstNonEmpty(values, profileConfig.externalId) || '').trim() || undefined,
+        source_row_hash: stableRowHash([
+          selectedSourceAccountId,
+          parsedFile.detectedProfile.key,
+          transactionDate,
+          ticker,
+          transactionType,
+          quantity,
+          pricePerUnit,
+          currency,
+        ]),
         valid: rowErrors.length === 0,
         errors: rowErrors,
       });
@@ -269,6 +306,26 @@ export const InvestmentCSVImport = ({ onImport }: InvestmentCSVImportProps) => {
   const validCount = rows.filter((row) => row.valid).length;
   const invalidCount = rows.length - validCount;
 
+  const handleSourceAccountChange = (value: string) => {
+    setSelectedSourceAccountId(value);
+    setRows((current) =>
+      current.map((row) => ({
+        ...row,
+        source_account_id: value === 'unassigned' ? undefined : value,
+        source_row_hash: stableRowHash([
+          value,
+          sourceInfo?.detectedProfile.key || 'generic',
+          row.transaction_date,
+          row.ticker,
+          row.transaction_type,
+          row.quantity,
+          row.price_per_unit,
+          row.currency,
+        ]),
+      }))
+    );
+  };
+
   return (
     <div className="space-y-4">
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
@@ -285,7 +342,19 @@ export const InvestmentCSVImport = ({ onImport }: InvestmentCSVImportProps) => {
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3 md:items-end">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 xl:items-end">
+        <div className="space-y-2">
+          <Label>Investiční účet / zdroj</Label>
+          <Select value={selectedSourceAccountId} onValueChange={handleSourceAccountChange}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="unassigned">Bez přiřazení</SelectItem>
+              {sourceAccounts.filter((account) => account.is_active).map((account) => (
+                <SelectItem key={account.id} value={account.id}>{account.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <div className="space-y-2">
           <Label>Výchozí typ aktiva</Label>
           <Select value={defaultAssetType} onValueChange={(value) => setDefaultAssetType(value as InvestmentAssetType)}>
