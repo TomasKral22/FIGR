@@ -14,21 +14,12 @@ type StorageSeed = {
   investmentValueSnapshots?: unknown[];
   investmentAssets?: unknown[];
   investmentTransactions?: unknown[];
+  investmentPrices?: unknown[];
+  investmentExchangeRates?: unknown[];
+  investmentSettings?: unknown | null;
   theme?: 'light' | 'dark';
   visualTheme?: string;
   lastTransaction?: unknown | null;
-};
-
-const DEFAULT_BUDGET = {
-  necessities: 50,
-  investments: 20,
-  savings: 20,
-  whims: 10,
-};
-
-const DEFAULT_PORTFOLIO = {
-  annualReturn: 7,
-  currentAge: 30,
 };
 
 export async function seedFinanceStorage(page: Page, seed: StorageSeed = {}) {
@@ -40,8 +31,16 @@ export async function seedFinanceStorage(page: Page, seed: StorageSeed = {}) {
     write('finance_transactions', data.transactions ?? []);
     write('finance_bank_accounts', data.bankAccounts ?? []);
     write('finance_broker_accounts', data.brokerAccounts ?? []);
-    write('finance_budget', DEFAULT_BUDGET);
-    write('finance_portfolio', DEFAULT_PORTFOLIO);
+    write('finance_budget', {
+      necessities: 50,
+      investments: 20,
+      savings: 20,
+      whims: 10,
+    });
+    write('finance_portfolio', {
+      annualReturn: 7,
+      currentAge: 30,
+    });
     write('finance_recurring_transactions', data.recurringTransactions ?? []);
     write('finance_folders', []);
     write('finance_goals', data.goals ?? []);
@@ -53,6 +52,9 @@ export async function seedFinanceStorage(page: Page, seed: StorageSeed = {}) {
     write('investment_value_snapshots', data.investmentValueSnapshots ?? []);
     write('investment_assets', data.investmentAssets ?? []);
     write('investment_transactions', data.investmentTransactions ?? []);
+    write('investment_prices', data.investmentPrices ?? []);
+    write('investment_exchange_rates', data.investmentExchangeRates ?? []);
+    if (data.investmentSettings !== undefined) write('investment_settings', data.investmentSettings);
     window.localStorage.setItem('finance_theme', data.theme ?? 'dark');
     window.localStorage.setItem('finance_visual_theme', data.visualTheme ?? 'dark-blue');
     window.localStorage.setItem('figr_auth_bypass', 'true');

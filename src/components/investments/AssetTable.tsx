@@ -227,7 +227,7 @@ export const AssetTable = ({
                           <p>{formatQuantity(asset.quantity)}</p>
                         </div>
                         <div>
-                          <p className="text-muted-foreground">Akt. cena</p>
+                          <p className="text-muted-foreground">{asset.priceSource === 'transaction' ? 'Náhradní cena' : 'Akt. cena'}</p>
                           <p>{asset.currentPriceInReportingCurrency !== null ? formatCurrency(asset.currentPriceInReportingCurrency, reportingCurrency) : '-'}</p>
                         </div>
                         <div>
@@ -307,6 +307,9 @@ export const AssetTable = ({
                           {asset.currentPriceInReportingCurrency !== null
                             ? formatCurrency(asset.currentPriceInReportingCurrency, reportingCurrency)
                             : '-'}
+                          {asset.priceSource === 'transaction' ? (
+                            <p className="text-xs text-muted-foreground">poslední transakce</p>
+                          ) : null}
                         </TableCell>
                         <TableCell className="text-right">
                           {asset.currentValueInReportingCurrency !== null

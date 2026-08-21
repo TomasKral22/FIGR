@@ -31,6 +31,38 @@ export const fetchTickerMarketSnapshot = async (ticker: string): Promise<MarketS
   return response.snapshot;
 };
 
+export const fetchExchangeRateSnapshot = async (fromCurrency: string, toCurrency: string) => {
+  const from = fromCurrency.trim().toUpperCase();
+  const to = toCurrency.trim().toUpperCase();
+  if (!from || !to || from === to) {
+    throw new Error('Neplatný měnový pár.');
+  }
+
+  try {
+    const snapshot = await fetchTickerMarketSnapshot(`${from}${to}=X`);
+    if (snapshot.regularMarketPrice == null || snapshot.regularMarketPrice <= 0) {
+      throw new Error(`Pro ${from}/${to} není dostupný směnný kurz.`);
+    }
+    return {
+      from_currency: from,
+      to_currency: to,
+      rate: snapshot.regularMarketPrice,
+      rate_date: snapshot.marketTime?.slice(0, 10) || new Date().toISOString().slice(0, 10),
+    };
+  } catch (directError) {
+    const inverseSnapshot = await fetchTickerMarketSnapshot(`${to}${from}=X`);
+    if (inverseSnapshot.regularMarketPrice == null || inverseSnapshot.regularMarketPrice <= 0) {
+      throw directError;
+    }
+    return {
+      from_currency: from,
+      to_currency: to,
+      rate: 1 / inverseSnapshot.regularMarketPrice,
+      rate_date: inverseSnapshot.marketTime?.slice(0, 10) || new Date().toISOString().slice(0, 10),
+    };
+  }
+};
+
 export const marketSnapshotToAssetPrice = (
   asset: InvestmentAsset,
   snapshot: MarketSnapshot

@@ -155,7 +155,13 @@ export const loadInvestmentState = async (): Promise<LoadedInvestmentState> => {
       loaded,
       INVESTMENT_STORAGE_KEYS.SOURCE_ACCOUNTS,
       []
-    ).sort((a, b) => a.name.localeCompare(b.name)),
+    )
+      .map((account) => ({
+        ...account,
+        covers_unassigned_positions: Boolean(account.covers_unassigned_positions),
+        excluded_amount: Math.max(0, Number(account.excluded_amount) || 0),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
     valueSnapshots: parseStoredValue<InvestmentValueSnapshot[]>(
       loaded,
       INVESTMENT_STORAGE_KEYS.VALUE_SNAPSHOTS,

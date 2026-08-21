@@ -27,19 +27,20 @@ const AccountGroup = ({
     <div className="space-y-2.5">
       <div className="flex items-center justify-between gap-3">
         <p className="text-caption uppercase tracking-[0.12em] text-muted-foreground">{title}</p>
-        <span className="text-xs text-muted-foreground">{accounts.length} uctu</span>
+        <span className="text-xs text-muted-foreground">{accounts.length} účtů</span>
       </div>
 
       {accounts.length === 0 ? (
         <div className="rounded-2xl border border-border/70 bg-muted/25 px-4 py-3 text-sm text-muted-foreground">
-          Zatim bez uctu v teto skupine.
+          Zatím bez účtů v této skupině.
         </div>
       ) : (
         <div className="grid gap-2.5 lg:grid-cols-2">
           {accounts.map((account) => {
             const accountCurrency = normalizeCurrencyCode(account.currency, 'CZK');
+            const ownedBalance = Math.max(0, account.currentBalance - (account.excludedAmount || 0));
             const convertedToCzk = convertCurrencyValue(
-              account.currentBalance,
+              ownedBalance,
               accountCurrency,
               'CZK',
               exchangeRates
@@ -57,19 +58,26 @@ const AccountGroup = ({
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="truncate text-sm font-medium">{account.name}</p>
+                    <p className="truncate text-sm font-medium">
+                      {account.name}{kind === 'bank' && account.isSavings ? ' · s.ú.' : ''}
+                    </p>
                     <span className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
                       {accountCurrency}
                     </span>
                     {kind === 'bank' && account.isSavings && (
                       <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                        s.u.
+                        s.ú.
                       </span>
                     )}
                   </div>
                   <p className="mt-0.5 text-base font-semibold">
-                    {formatCurrency(account.currentBalance, accountCurrency)}
+                    {formatCurrency(ownedBalance, accountCurrency)}
                   </p>
+                  {account.excludedAmount > 0 ? (
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Celkem {formatCurrency(account.currentBalance, accountCurrency)} · cizí {formatCurrency(account.excludedAmount, accountCurrency)}
+                    </p>
+                  ) : null}
                   {accountCurrency !== 'CZK' ? (
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {formatCurrency(convertedToCzk, 'CZK')}
@@ -96,6 +104,17 @@ export const WealthOverview = ({
   const monthDelta = latest && previous ? latest.totalNetWorth - previous.totalNetWorth : 0;
   const monthDeltaLabel =
     monthDelta >= 0 ? 'Rust oproti minulemu snapshotu' : 'Pokles oproti minulemu snapshotu';
+  const excludedValue = [...bankAccounts, ...brokerAccounts].reduce(
+    (sum, account) =>
+      sum +
+      convertCurrencyValue(
+        Math.min(Math.max(0, account.excludedAmount || 0), Math.max(0, account.currentBalance)),
+        normalizeCurrencyCode(account.currency, 'CZK'),
+        'CZK',
+        exchangeRates
+      ),
+    0
+  );
 
   if (!latest) {
     return (
@@ -125,6 +144,11 @@ export const WealthOverview = ({
               <p className="text-[clamp(2rem,3.6vw,3rem)] font-bold leading-none tracking-[-0.04em]">
                 {formatCurrency(latest.totalNetWorth, 'CZK')}
               </p>
+              {excludedValue > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Mimo vlastní majetek: {formatCurrency(excludedValue, 'CZK')}
+                </p>
+              ) : null}
             </div>
 
             <div className="grid gap-3 md:grid-cols-3">
@@ -180,8 +204,8 @@ export const WealthOverview = ({
           </div>
 
           <div className="grid gap-4 border-t border-border/70 pt-4 xl:grid-cols-2">
-            <AccountGroup title="Bankovni ucty" accounts={bankAccounts} kind="bank" exchangeRates={exchangeRates} />
-            <AccountGroup title="Brokerske ucty" accounts={brokerAccounts} kind="broker" exchangeRates={exchangeRates} />
+            <AccountGroup title="Bankovní účty" accounts={bankAccounts} kind="bank" exchangeRates={exchangeRates} />
+            <AccountGroup title="Brokerské účty" accounts={brokerAccounts} kind="broker" exchangeRates={exchangeRates} />
           </div>
         </CardContent>
       </Card>

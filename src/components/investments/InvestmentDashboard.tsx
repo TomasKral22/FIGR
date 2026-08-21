@@ -35,7 +35,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { buildTickerAnalysisPrompt, EXTERNAL_AI_URLS } from '@/services/aiAnalysis';
-import { fetchTickerMarketSnapshot, marketSnapshotToAssetPrice } from '@/services/marketData';
+import { fetchExchangeRateSnapshot, fetchTickerMarketSnapshot, marketSnapshotToAssetPrice } from '@/services/marketData';
 import { useToast } from '@/hooks/use-toast';
 
 interface InvestmentDashboardProps {
@@ -227,6 +227,7 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
         quantity: trackedAsset.quantity || 0,
         avgBuyPrice: 0,
         totalInvested: 0,
+        priceSource: trackedAsset.current_price != null ? 'market' : 'missing',
         currentPrice: trackedAsset.current_price,
         currentValue: trackedAsset.current_value,
         profitLoss: null,
@@ -254,6 +255,7 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
       quantity: 0,
       avgBuyPrice: 0,
       totalInvested: 0,
+      priceSource: 'missing',
       currentPrice: null,
       currentValue: null,
       profitLoss: null,
@@ -489,10 +491,18 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
     const positionSourceIds = new Set(
       sourceAccounts.filter((source) => source.valuation_mode === 'positions').map((source) => source.id)
     );
+    const unassignedPositionsCovered = sourceAccounts.some(
+      (source) =>
+        source.is_active &&
+        source.valuation_mode === 'snapshot' &&
+        Boolean(source.covers_unassigned_positions) &&
+        valueSnapshots.some((snapshot) => snapshot.source_account_id === source.id)
+    );
     const refreshableAssets = assets.filter(
       (asset) =>
         marketAssetTypes.has(asset.asset_type) &&
-        (!asset.source_account_id || positionSourceIds.has(asset.source_account_id))
+        ((!asset.source_account_id && !unassignedPositionsCovered) ||
+          (Boolean(asset.source_account_id) && positionSourceIds.has(asset.source_account_id!)))
     );
     const targetAssets = onlyStale
       ? refreshableAssets.filter((asset) => latestPriceDateByAsset.get(asset.id) !== today)
@@ -504,7 +514,27 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
       return investment.last_price_synced_at?.slice(0, 10) !== today;
     });
 
-    if (targetAssets.length === 0 && targetTracked.length === 0) {
+    const reportingCurrency = settings?.reporting_currency || 'CZK';
+    const requiredCurrencies = new Set([
+      ...assets.map((asset) => asset.currency),
+      ...prices.map((price) => price.currency),
+      ...trackedInvestments.map((investment) => investment.currency),
+      ...creditInvestments.map((investment) => investment.currency),
+      ...sourceAccounts.map((source) => source.currency),
+      ...valueSnapshots.map((snapshot) => snapshot.currency),
+    ].map((currency) => currency.trim().toUpperCase()).filter(Boolean));
+    const targetCurrencies = [...requiredCurrencies].filter((currency) => {
+      if (currency === reportingCurrency) return false;
+      if (!onlyStale) return true;
+      return !exchangeRates.some(
+        (rate) =>
+          rate.rate_date === today &&
+          ((rate.from_currency === currency && rate.to_currency === reportingCurrency) ||
+            (rate.from_currency === reportingCurrency && rate.to_currency === currency))
+      );
+    });
+
+    if (targetAssets.length === 0 && targetTracked.length === 0 && targetCurrencies.length === 0) {
       if (!silent) {
         toast({
           title: 'Zadne tickerove polozky',
@@ -532,6 +562,16 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
         updated += 1;
       } catch (error) {
         failures.push(`${asset.ticker}: ${getErrorMessage(error) || 'chyba nacteni ceny'}`);
+      }
+    }
+
+    for (const currency of targetCurrencies) {
+      try {
+        const nextRate = await fetchExchangeRateSnapshot(currency, reportingCurrency);
+        await addExchangeRate(nextRate, { silent: true });
+        updated += 1;
+      } catch (error) {
+        failures.push(`${currency}/${reportingCurrency}: ${getErrorMessage(error) || 'chyba načtení kurzu'}`);
       }
     }
 
@@ -585,7 +625,22 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
         variant: 'destructive',
       });
     }
-  }, [addPrice, assets, latestPriceDateByAsset, recordPriceRefresh, sourceAccounts, toast, trackedInvestments, updateTrackedInvestment]);
+  }, [
+    addExchangeRate,
+    addPrice,
+    assets,
+    creditInvestments,
+    exchangeRates,
+    latestPriceDateByAsset,
+    prices,
+    recordPriceRefresh,
+    settings?.reporting_currency,
+    sourceAccounts,
+    toast,
+    trackedInvestments,
+    updateTrackedInvestment,
+    valueSnapshots,
+  ]);
 
   const handleRefreshPrices = useCallback(async () => {
     await refreshPrices({ silent: false, onlyStale: false });

@@ -180,6 +180,8 @@ Bankovní účet může být:
 - běžný účet
 - spořicí účet (`s.ú.`)
 
+U bankovního i brokerského účtu lze nastavit **Cizí prostředky**. Jde o část zůstatku, kterou uživatel pouze spravuje pro jinou osobu. Aplikace dál ukazuje skutečný hrubý zůstatek, ale z likvidity, čistého majetku, reportů a historických snapshotů započítá jen vlastní část po odečtení této částky.
+
 ### Brokerský účet
 Brokerské účty slouží pro správu investičních prostředků a vazbu na investiční část aplikace.
 
@@ -270,6 +272,7 @@ Aktuálně lze evidovat:
 Lze přiřadit:
 
 - Broker
+- Alocano
 - Investown
 - Fingood
 - Edward
@@ -277,6 +280,8 @@ Lze přiřadit:
 - Jiný poskytovatel
 
 Tato data se používají v reálném rozložení portfolia.
+
+Alocano lze založit jako ručně aktualizovaný souhrnný zdroj. Uživatel z něj opíše pouze datum a celkovou hodnotu portfolia. Jakmile snapshot existuje, nahradí ocenění pozic bez přiřazeného účtu, takže se stejné broker portfolio nezapočítá podruhé. Edward, Conseq, Investown a další samostatné zdroje se k němu dál přičítají.
 
 ### Dividendy
 Dividendový přehled je v:
@@ -337,6 +342,8 @@ Lze importovat:
 - prodeje
 - dividendy
 - alternativní investice podle poskytovatele
+
+FIGR umí z vlastní XLSX šablony načíst české názvy sloupců i excelová datumová čísla. Otevřené pozice bez živé ceny zůstávají v celkovém majetku oceněné poslední transakční cenou; aplikace je viditelně označí jako náhradní ocenění a nezobrazuje z nich přesnou výkonnost. Při aktualizaci cen se doplní také potřebné kurzy do reportovací měny.
 
 ---
 

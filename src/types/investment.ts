@@ -25,6 +25,7 @@ export type InvestmentAssetType =
 
 export type InvestmentProvider =
   | 'broker'
+  | 'alocano'
   | 'investown'
   | 'fingood'
   | 'edward'
@@ -59,6 +60,8 @@ export interface InvestmentSourceAccount {
   currency: string;
   sync_mode: InvestmentSourceSyncMode;
   valuation_mode: InvestmentSourceValuationMode;
+  covers_unassigned_positions: boolean;
+  excluded_amount: number;
   is_active: boolean;
   last_synced_at: string | null;
   note: string | null;
@@ -266,6 +269,7 @@ export interface PortfolioAsset {
   quantity: number;
   avgBuyPrice: number;
   totalInvested: number;
+  priceSource: 'market' | 'transaction' | 'missing';
   currentPrice: number | null;
   currentValue: number | null;
   profitLoss: number | null;
@@ -315,11 +319,14 @@ export interface PortfolioSummary {
   dividendCalendar: DividendCalendarMonth[];
   dividendDetails: DividendDetail[];
   dividendTaxEstimate: number;
+  excludedValue: number;
   sourceBreakdown: Array<{
     sourceAccountId: string | null;
     label: string;
     provider: InvestmentProvider | 'unassigned';
     value: number;
+    grossValue: number;
+    excludedValue: number;
     currency: string;
     lastUpdatedAt: string | null;
     valuationMode: InvestmentSourceValuationMode | 'positions';
@@ -334,6 +341,7 @@ export interface PortfolioSummary {
     status: 'complete' | 'partial' | 'insufficient';
     score: number;
     missingPrices: number;
+    fallbackPrices: number;
     missingExchangeRates: number;
     staleSources: number;
     excludedValueCount: number;
@@ -378,6 +386,7 @@ export const ASSET_TYPE_LABELS: Record<InvestmentAssetType, string> = {
 
 export const INVESTMENT_PROVIDER_LABELS: Record<InvestmentProvider, string> = {
   broker: 'Broker',
+  alocano: 'Alocano',
   investown: 'Investown',
   fingood: 'Fingood',
   edward: 'Edward',

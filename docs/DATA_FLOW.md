@@ -67,6 +67,8 @@ Výstup:
 - `accountSnapshots`
 - `wealthSnapshots`
 
+Snapshot účtu uchovává hrubý zůstatek i vlastní zůstatek po odečtení nastavených cizích prostředků. Měsíční kontrola pracuje s hrubým bankovním stavem, zatímco majetkové součty a reporty používají vlastní část.
+
 Tyto snapshoty používají:
 - `/src/components/WealthOverview.tsx`
 - `/src/components/TransactionList.tsx`
@@ -125,7 +127,7 @@ Komponenty a utility:
 
 Tok:
 1. Uživatel nahraje CSV/XLSX.
-2. Import parser převede řádky na normalizovaná data.
+2. Import parser namapuje české i brokerové hlavičky, převede textová i excelová data a vytvoří normalizované řádky.
 3. Validní řádky se pošlou do `importTransactions`.
 4. Hook založí chybějící aktiva.
 5. Vytvoří import batch.
@@ -146,6 +148,9 @@ Vstupy:
 Transformace:
 - výpočet investované částky
 - výpočet aktuální hodnoty
+- fallback na poslední transakční cenu, pokud není živá cena
+- fallback na součet pozic, pokud snapshotový zdroj ještě nemá snapshot
+- nahrazení nepřiřazených pozic ručním souhrnným snapshotem Alocana, aby nedošlo k dvojímu započtení
 - výpočet zisku / ztráty
 - rozpad podle typu aktiva
 - rozpad podle poskytovatele

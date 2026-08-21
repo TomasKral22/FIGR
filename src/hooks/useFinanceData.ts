@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   AccountGoal,
   AutoCategorizationRule,
@@ -111,6 +111,7 @@ export const useFinanceData = () => {
   const [lastTransaction, setLastTransaction] = useState<Omit<Transaction, 'id' | 'createdAt'> | null>(null);
   const [exchangeRates, setExchangeRates] = useState<ExchangeRateLike[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const decorateGoals = useCallback(
     (
@@ -193,7 +194,7 @@ export const useFinanceData = () => {
 
   useEffect(() => {
     if (!isHydrated) return;
-    void saveFinanceState({
+    const stateToSave = {
       transactions,
       bankAccounts,
       brokerAccounts,
@@ -214,7 +215,12 @@ export const useFinanceData = () => {
       isDarkMode,
       visualTheme,
       lastTransaction,
-    });
+    };
+    saveQueueRef.current = saveQueueRef.current
+      .catch((error) => {
+        console.error('Previous finance state save failed:', error);
+      })
+      .then(() => saveFinanceState(stateToSave));
   }, [
     transactions,
     bankAccounts,
@@ -280,6 +286,7 @@ export const useFinanceData = () => {
         accountGroup: 'bank' as const,
         initialBalance: account.initialBalance,
         currentBalance: account.currentBalance,
+        excludedAmount: account.excludedAmount,
       })),
       ...brokerAccounts.map((account) => ({
         accountId: account.id,
@@ -289,6 +296,7 @@ export const useFinanceData = () => {
         accountGroup: 'broker' as const,
         initialBalance: account.initialBalance,
         currentBalance: account.currentBalance,
+        excludedAmount: account.excludedAmount,
       })),
     ];
 
@@ -302,6 +310,7 @@ export const useFinanceData = () => {
           accountGroup: account.accountGroup,
           initialBalance: account.initialBalance,
           currentBalance: account.currentBalance,
+          excludedAmount: account.excludedAmount,
         },
       ])
     ) as Record<
@@ -313,6 +322,7 @@ export const useFinanceData = () => {
         accountGroup: 'bank' | 'broker';
         initialBalance: number;
         currentBalance: number;
+        excludedAmount: number;
       }
     >;
 
@@ -370,6 +380,9 @@ export const useFinanceData = () => {
 
       mergedAccounts.forEach((account) => {
         const adjustment = month === currentMonth ? adjustments[account.accountId] || 0 : 0;
+        const balance = (balancesByAccount[account.accountId] ?? 0) + adjustment;
+        const excludedAmount = Math.min(Math.max(0, account.excludedAmount), Math.max(0, balance));
+        const ownedBalance = Math.max(0, balance - excludedAmount);
         computedAccountSnapshots.push({
           id: `${month}-${account.accountGroup}-${account.accountId}`,
           month,
@@ -378,9 +391,18 @@ export const useFinanceData = () => {
           institutionId: account.institutionId,
           accountGroup: account.accountGroup,
           currency: account.currency,
-          balance: (balancesByAccount[account.accountId] ?? 0) + adjustment,
+          balance,
           balanceCzk: convertCurrencyValue(
-            (balancesByAccount[account.accountId] ?? 0) + adjustment,
+            balance,
+            account.currency,
+            'CZK',
+            exchangeRates,
+            `${month}-31`
+          ),
+          excludedAmount,
+          ownedBalance,
+          ownedBalanceCzk: convertCurrencyValue(
+            ownedBalance,
             account.currency,
             'CZK',
             exchangeRates,
@@ -401,6 +423,12 @@ export const useFinanceData = () => {
 
         if (!matchedAccount) return null;
 
+        const excludedAmount = Math.min(
+          Math.max(0, matchedAccount.excludedAmount),
+          Math.max(0, snapshot.balance)
+        );
+        const ownedBalance = Math.max(0, snapshot.balance - excludedAmount);
+
         return {
           id: `import-${snapshot.month}-${snapshot.accountId}`,
           month: snapshot.month,
@@ -411,6 +439,9 @@ export const useFinanceData = () => {
           currency: matchedAccount.currency,
           balance: snapshot.balance,
           balanceCzk: convertCurrencyValue(snapshot.balance, matchedAccount.currency, 'CZK', exchangeRates, `${snapshot.month}-31`),
+          excludedAmount,
+          ownedBalance,
+          ownedBalanceCzk: convertCurrencyValue(ownedBalance, matchedAccount.currency, 'CZK', exchangeRates, `${snapshot.month}-31`),
           isSavings: bankMatch?.isSavings || false,
           source: 'import',
           createdAt: snapshot.createdAt,
@@ -431,10 +462,10 @@ export const useFinanceData = () => {
       const monthSnapshots = mergedSnapshots.filter((snapshot) => snapshot.month === month);
       const bankAssets = monthSnapshots
         .filter((snapshot) => snapshot.accountGroup === 'bank')
-        .reduce((sum, snapshot) => sum + (snapshot.balanceCzk ?? convertCurrencyValue(snapshot.balance, snapshot.currency, 'CZK', exchangeRates, `${month}-31`)), 0);
+        .reduce((sum, snapshot) => sum + (snapshot.ownedBalanceCzk ?? convertCurrencyValue(snapshot.ownedBalance ?? snapshot.balance, snapshot.currency, 'CZK', exchangeRates, `${month}-31`)), 0);
       const brokerAssets = monthSnapshots
         .filter((snapshot) => snapshot.accountGroup === 'broker')
-        .reduce((sum, snapshot) => sum + (snapshot.balanceCzk ?? convertCurrencyValue(snapshot.balance, snapshot.currency, 'CZK', exchangeRates, `${month}-31`)), 0);
+        .reduce((sum, snapshot) => sum + (snapshot.ownedBalanceCzk ?? convertCurrencyValue(snapshot.ownedBalance ?? snapshot.balance, snapshot.currency, 'CZK', exchangeRates, `${month}-31`)), 0);
 
       return {
         id: `wealth-${month}`,
@@ -641,7 +672,7 @@ export const useFinanceData = () => {
       });
     }, [applyBalanceDelta, pushAudit]);
 
-  const addBankAccount = useCallback((name: string, initialBalance: number, currency = 'CZK', isSavings?: boolean, interestRate?: number, institutionId?: string) => {
+  const addBankAccount = useCallback((name: string, initialBalance: number, currency = 'CZK', isSavings?: boolean, interestRate?: number, institutionId?: string, excludedAmount = 0) => {
     const newAccount: BankAccount = {
       id: crypto.randomUUID(),
       name,
@@ -649,6 +680,7 @@ export const useFinanceData = () => {
       currency: normalizeCurrencyCode(currency, 'CZK'),
       initialBalance,
       currentBalance: initialBalance,
+      excludedAmount: Math.max(0, excludedAmount),
       isSavings: isSavings || false,
       interestRate: interestRate || 0,
     };
@@ -660,18 +692,18 @@ export const useFinanceData = () => {
     });
   }, [pushAudit]);
 
-  const updateBankAccount = useCallback((id: string, name: string, currentBalance: number, currency = 'CZK', isSavings?: boolean, interestRate?: number, institutionId?: string) => {
+  const updateBankAccount = useCallback((id: string, name: string, currentBalance: number, currency = 'CZK', isSavings?: boolean, interestRate?: number, institutionId?: string, excludedAmount = 0) => {
     setBankAccounts((prev) =>
       prev.map((account) =>
         account.id === id
-          ? { ...account, name, currentBalance, currency: normalizeCurrencyCode(currency, 'CZK'), isSavings: isSavings || false, interestRate: interestRate || 0, institutionId }
+          ? { ...account, name, currentBalance, currency: normalizeCurrencyCode(currency, 'CZK'), isSavings: isSavings || false, interestRate: interestRate || 0, institutionId, excludedAmount: Math.max(0, excludedAmount) }
           : account
       )
     );
     pushAudit({
       type: 'account',
       action: 'update',
-      detail: `Bankovni ucet ${name} byl upraven.`,
+      detail: `Bankovni ucet ${name} byl upraven; nezapocitavana castka ${Math.max(0, excludedAmount)} ${normalizeCurrencyCode(currency, 'CZK')}.`,
     });
   }, [pushAudit]);
 
@@ -684,7 +716,7 @@ export const useFinanceData = () => {
     });
   }, [pushAudit]);
 
-  const addBrokerAccount = useCallback((name: string, initialBalance: number, currency = 'CZK', institutionId?: string) => {
+  const addBrokerAccount = useCallback((name: string, initialBalance: number, currency = 'CZK', institutionId?: string, excludedAmount = 0) => {
     const newAccount: BankAccount = {
       id: crypto.randomUUID(),
       name,
@@ -692,6 +724,7 @@ export const useFinanceData = () => {
       currency: normalizeCurrencyCode(currency, 'CZK'),
       initialBalance,
       currentBalance: initialBalance,
+      excludedAmount: Math.max(0, excludedAmount),
     };
     setBrokerAccounts((prev) => [...prev, newAccount]);
     pushAudit({
@@ -701,16 +734,16 @@ export const useFinanceData = () => {
     });
   }, [pushAudit]);
 
-  const updateBrokerAccount = useCallback((id: string, name: string, currentBalance: number, currency = 'CZK', institutionId?: string) => {
+  const updateBrokerAccount = useCallback((id: string, name: string, currentBalance: number, currency = 'CZK', institutionId?: string, excludedAmount = 0) => {
     setBrokerAccounts((prev) =>
       prev.map((account) =>
-        account.id === id ? { ...account, name, currentBalance, currency: normalizeCurrencyCode(currency, 'CZK'), institutionId } : account
+        account.id === id ? { ...account, name, currentBalance, currency: normalizeCurrencyCode(currency, 'CZK'), institutionId, excludedAmount: Math.max(0, excludedAmount) } : account
       )
     );
     pushAudit({
       type: 'account',
       action: 'update',
-      detail: `Brokersky ucet ${name} byl upraven.`,
+      detail: `Brokersky ucet ${name} byl upraven; nezapocitavana castka ${Math.max(0, excludedAmount)} ${normalizeCurrencyCode(currency, 'CZK')}.`,
     });
   }, [pushAudit]);
 

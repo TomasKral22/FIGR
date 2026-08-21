@@ -89,7 +89,9 @@ export const AnnualReports = ({
 
   const wealthHistory = useMemo(() => {
     const monthlyTotals = accountSnapshots.reduce<Record<string, number>>((acc, snapshot) => {
-      acc[snapshot.month] = (acc[snapshot.month] || 0) + snapshot.balance;
+      acc[snapshot.month] =
+        (acc[snapshot.month] || 0) +
+        (snapshot.ownedBalanceCzk ?? snapshot.balanceCzk ?? snapshot.ownedBalance ?? snapshot.balance);
       return acc;
     }, {});
 

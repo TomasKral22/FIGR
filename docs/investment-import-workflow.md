@@ -12,20 +12,26 @@
 
 FIGR nyní rozlišuje dvě úrovně investičních dat:
 
-- **investiční zdroj / účet** – například Investown, Edward, XTB nebo IBKR,
+- **investiční zdroj / účet** – například Alocano, Investown, Edward, XTB nebo IBKR,
 - **ocenění** – buď součet jednotlivých pozic, nebo snapshot celkové hodnoty účtu.
 
 Investown a Edward používají ve výchozím nastavení snapshot. To je spolehlivější než vyrábět fiktivní veřejně obchodované pozice a umožňuje zahrnout také hotovost, úroky a spravované „kyblíky“. U brokerů se naopak používá součet pozic a jejich tržních cen.
+
+Alocano se používá jako ruční souhrnný snapshot hlavního portfolia. Uživatel opíše pouze aktuální celkovou hodnotu a datum. Výchozí volba **Nahradit pozice bez přiřazeného účtu** zajistí, že dříve importované broker pozice zůstanou dostupné pro historii a dividendy, ale v aktuálním majetku se vedle hodnoty z Alocana nezapočítají znovu. Edward, Conseq, Investown a další účty zůstávají samostatnými zdroji a přičítají se zvlášť.
 
 Součástí implementace je:
 
 - evidence zdrojů a jejich aktivace/deaktivace,
 - ruční snapshot hodnoty, hotovosti a vložené částky,
+- nastavení cizích prostředků spravovaných na účtu, které se nezapočítají do vlastního majetku,
 - importní profily pro Investown a Edward,
 - vazba importovaných transakcí na konkrétní zdroj,
 - ochrana proti duplicitám mezi importy i uvnitř jednoho souboru,
+- přímé načtení českých hlaviček z exportované FIGR šablony a převod excelových pořadových datumů,
 - souhrn majetku podle zdroje,
 - kontrola chybějících cen, kurzů, zastaralých zdrojů a neúplného výnosu,
+- náhradní ocenění otevřené pozice poslední transakční cenou, pokud živá cena není dostupná,
+- automatické doplnění potřebných měnových kurzů při aktualizaci cen,
 - skutečná historie portfolia ze snapshotů a historických cen.
 
 ## Doporučený postup pro Investown a Edward
@@ -36,7 +42,18 @@ Součástí implementace je:
 4. Při dostupném CSV/XLSX exportu jej načíst přes import a přiřadit stejnému zdroji.
 5. Snapshot aktualizovat pravidelně, ideálně jednou měsíčně. Po 45 dnech FIGR zdroj označí jako zastaralý.
 
+Pokud účet obsahuje také peníze spravované pro jinou osobu, nastav u zdroje položku **Cizí prostředky**. FIGR zachová hrubou hodnotu pro kontrolu, ale z celkového majetku, rozdělení podle zdrojů a historie odečte zadanou částku. Výkonnost investované části se přepočítá poměrem vlastněné části účtu.
+
 Exportní transakce slouží pro audit a budoucí analytiku; celková hodnota snapshotového účtu se do portfolia započítá právě jednou, takže nedochází k dvojímu započítání importovaných položek.
+
+Pokud snapshotový účet ještě žádný snapshot nemá, FIGR dočasně použije součet jeho pozic, aby účet z celkového portfolia nezmizel. Jakmile je snapshot doplněn, přepne se ocenění zpět na snapshot bez dvojího započítání.
+
+## Doporučený postup pro Alocano
+
+1. V panelu **Investiční účty a zdroje** přidat poskytovatele **Alocano**.
+2. Ponechat přednastavený ruční snapshot a volbu **Nahradit pozice bez přiřazeného účtu**.
+3. V Alocanu najít údaj **Celková hodnota** a opsat jej do FIGR.
+4. Snapshot průběžně aktualizovat; předchozí hodnoty zůstávají v historii.
 
 ## Omezení konektorů
 
@@ -56,6 +73,7 @@ Přímé přihlašování k Investownu nebo Edwardovi není součástí této f�
 - Uživatel stáhne XLSX šablonu.
 - Vyplní obchody ručně nebo do ní vloží očištěná data z jiného exportu.
 - Šablona slouží jako bezpečný fallback, když broker nemá vhodný export nebo je export potřeba upravit.
+- Datum může být buď `YYYY-MM-DD`, nebo skutečná excelová datumová buňka; importér normalizuje oba formáty.
 
 ### Priorita 3: Ruční zadání
 

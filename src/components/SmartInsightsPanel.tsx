@@ -34,7 +34,9 @@ export const SmartInsightsPanel = ({
   );
   const openMonths = months.filter((month) => !monthClosures.some((entry) => entry.month === month));
   const latestSnapshots = latestMonth ? accountSnapshots.filter((snapshot) => snapshot.month === latestMonth) : [];
-  const richestAccount = latestSnapshots.slice().sort((a, b) => b.balance - a.balance)[0];
+  const richestAccount = latestSnapshots
+    .slice()
+    .sort((a, b) => (b.ownedBalanceCzk ?? b.balanceCzk ?? b.ownedBalance ?? b.balance) - (a.ownedBalanceCzk ?? a.balanceCzk ?? a.ownedBalance ?? a.balance))[0];
   const budgetAlerts = latestMonth ? getBudgetAlerts(budgetLimits, yearTransactions, subcategories, latestMonth) : [];
 
   const insights = [
@@ -51,7 +53,7 @@ export const SmartInsightsPanel = ({
           icon: Landmark,
           tone: 'text-primary',
           title: 'Nejsilnější účet',
-          description: `${richestAccount.accountName} drží ${formatCurrency(richestAccount.balance)}.`,
+          description: `${richestAccount.accountName} drží ${formatCurrency(richestAccount.ownedBalanceCzk ?? richestAccount.balanceCzk ?? richestAccount.ownedBalance ?? richestAccount.balance)} vlastních prostředků.`,
         }
       : null,
     months.length > 0

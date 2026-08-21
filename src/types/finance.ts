@@ -99,6 +99,7 @@ export interface BankAccount {
   currency: string;
   initialBalance: number;
   currentBalance: number;
+  excludedAmount: number;
   isSavings?: boolean;
   interestRate?: number; // annual % rate
 }
@@ -202,6 +203,9 @@ export interface AccountMonthlySnapshot {
   currency: string;
   balance: number;
   balanceCzk?: number;
+  excludedAmount?: number;
+  ownedBalance?: number;
+  ownedBalanceCzk?: number;
   isSavings?: boolean;
   source?: 'computed' | 'import';
   createdAt: string;

@@ -101,6 +101,11 @@ const parseDate = (value: unknown): string => {
   const source = String(value || '').trim();
   if (!source) return new Date().toISOString().slice(0, 10);
 
+  const numericSerial = Number(source.replace(',', '.'));
+  if (/^\d+(?:[.,]\d+)?$/.test(source) && numericSerial >= 20_000 && numericSerial <= 100_000) {
+    return excelSerialToDate(numericSerial);
+  }
+
   const normalized = source.replace(/\s+/g, '');
   const dateMatch = normalized.match(/^(\d{1,4})[./-](\d{1,2})[./-](\d{1,4})$/);
   if (dateMatch) {
@@ -161,8 +166,10 @@ export const InvestmentCSVImport = ({ onImport, sourceAccounts = [] }: Investmen
           (['investown', 'edward'].includes(parsedFile.detectedProfile.key) ? 'CZK' : 'USD')
       ).trim().toUpperCase();
       const sector = String(firstNonEmpty(values, profileConfig.sector) || '').trim() || undefined;
-      const exDividendDate = String(firstNonEmpty(values, profileConfig.exDividendDate) || '').trim() || undefined;
-      const payDate = String(firstNonEmpty(values, profileConfig.payDate) || '').trim() || undefined;
+      const exDividendDateRaw = firstNonEmpty(values, profileConfig.exDividendDate);
+      const payDateRaw = firstNonEmpty(values, profileConfig.payDate);
+      const exDividendDate = exDividendDateRaw !== '' ? parseDate(exDividendDateRaw) : undefined;
+      const payDate = payDateRaw !== '' ? parseDate(payDateRaw) : undefined;
       const expectedDividendAmountRaw = firstNonEmpty(values, profileConfig.expectedDividendAmount);
       const expectedDividendAmount =
         expectedDividendAmountRaw !== '' ? parseAmount(expectedDividendAmountRaw) : undefined;
@@ -189,7 +196,7 @@ export const InvestmentCSVImport = ({ onImport, sourceAccounts = [] }: Investmen
       let assetType: InvestmentAssetType = defaultAssetType;
       if (parsedFile.detectedProfile.key === 'investown') assetType = 'private_credit';
       if (parsedFile.detectedProfile.key === 'edward') assetType = 'managed_portfolio';
-      const assetTypeValue = normalizeText(String(firstNonEmpty(values, ['assettype', 'druh', 'category']) || ''));
+      const assetTypeValue = normalizeText(String(firstNonEmpty(values, ['assettype', 'typaktiva', 'druh', 'category']) || ''));
       if (assetTypeValue.includes('etf')) assetType = 'etf';
       else if (assetTypeValue.includes('crypto') || assetTypeValue.includes('krypto')) assetType = 'crypto';
       else if (assetTypeValue.includes('bond') || assetTypeValue.includes('dluhopis')) assetType = 'bond';
@@ -224,6 +231,8 @@ export const InvestmentCSVImport = ({ onImport, sourceAccounts = [] }: Investmen
       if (Number.isNaN(quantity) || quantity <= 0) rowErrors.push('Neplatné množství');
       if (Number.isNaN(pricePerUnit) || pricePerUnit < 0) rowErrors.push('Neplatná cena');
       if (!/^\d{4}-\d{2}-\d{2}$/.test(transactionDate)) rowErrors.push('Neplatné datum');
+      if (exDividendDate && !/^\d{4}-\d{2}-\d{2}$/.test(exDividendDate)) rowErrors.push('Neplatné ex-dividend datum');
+      if (payDate && !/^\d{4}-\d{2}-\d{2}$/.test(payDate)) rowErrors.push('Neplatné datum výplaty');
       if (expectedDividendAmountRaw !== '' && Number.isNaN(expectedDividendAmount)) {
         rowErrors.push('Neplatná očekávaná dividenda');
       }

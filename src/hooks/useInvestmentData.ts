@@ -441,7 +441,7 @@ export const useInvestmentData = () => {
     to_currency: string;
     rate: number;
     rate_date: string;
-  }) => {
+  }, options?: { silent?: boolean }) => {
     try {
       const existingRate = exchangeRates.find(
         (entry) =>
@@ -477,15 +477,17 @@ export const useInvestmentData = () => {
         scope: 'sync',
         severity: 'info',
       });
-      toast({ title: 'Smenny kurz aktualizovan' });
+      if (!options?.silent) toast({ title: 'Smenny kurz aktualizovan' });
       return nextRate;
     } catch (error: unknown) {
       console.error('Error adding exchange rate:', error);
-      toast({
-        title: 'Chyba',
-        description: 'Nepodarilo se pridat smenny kurz.',
-        variant: 'destructive',
-      });
+      if (!options?.silent) {
+        toast({
+          title: 'Chyba',
+          description: 'Nepodarilo se pridat smenny kurz.',
+          variant: 'destructive',
+        });
+      }
       return null;
     }
   };
@@ -805,12 +807,22 @@ export const useInvestmentData = () => {
     updates: Partial<Omit<InvestmentSourceAccount, 'id' | 'created_at' | 'updated_at'>>
   ) => {
     const now = createTimestamp();
+    const currentAccount = sourceAccounts.find((account) => account.id === id);
     setSourceAccounts((prev) =>
       prev
         .map((account) => (account.id === id ? { ...account, ...updates, updated_at: now } : account))
         .sort((a, b) => a.name.localeCompare(b.name))
     );
     touchMeta({ last_saved_at: now });
+    if (updates.excluded_amount !== undefined && currentAccount?.excluded_amount !== updates.excluded_amount) {
+      pushAudit({
+        action: 'source-account-excluded-amount-update',
+        detail: `U zdroje ${currentAccount?.name || id} nastavena nezapočítávaná částka ${updates.excluded_amount} ${currentAccount?.currency || ''}.`,
+        scope: 'portfolio',
+        severity: 'info',
+      });
+      toast({ title: 'Cizí prostředky aktualizovány' });
+    }
   };
 
   const addValueSnapshot = async (

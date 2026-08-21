@@ -27,7 +27,8 @@ interface AccountSetupProps {
     currency?: string,
     isSavings?: boolean,
     interestRate?: number,
-    institutionId?: string
+    institutionId?: string,
+    excludedAmount?: number
   ) => void;
   onUpdateBankAccount: (
     id: string,
@@ -36,11 +37,12 @@ interface AccountSetupProps {
     currency?: string,
     isSavings?: boolean,
     interestRate?: number,
-    institutionId?: string
+    institutionId?: string,
+    excludedAmount?: number
   ) => void;
   onDeleteBankAccount: (id: string) => void;
-  onAddBrokerAccount: (name: string, balance: number, currency?: string, institutionId?: string) => void;
-  onUpdateBrokerAccount: (id: string, name: string, balance: number, currency?: string, institutionId?: string) => void;
+  onAddBrokerAccount: (name: string, balance: number, currency?: string, institutionId?: string, excludedAmount?: number) => void;
+  onUpdateBrokerAccount: (id: string, name: string, balance: number, currency?: string, institutionId?: string, excludedAmount?: number) => void;
   onDeleteBrokerAccount: (id: string) => void;
 }
 
@@ -88,11 +90,13 @@ export const AccountSetup = ({
   const [bankCurrency, setBankCurrency] = useState('CZK');
   const [bankIsSavings, setBankIsSavings] = useState(false);
   const [bankInterestRate, setBankInterestRate] = useState('');
+  const [bankExcludedAmount, setBankExcludedAmount] = useState('0');
 
   const [brokerName, setBrokerName] = useState('');
   const [brokerInstitutionId, setBrokerInstitutionId] = useState('custom');
   const [brokerBalance, setBrokerBalance] = useState('');
   const [brokerCurrency, setBrokerCurrency] = useState('CZK');
+  const [brokerExcludedAmount, setBrokerExcludedAmount] = useState('0');
 
   const [editingBankId, setEditingBankId] = useState<string | null>(null);
   const [editBankName, setEditBankName] = useState('');
@@ -101,12 +105,14 @@ export const AccountSetup = ({
   const [editBankCurrency, setEditBankCurrency] = useState('CZK');
   const [editBankIsSavings, setEditBankIsSavings] = useState(false);
   const [editBankInterestRate, setEditBankInterestRate] = useState('');
+  const [editBankExcludedAmount, setEditBankExcludedAmount] = useState('0');
 
   const [editingBrokerId, setEditingBrokerId] = useState<string | null>(null);
   const [editBrokerName, setEditBrokerName] = useState('');
   const [editBrokerInstitutionId, setEditBrokerInstitutionId] = useState('custom');
   const [editBrokerBalance, setEditBrokerBalance] = useState('');
   const [editBrokerCurrency, setEditBrokerCurrency] = useState('CZK');
+  const [editBrokerExcludedAmount, setEditBrokerExcludedAmount] = useState('0');
 
   const resolvedBankName = useMemo(() => {
     if (bankInstitutionId === 'custom') return bankName;
@@ -127,7 +133,8 @@ export const AccountSetup = ({
       bankCurrency,
       bankIsSavings,
       bankIsSavings ? parseFloat(bankInterestRate) || 0 : 0,
-      bankInstitutionId === 'custom' ? undefined : bankInstitutionId
+      bankInstitutionId === 'custom' ? undefined : bankInstitutionId,
+      Math.max(0, parseFloat(bankExcludedAmount) || 0)
     );
 
     setBankName('');
@@ -136,6 +143,7 @@ export const AccountSetup = ({
     setBankCurrency('CZK');
     setBankIsSavings(false);
     setBankInterestRate('');
+    setBankExcludedAmount('0');
   };
 
   const handleAddBroker = () => {
@@ -145,13 +153,15 @@ export const AccountSetup = ({
       resolvedBrokerName,
       parseFloat(brokerBalance),
       brokerCurrency,
-      brokerInstitutionId === 'custom' ? undefined : brokerInstitutionId
+      brokerInstitutionId === 'custom' ? undefined : brokerInstitutionId,
+      Math.max(0, parseFloat(brokerExcludedAmount) || 0)
     );
 
     setBrokerName('');
     setBrokerInstitutionId('custom');
     setBrokerBalance('');
     setBrokerCurrency('CZK');
+    setBrokerExcludedAmount('0');
   };
 
   const startEditBank = (account: BankAccount) => {
@@ -162,6 +172,7 @@ export const AccountSetup = ({
     setEditBankCurrency(account.currency || 'CZK');
     setEditBankIsSavings(account.isSavings || false);
     setEditBankInterestRate((account.interestRate || 0).toString());
+    setEditBankExcludedAmount((account.excludedAmount || 0).toString());
   };
 
   const saveEditBank = () => {
@@ -179,7 +190,8 @@ export const AccountSetup = ({
       editBankCurrency,
       editBankIsSavings,
       editBankIsSavings ? parseFloat(editBankInterestRate) || 0 : 0,
-      editBankInstitutionId === 'custom' ? undefined : editBankInstitutionId
+      editBankInstitutionId === 'custom' ? undefined : editBankInstitutionId,
+      Math.max(0, parseFloat(editBankExcludedAmount) || 0)
     );
 
     setEditingBankId(null);
@@ -193,6 +205,7 @@ export const AccountSetup = ({
     setEditBankCurrency('CZK');
     setEditBankIsSavings(false);
     setEditBankInterestRate('');
+    setEditBankExcludedAmount('0');
   };
 
   const startEditBroker = (account: BankAccount) => {
@@ -201,6 +214,7 @@ export const AccountSetup = ({
     setEditBrokerInstitutionId(account.institutionId || 'custom');
     setEditBrokerBalance(account.currentBalance.toString());
     setEditBrokerCurrency(account.currency || 'CZK');
+    setEditBrokerExcludedAmount((account.excludedAmount || 0).toString());
   };
 
   const saveEditBroker = () => {
@@ -216,7 +230,8 @@ export const AccountSetup = ({
       institutionName,
       parseFloat(editBrokerBalance),
       editBrokerCurrency,
-      editBrokerInstitutionId === 'custom' ? undefined : editBrokerInstitutionId
+      editBrokerInstitutionId === 'custom' ? undefined : editBrokerInstitutionId,
+      Math.max(0, parseFloat(editBrokerExcludedAmount) || 0)
     );
 
     setEditingBrokerId(null);
@@ -228,6 +243,7 @@ export const AccountSetup = ({
     setEditBrokerInstitutionId('custom');
     setEditBrokerBalance('');
     setEditBrokerCurrency('CZK');
+    setEditBrokerExcludedAmount('0');
   };
 
   if (!isOpen) return null;
@@ -247,7 +263,7 @@ export const AccountSetup = ({
             <h3 className="text-lg font-semibold">Bankovni ucty</h3>
 
             <div className="space-y-3 rounded-lg border border-border p-4">
-              <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_120px_auto]">
+              <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_120px_auto]">
                 <div className="space-y-2">
                   <Label>Instituce</Label>
                   <Select value={bankInstitutionId} onValueChange={setBankInstitutionId}>
@@ -284,6 +300,19 @@ export const AccountSetup = ({
                     step="0.01"
                     value={bankBalance}
                     onChange={(event) => setBankBalance(event.target.value)}
+                    placeholder="0.00"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Cizí prostředky</Label>
+                  <Input
+                    className="min-w-0"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={bankExcludedAmount}
+                    onChange={(event) => setBankExcludedAmount(event.target.value)}
                     placeholder="0.00"
                   />
                 </div>
@@ -337,7 +366,7 @@ export const AccountSetup = ({
                 >
                   {editingBankId === account.id ? (
                     <div className="space-y-3">
-                      <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_120px_auto]">
+                      <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_120px_auto]">
                         <Select value={editBankInstitutionId} onValueChange={setEditBankInstitutionId}>
                           <SelectTrigger className="min-w-0">
                             <SelectValue />
@@ -368,12 +397,21 @@ export const AccountSetup = ({
                           value={editBankBalance}
                           onChange={(event) => setEditBankBalance(event.target.value)}
                         />
+                        <Input
+                          aria-label="Cizí prostředky"
+                          className="min-w-0"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={editBankExcludedAmount}
+                          onChange={(event) => setEditBankExcludedAmount(event.target.value)}
+                        />
                         <CurrencySelect value={editBankCurrency} onChange={setEditBankCurrency} className="min-w-0" />
                         <div className="grid grid-cols-2 gap-2 md:col-span-2 2xl:col-span-1 2xl:grid-cols-1">
-                          <Button onClick={saveEditBank} size="icon" variant="ghost" className="w-full 2xl:w-10">
+                          <Button aria-label={`Uložit ${account.name}`} onClick={saveEditBank} size="icon" variant="ghost" className="w-full 2xl:w-10">
                             <Check className="h-4 w-4 text-primary" />
                           </Button>
-                          <Button onClick={cancelEditBank} size="icon" variant="ghost" className="w-full 2xl:w-10">
+                          <Button aria-label={`Zrušit úpravu ${account.name}`} onClick={cancelEditBank} size="icon" variant="ghost" className="w-full 2xl:w-10">
                             <X className="h-4 w-4 text-muted-foreground" />
                           </Button>
                         </div>
@@ -413,16 +451,15 @@ export const AccountSetup = ({
                               </span>
                             )}
                           </p>
-                          <p className="text-sm text-muted-foreground">
-                            Aktualni: {formatCurrency(account.currentBalance, account.currency)}
-                          </p>
+                          <p className="text-sm text-muted-foreground">Vlastní: {formatCurrency(Math.max(0, account.currentBalance - (account.excludedAmount || 0)), account.currency)}</p>
+                          {account.excludedAmount > 0 ? <p className="text-xs text-muted-foreground">Celkem {formatCurrency(account.currentBalance, account.currency)} · cizí {formatCurrency(account.excludedAmount, account.currency)}</p> : null}
                         </div>
                       </div>
                       <div className="flex gap-1 self-end sm:self-auto">
-                        <Button variant="ghost" size="icon" onClick={() => startEditBank(account)}>
+                        <Button aria-label={`Upravit ${account.name}`} variant="ghost" size="icon" onClick={() => startEditBank(account)}>
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => onDeleteBankAccount(account.id)}>
+                        <Button aria-label={`Smazat ${account.name}`} variant="ghost" size="icon" onClick={() => onDeleteBankAccount(account.id)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
@@ -437,7 +474,7 @@ export const AccountSetup = ({
             <h3 className="text-lg font-semibold">Brokerske ucty</h3>
 
             <div className="space-y-3 rounded-lg border border-border p-4">
-              <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_120px_auto]">
+              <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_120px_auto]">
                 <div className="space-y-2">
                   <Label>Instituce</Label>
                   <Select value={brokerInstitutionId} onValueChange={setBrokerInstitutionId}>
@@ -479,6 +516,19 @@ export const AccountSetup = ({
                 </div>
 
                 <div className="space-y-2">
+                  <Label>Cizí prostředky</Label>
+                  <Input
+                    className="min-w-0"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={brokerExcludedAmount}
+                    onChange={(event) => setBrokerExcludedAmount(event.target.value)}
+                    placeholder="0.00"
+                  />
+                </div>
+
+                <div className="space-y-2">
                   <Label>Mena</Label>
                   <CurrencySelect value={brokerCurrency} onChange={setBrokerCurrency} className="min-w-0" />
                 </div>
@@ -500,7 +550,7 @@ export const AccountSetup = ({
                   }`}
                 >
                   {editingBrokerId === account.id ? (
-                    <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_120px_auto]">
+                    <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_120px_auto]">
                       <Select value={editBrokerInstitutionId} onValueChange={setEditBrokerInstitutionId}>
                         <SelectTrigger className="min-w-0">
                           <SelectValue />
@@ -531,12 +581,21 @@ export const AccountSetup = ({
                         value={editBrokerBalance}
                         onChange={(event) => setEditBrokerBalance(event.target.value)}
                       />
+                      <Input
+                        aria-label="Cizí prostředky"
+                        className="min-w-0"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={editBrokerExcludedAmount}
+                        onChange={(event) => setEditBrokerExcludedAmount(event.target.value)}
+                      />
                       <CurrencySelect value={editBrokerCurrency} onChange={setEditBrokerCurrency} className="min-w-0" />
                       <div className="grid grid-cols-2 gap-2 md:col-span-2 2xl:col-span-1 2xl:grid-cols-1">
-                        <Button onClick={saveEditBroker} size="icon" variant="ghost" className="w-full 2xl:w-10">
+                        <Button aria-label={`Uložit ${account.name}`} onClick={saveEditBroker} size="icon" variant="ghost" className="w-full 2xl:w-10">
                           <Check className="h-4 w-4 text-primary" />
                         </Button>
-                        <Button onClick={cancelEditBroker} size="icon" variant="ghost" className="w-full 2xl:w-10">
+                        <Button aria-label={`Zrušit úpravu ${account.name}`} onClick={cancelEditBroker} size="icon" variant="ghost" className="w-full 2xl:w-10">
                           <X className="h-4 w-4 text-muted-foreground" />
                         </Button>
                       </div>
@@ -550,16 +609,15 @@ export const AccountSetup = ({
                             {account.name}
                             <span className="ml-2 inline-block text-xs text-muted-foreground">{account.currency}</span>
                           </p>
-                          <p className="text-sm text-muted-foreground">
-                            Aktualni: {formatCurrency(account.currentBalance, account.currency)}
-                          </p>
+                          <p className="text-sm text-muted-foreground">Vlastní: {formatCurrency(Math.max(0, account.currentBalance - (account.excludedAmount || 0)), account.currency)}</p>
+                          {account.excludedAmount > 0 ? <p className="text-xs text-muted-foreground">Celkem {formatCurrency(account.currentBalance, account.currency)} · cizí {formatCurrency(account.excludedAmount, account.currency)}</p> : null}
                         </div>
                       </div>
                       <div className="flex gap-1 self-end sm:self-auto">
-                        <Button variant="ghost" size="icon" onClick={() => startEditBroker(account)}>
+                        <Button aria-label={`Upravit ${account.name}`} variant="ghost" size="icon" onClick={() => startEditBroker(account)}>
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => onDeleteBrokerAccount(account.id)}>
+                        <Button aria-label={`Smazat ${account.name}`} variant="ghost" size="icon" onClick={() => onDeleteBrokerAccount(account.id)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>

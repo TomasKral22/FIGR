@@ -128,13 +128,42 @@ export const calculatePortfolioSummary = ({
   const orderedPrices = [...prices].sort((a, b) => b.price_date.localeCompare(a.price_date));
   const orderedRates = [...exchangeRates].sort((a, b) => b.rate_date.localeCompare(a.rate_date));
   const activeSources = sourceAccounts.filter((source) => source.is_active);
-  const snapshotSourceIds = new Set(
-    activeSources.filter((source) => source.valuation_mode === 'snapshot').map((source) => source.id)
-  );
   const latestSnapshotBySource = new Map<string, InvestmentValueSnapshot>();
   for (const snapshot of [...valueSnapshots].sort((a, b) => b.snapshot_date.localeCompare(a.snapshot_date))) {
     if (!latestSnapshotBySource.has(snapshot.source_account_id)) latestSnapshotBySource.set(snapshot.source_account_id, snapshot);
   }
+  const snapshotSourceIds = new Set(
+    activeSources
+      .filter((source) => source.valuation_mode === 'snapshot' && latestSnapshotBySource.has(source.id))
+      .map((source) => source.id)
+  );
+  const snapshotFallbackSourceIds = new Set(
+    activeSources
+      .filter((source) => source.valuation_mode === 'snapshot' && !latestSnapshotBySource.has(source.id))
+      .map((source) => source.id)
+  );
+  const unassignedPositionsCovered = activeSources.some(
+    (source) =>
+      source.valuation_mode === 'snapshot' &&
+      Boolean(source.covers_unassigned_positions) &&
+      latestSnapshotBySource.has(source.id)
+  );
+
+  const unassignedSourceKey = '__unassigned__';
+  const activeSourceIds = new Set(activeSources.map((source) => source.id));
+  const sourceKeyFor = (sourceAccountId?: string | null) =>
+    sourceAccountId && activeSourceIds.has(sourceAccountId) ? sourceAccountId : unassignedSourceKey;
+  const addSourceAmount = (target: Map<string, number>, sourceKey: string, amount: number) => {
+    target.set(sourceKey, (target.get(sourceKey) ?? 0) + amount);
+  };
+  const marketCurrentBySource = new Map<string, number>();
+  const marketInvestedBySource = new Map<string, number>();
+  const trackedCurrentBySource = new Map<string, number>();
+  const trackedInvestedBySource = new Map<string, number>();
+  const creditCurrentBySource = new Map<string, number>();
+  const creditInvestedBySource = new Map<string, number>();
+  const snapshotCurrentBySource = new Map<string, number>();
+  const snapshotInvestedBySource = new Map<string, number>();
 
   const portfolioAssets: PortfolioAsset[] = [];
   const assetsByType: PortfolioSummary['assetsByType'] = {};
@@ -145,6 +174,7 @@ export const calculatePortfolioSummary = ({
   const dividendDetails: DividendDetail[] = [];
   let dividendTaxEstimate = 0;
   let missingPrices = 0;
+  let fallbackPrices = 0;
   let missingExchangeRates = 0;
   let excludedValueCount = 0;
 
@@ -170,19 +200,48 @@ export const calculatePortfolioSummary = ({
     });
   }
 
-  for (const asset of assets.filter((item) => !item.source_account_id || !snapshotSourceIds.has(item.source_account_id))) {
+  for (const asset of assets.filter(
+    (item) =>
+      (!item.source_account_id && !unassignedPositionsCovered) ||
+      (Boolean(item.source_account_id) && !snapshotSourceIds.has(item.source_account_id!))
+  )) {
     const assetTransactions = orderedTransactions.filter((transaction) => transaction.asset_id === asset.id);
     const position = getPositionAt(assetTransactions, '9999-12-31');
     if (position.quantity <= 0) continue;
     const latestPrice = orderedPrices.find((price) => price.asset_id === asset.id) ?? null;
+    const latestTransactionPrice = [...assetTransactions]
+      .filter(
+        (transaction) =>
+          (transaction.transaction_type === 'buy' || transaction.transaction_type === 'sell') &&
+          transaction.price_per_unit > 0
+      )
+      .sort((a, b) => b.transaction_date.localeCompare(a.transaction_date))[0] ?? null;
+    const valuationPrice = latestPrice
+      ? {
+          price: latestPrice.price,
+          currency: latestPrice.currency,
+          priceDate: latestPrice.price_date,
+          source: 'market' as const,
+        }
+      : latestTransactionPrice
+        ? {
+            price: latestTransactionPrice.price_per_unit,
+            currency: latestTransactionPrice.currency,
+            priceDate: latestTransactionPrice.transaction_date,
+            source: 'transaction' as const,
+          }
+        : null;
     const transactionCurrency = assetTransactions.find((transaction) => transaction.transaction_type === 'buy')?.currency ?? asset.currency;
     const costRate = getExchangeRate(orderedRates, transactionCurrency, reportingCurrency);
     const totalInvestedInReportingCurrency = costRate === null ? null : position.cost * costRate;
-    const currentRate = latestPrice ? getExchangeRate(orderedRates, latestPrice.currency, reportingCurrency, latestPrice.price_date) : null;
+    const currentRate = valuationPrice
+      ? getExchangeRate(orderedRates, valuationPrice.currency, reportingCurrency)
+      : null;
     if (!latestPrice) missingPrices += 1;
-    if (latestPrice && currentRate === null) missingExchangeRates += 1;
+    if (!latestPrice && valuationPrice) fallbackPrices += 1;
+    if (valuationPrice && currentRate === null) missingExchangeRates += 1;
     if (totalInvestedInReportingCurrency === null) missingExchangeRates += 1;
-    const currentValue = latestPrice ? latestPrice.price * position.quantity : null;
+    const currentValue = valuationPrice ? valuationPrice.price * position.quantity : null;
     const currentValueInReportingCurrency = currentValue !== null && currentRate !== null ? currentValue * currentRate : null;
     const investedReporting = totalInvestedInReportingCurrency ?? 0;
     if (currentValueInReportingCurrency === null) excludedValueCount += 1;
@@ -198,11 +257,12 @@ export const calculatePortfolioSummary = ({
       quantity: position.quantity,
       avgBuyPrice: position.cost / position.quantity,
       totalInvested: position.cost,
-      currentPrice: latestPrice?.price ?? null,
+      priceSource: valuationPrice?.source ?? 'missing',
+      currentPrice: valuationPrice?.price ?? null,
       currentValue,
       profitLoss: currentValue === null ? null : currentValue - position.cost,
       profitLossPercent: currentValue === null || position.cost <= 0 ? null : ((currentValue - position.cost) / position.cost) * 100,
-      currentPriceInReportingCurrency: latestPrice && currentRate !== null ? latestPrice.price * currentRate : null,
+      currentPriceInReportingCurrency: valuationPrice && currentRate !== null ? valuationPrice.price * currentRate : null,
       currentValueInReportingCurrency,
       totalInvestedInReportingCurrency: investedReporting,
       profitLossInReportingCurrency:
@@ -211,6 +271,11 @@ export const calculatePortfolioSummary = ({
           : currentValueInReportingCurrency - totalInvestedInReportingCurrency,
     };
     portfolioAssets.push(portfolioAsset);
+    const sourceKey = sourceKeyFor(asset.source_account_id);
+    if (currentValueInReportingCurrency !== null) {
+      addSourceAmount(marketCurrentBySource, sourceKey, currentValueInReportingCurrency);
+    }
+    addSourceAmount(marketInvestedBySource, sourceKey, investedReporting);
     const addAllocation = (target: Record<string, { invested: number; value: number | null }>, key: string) => {
       const current = target[key] ?? { invested: 0, value: 0 };
       current.invested += investedReporting;
@@ -224,38 +289,43 @@ export const calculatePortfolioSummary = ({
     addAllocation(assetsBySector, asset.sector || UNCATEGORIZED_SECTOR);
   }
 
-  const granularMarketValue = portfolioAssets.reduce((sum, asset) => sum + (asset.currentValueInReportingCurrency ?? 0), 0);
-  const marketCurrentValue = portfolioAssets.length > 0 ? granularMarketValue : null;
-  const granularInvested = portfolioAssets.reduce((sum, asset) => sum + asset.totalInvestedInReportingCurrency, 0);
-
-  let trackedCurrentValue = 0;
-  let trackedInvested = 0;
   for (const investment of trackedInvestments.filter(
-    (item) => !item.is_watchlist && item.include_in_portfolio && (!item.source_account_id || !snapshotSourceIds.has(item.source_account_id))
+    (item) =>
+      !item.is_watchlist &&
+      item.include_in_portfolio &&
+      ((!item.source_account_id && !unassignedPositionsCovered) ||
+        (Boolean(item.source_account_id) && !snapshotSourceIds.has(item.source_account_id!)))
   )) {
+    const sourceKey = sourceKeyFor(investment.source_account_id);
     const converted = toReportingCurrency(investment.current_value, investment.currency, reportingCurrency, orderedRates);
     if (converted === null) {
       missingExchangeRates += 1;
       excludedValueCount += 1;
-    } else trackedCurrentValue += converted;
-    if (investment.invested_value != null) trackedInvested += toReportingCurrency(investment.invested_value, investment.currency, reportingCurrency, orderedRates) ?? 0;
+    } else addSourceAmount(trackedCurrentBySource, sourceKey, converted);
+    if (investment.invested_value != null) {
+      const invested = toReportingCurrency(investment.invested_value, investment.currency, reportingCurrency, orderedRates);
+      if (invested !== null) addSourceAmount(trackedInvestedBySource, sourceKey, invested);
+    }
   }
 
-  let creditCurrentValue = 0;
-  let creditInvested = 0;
   for (const investment of creditInvestments.filter(
-    (item) => item.status !== 'repaid' && (!item.source_account_id || !snapshotSourceIds.has(item.source_account_id))
+    (item) =>
+      item.status !== 'repaid' &&
+      ((!item.source_account_id && !unassignedPositionsCovered) ||
+        (Boolean(item.source_account_id) && !snapshotSourceIds.has(item.source_account_id!)))
   )) {
+    const sourceKey = sourceKeyFor(investment.source_account_id);
     const converted = toReportingCurrency(investment.current_value, investment.currency, reportingCurrency, orderedRates);
     if (converted === null) {
       missingExchangeRates += 1;
       excludedValueCount += 1;
-    } else creditCurrentValue += converted;
-    if (investment.invested_value != null) creditInvested += toReportingCurrency(investment.invested_value, investment.currency, reportingCurrency, orderedRates) ?? 0;
+    } else addSourceAmount(creditCurrentBySource, sourceKey, converted);
+    if (investment.invested_value != null) {
+      const invested = toReportingCurrency(investment.invested_value, investment.currency, reportingCurrency, orderedRates);
+      if (invested !== null) addSourceAmount(creditInvestedBySource, sourceKey, invested);
+    }
   }
 
-  let snapshotCurrentValue = 0;
-  let snapshotInvested = 0;
   for (const source of activeSources.filter((item) => item.valuation_mode === 'snapshot')) {
     const snapshot = latestSnapshotBySource.get(source.id);
     if (!snapshot) {
@@ -266,12 +336,69 @@ export const calculatePortfolioSummary = ({
     if (converted === null) {
       missingExchangeRates += 1;
       excludedValueCount += 1;
-    } else snapshotCurrentValue += converted;
-    if (snapshot.invested_value != null) snapshotInvested += toReportingCurrency(snapshot.invested_value, snapshot.currency, reportingCurrency, orderedRates, snapshot.snapshot_date) ?? 0;
+    } else addSourceAmount(snapshotCurrentBySource, source.id, converted);
+    if (snapshot.invested_value != null) {
+      const invested = toReportingCurrency(snapshot.invested_value, snapshot.currency, reportingCurrency, orderedRates, snapshot.snapshot_date);
+      if (invested !== null) addSourceAmount(snapshotInvestedBySource, source.id, invested);
+    }
   }
 
-  const totalInvested = granularInvested + trackedInvested + creditInvested + snapshotInvested;
-  const currentValue = granularMarketValue + trackedCurrentValue + creditCurrentValue + snapshotCurrentValue;
+  const sourceGrossValue = (sourceKey: string) =>
+    (marketCurrentBySource.get(sourceKey) ?? 0) +
+    (trackedCurrentBySource.get(sourceKey) ?? 0) +
+    (creditCurrentBySource.get(sourceKey) ?? 0) +
+    (snapshotCurrentBySource.get(sourceKey) ?? 0);
+  const ownershipRatioBySource = new Map<string, number>();
+  let excludedValue = 0;
+  const sourceBreakdown: PortfolioSummary['sourceBreakdown'] = activeSources.map((source) => {
+    const snapshot = latestSnapshotBySource.get(source.id);
+    const grossValue = sourceGrossValue(source.id);
+    const convertedExcludedAmount = source.excluded_amount > 0
+      ? toReportingCurrency(
+          source.excluded_amount,
+          source.currency,
+          reportingCurrency,
+          orderedRates,
+          snapshot?.snapshot_date ?? source.last_synced_at?.slice(0, 10)
+        )
+      : 0;
+    if (source.excluded_amount > 0 && convertedExcludedAmount === null) {
+      missingExchangeRates += 1;
+      excludedValueCount += 1;
+    }
+    const appliedExcludedValue = Math.min(grossValue, convertedExcludedAmount ?? 0);
+    const value = Math.max(0, grossValue - appliedExcludedValue);
+    ownershipRatioBySource.set(source.id, grossValue > 0 ? value / grossValue : 1);
+    excludedValue += appliedExcludedValue;
+    return {
+      sourceAccountId: source.id,
+      label: source.name,
+      provider: source.provider,
+      value,
+      grossValue,
+      excludedValue: appliedExcludedValue,
+      currency: reportingCurrency,
+      lastUpdatedAt: snapshot?.snapshot_date ?? source.last_synced_at,
+      valuationMode: snapshotFallbackSourceIds.has(source.id) ? 'positions' : source.valuation_mode,
+    };
+  });
+  ownershipRatioBySource.set(unassignedSourceKey, 1);
+  const sumOwnedAmounts = (target: Map<string, number>) =>
+    [...target.entries()].reduce(
+      (sum, [sourceKey, amount]) => sum + amount * (ownershipRatioBySource.get(sourceKey) ?? 1),
+      0
+    );
+  const marketCurrentValueAmount = sumOwnedAmounts(marketCurrentBySource);
+  const marketCurrentValue = marketCurrentBySource.size > 0 ? marketCurrentValueAmount : null;
+  const marketInvestedValue = sumOwnedAmounts(marketInvestedBySource);
+  const trackedCurrentValue = sumOwnedAmounts(trackedCurrentBySource);
+  const trackedInvested = sumOwnedAmounts(trackedInvestedBySource);
+  const creditCurrentValue = sumOwnedAmounts(creditCurrentBySource);
+  const creditInvested = sumOwnedAmounts(creditInvestedBySource);
+  const snapshotCurrentValue = sumOwnedAmounts(snapshotCurrentBySource);
+  const snapshotInvested = sumOwnedAmounts(snapshotInvestedBySource);
+  const totalInvested = marketInvestedValue + trackedInvested + creditInvested + snapshotInvested;
+  const currentValue = marketCurrentValueAmount + trackedCurrentValue + creditCurrentValue + snapshotCurrentValue;
   const hasPortfolioData =
     assets.length > 0 ||
     transactions.length > 0 ||
@@ -281,31 +408,72 @@ export const calculatePortfolioSummary = ({
     valueSnapshots.length > 0;
   const performanceCoverageComplete =
     totalInvested > 0 &&
+    missingPrices === 0 &&
+    missingExchangeRates === 0 &&
+    excludedValueCount === 0 &&
     trackedInvestments.every((item) => item.is_watchlist || !item.include_in_portfolio || item.invested_value != null) &&
     creditInvestments.every((item) => item.status === 'repaid' || item.invested_value != null) &&
     activeSources.filter((item) => item.valuation_mode === 'snapshot').every((source) => latestSnapshotBySource.get(source.id)?.invested_value != null);
   const totalReturn = performanceCoverageComplete ? currentValue - totalInvested : null;
-  const profitLoss = portfolioAssets.length > 0 ? granularMarketValue - granularInvested : null;
-  const profitLossPercent = profitLoss !== null && granularInvested > 0 ? (profitLoss / granularInvested) * 100 : null;
+  const profitLoss = marketCurrentBySource.size > 0 ? marketCurrentValueAmount - marketInvestedValue : null;
+  const profitLossPercent = profitLoss !== null && marketInvestedValue > 0 ? (profitLoss / marketInvestedValue) * 100 : null;
 
   const today = new Date().toISOString().slice(0, 10);
   const historyDates = new Set<string>();
   prices.forEach((price) => historyDates.add(price.price_date));
+  orderedTransactions
+    .filter((transaction) => transaction.transaction_type === 'buy' || transaction.transaction_type === 'sell')
+    .forEach((transaction) => historyDates.add(transaction.transaction_date));
   valueSnapshots.forEach((snapshot) => historyDates.add(snapshot.snapshot_date));
   if (trackedInvestments.length > 0 || creditInvestments.length > 0) historyDates.add(today);
   const portfolioHistory = [...historyDates]
     .sort()
     .map((date) => {
-      let value = 0;
-      let hasValue = false;
-      for (const asset of assets.filter((item) => !item.source_account_id || !snapshotSourceIds.has(item.source_account_id))) {
+      const valueBySource = new Map<string, number>();
+      const unassignedPositionsCoveredAtDate = activeSources.some(
+        (source) =>
+          source.valuation_mode === 'snapshot' &&
+          Boolean(source.covers_unassigned_positions) &&
+          Boolean(
+            latestOnOrBefore(
+              valueSnapshots.filter((snapshot) => snapshot.source_account_id === source.id),
+              date,
+              (snapshot) => snapshot.snapshot_date
+            )
+          )
+      );
+      for (const asset of assets.filter(
+        (item) =>
+          (!item.source_account_id && !unassignedPositionsCoveredAtDate) ||
+          (Boolean(item.source_account_id) && !snapshotSourceIds.has(item.source_account_id!))
+      )) {
         const position = getPositionAt(orderedTransactions.filter((transaction) => transaction.asset_id === asset.id), date);
-        const price = latestOnOrBefore(orderedPrices.filter((item) => item.asset_id === asset.id), date, (item) => item.price_date);
-        if (!price || position.quantity <= 0) continue;
-        const converted = toReportingCurrency(price.price * position.quantity, price.currency, reportingCurrency, orderedRates, date);
+        const marketPrice = latestOnOrBefore(orderedPrices.filter((item) => item.asset_id === asset.id), date, (item) => item.price_date);
+        const transactionPrice = latestOnOrBefore(
+          orderedTransactions.filter(
+            (transaction) =>
+              transaction.asset_id === asset.id &&
+              (transaction.transaction_type === 'buy' || transaction.transaction_type === 'sell') &&
+              transaction.price_per_unit > 0
+          ),
+          date,
+          (transaction) => transaction.transaction_date
+        );
+        const valuationPrice = marketPrice
+          ? { price: marketPrice.price, currency: marketPrice.currency }
+          : transactionPrice
+            ? { price: transactionPrice.price_per_unit, currency: transactionPrice.currency }
+            : null;
+        if (!valuationPrice || position.quantity <= 0) continue;
+        const converted = toReportingCurrency(
+          valuationPrice.price * position.quantity,
+          valuationPrice.currency,
+          reportingCurrency,
+          orderedRates,
+          date
+        );
         if (converted !== null) {
-          value += converted;
-          hasValue = true;
+          addSourceAmount(valueBySource, sourceKeyFor(asset.source_account_id), converted);
         }
       }
       for (const source of activeSources.filter((item) => item.valuation_mode === 'snapshot')) {
@@ -313,15 +481,28 @@ export const calculatePortfolioSummary = ({
         if (!snapshot) continue;
         const converted = toReportingCurrency(snapshot.total_value, snapshot.currency, reportingCurrency, orderedRates, date);
         if (converted !== null) {
-          value += converted;
-          hasValue = true;
+          addSourceAmount(valueBySource, source.id, converted);
         }
       }
       if (date === today) {
-        value += trackedCurrentValue + creditCurrentValue;
-        hasValue ||= trackedCurrentValue + creditCurrentValue > 0;
+        for (const [sourceKey, amount] of trackedCurrentBySource) addSourceAmount(valueBySource, sourceKey, amount);
+        for (const [sourceKey, amount] of creditCurrentBySource) addSourceAmount(valueBySource, sourceKey, amount);
       }
-      return hasValue ? { date, value } : null;
+      if (valueBySource.size === 0) return null;
+      const value = [...valueBySource.entries()].reduce((sum, [sourceKey, grossValue]) => {
+        if (sourceKey === unassignedSourceKey) return sum + grossValue;
+        const source = activeSources.find((item) => item.id === sourceKey);
+        if (!source || source.excluded_amount <= 0) return sum + grossValue;
+        const convertedExcludedAmount = toReportingCurrency(
+          source.excluded_amount,
+          source.currency,
+          reportingCurrency,
+          orderedRates,
+          date
+        );
+        return sum + Math.max(0, grossValue - (convertedExcludedAmount ?? 0));
+      }, 0);
+      return { date, value };
     })
     .filter((item): item is { date: string; value: number } => item !== null);
 
@@ -333,7 +514,15 @@ export const calculatePortfolioSummary = ({
     return (now - new Date(`${lastDate}T00:00:00`).getTime()) / 86_400_000 > STALE_SOURCE_DAYS;
   }).length;
   const messages: string[] = [];
-  if (missingPrices > 0) messages.push(`${missingPrices} aktiv nemá aktuální cenu.`);
+  if (fallbackPrices > 0) {
+    messages.push(`${fallbackPrices} aktiv nemá aktuální cenu; v celku je použita poslední transakční cena.`);
+  }
+  if (missingPrices - fallbackPrices > 0) {
+    messages.push(`${missingPrices - fallbackPrices} aktiv nelze ocenit ani náhradní transakční cenou.`);
+  }
+  if (snapshotFallbackSourceIds.size > 0) {
+    messages.push(`${snapshotFallbackSourceIds.size} snapshotových zdrojů nemá snapshot; dočasně se počítá součet pozic.`);
+  }
   if (missingExchangeRates > 0) messages.push(`${missingExchangeRates} hodnot nemá použitelný měnový kurz.`);
   if (staleSources > 0) messages.push(`${staleSources} zdrojů nebylo aktualizováno déle než ${STALE_SOURCE_DAYS} dní.`);
   if (!hasPortfolioData) messages.push('Zatím nejsou k dispozici žádná investiční data.');
@@ -345,38 +534,13 @@ export const calculatePortfolioSummary = ({
     status: score >= 90 ? 'complete' : score >= 50 ? 'partial' : 'insufficient',
     score,
     missingPrices,
+    fallbackPrices,
     missingExchangeRates,
     staleSources,
     excludedValueCount,
     messages,
   };
 
-  const sourceBreakdown: PortfolioSummary['sourceBreakdown'] = activeSources.map((source) => {
-    const snapshot = latestSnapshotBySource.get(source.id);
-    let value = 0;
-    if (source.valuation_mode === 'snapshot' && snapshot) {
-      value = toReportingCurrency(snapshot.total_value, snapshot.currency, reportingCurrency, orderedRates, snapshot.snapshot_date) ?? 0;
-    } else {
-      value += portfolioAssets
-        .filter((asset) => assets.find((item) => item.id === asset.id)?.source_account_id === source.id)
-        .reduce((sum, asset) => sum + (asset.currentValueInReportingCurrency ?? 0), 0);
-      value += trackedInvestments
-        .filter((item) => item.source_account_id === source.id && item.include_in_portfolio && !item.is_watchlist)
-        .reduce((sum, item) => sum + (toReportingCurrency(item.current_value, item.currency, reportingCurrency, orderedRates) ?? 0), 0);
-      value += creditInvestments
-        .filter((item) => item.source_account_id === source.id && item.status !== 'repaid')
-        .reduce((sum, item) => sum + (toReportingCurrency(item.current_value, item.currency, reportingCurrency, orderedRates) ?? 0), 0);
-    }
-    return {
-      sourceAccountId: source.id,
-      label: source.name,
-      provider: source.provider,
-      value,
-      currency: reportingCurrency,
-      lastUpdatedAt: snapshot?.snapshot_date ?? source.last_synced_at,
-      valuationMode: source.valuation_mode,
-    };
-  });
   const assignedValue = sourceBreakdown.reduce((sum, item) => sum + item.value, 0);
   if (currentValue - assignedValue > 0.005) {
     sourceBreakdown.push({
@@ -384,6 +548,8 @@ export const calculatePortfolioSummary = ({
       label: 'Bez přiřazeného účtu',
       provider: 'unassigned',
       value: currentValue - assignedValue,
+      grossValue: currentValue - assignedValue,
+      excludedValue: 0,
       currency: reportingCurrency,
       lastUpdatedAt: null,
       valuationMode: 'positions',
@@ -392,7 +558,13 @@ export const calculatePortfolioSummary = ({
 
   return {
     totalInvested,
-    currentValue: currentValue > 0 || portfolioAssets.length > 0 ? currentValue : null,
+    currentValue:
+      marketCurrentBySource.size > 0 ||
+      trackedCurrentBySource.size > 0 ||
+      creditCurrentBySource.size > 0 ||
+      snapshotCurrentBySource.size > 0
+        ? currentValue
+        : null,
     profitLoss,
     profitLossPercent,
     reportingCurrency,
@@ -410,6 +582,7 @@ export const calculatePortfolioSummary = ({
     dividendCalendar: Array.from(dividendCalendarMap.values()).sort((a, b) => a.month.localeCompare(b.month)),
     dividendDetails: dividendDetails.sort((a, b) => (a.pay_date || a.transaction_date).localeCompare(b.pay_date || b.transaction_date)),
     dividendTaxEstimate,
+    excludedValue,
     sourceBreakdown,
     performance: {
       totalReturn,

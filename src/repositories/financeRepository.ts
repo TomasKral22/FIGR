@@ -89,6 +89,7 @@ export interface LoadedFinanceState extends FinanceStorageSnapshot {
 const normalizeAccount = (account: BankAccount): BankAccount => ({
   ...account,
   currency: normalizeCurrencyCode(account.currency, 'CZK'),
+  excludedAmount: Math.max(0, Number(account.excludedAmount) || 0),
 });
 
 const parseStoredValue = <T,>(loaded: Record<string, string | null>, key: string, fallback: T): T => {
