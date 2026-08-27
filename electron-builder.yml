@@ -1,0 +1,33 @@
+appId: cz.figr.desktop
+productName: FIGR
+directories:
+  output: release
+files:
+  - dist/**/*
+  - electron/**/*.cjs
+  - package.json
+  - '!**/*.map'
+asar: true
+asarUnpack:
+  - node_modules/better-sqlite3/**/*
+# better-sqlite3 13 ships a stable Node-API binary; rebuilding it is unnecessary.
+npmRebuild: false
+win:
+  icon: public/logos/favicon.png
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+nsis:
+  artifactName: FIGR-Setup-${version}-${arch}.${ext}
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: FIGR
+  runAfterFinish: false
+portable:
+  artifactName: FIGR-Portable-${version}-${arch}.${ext}

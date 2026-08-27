@@ -1,4 +1,4 @@
-import { appStorage } from '@/lib/appStorage';
+import { appStorage, type AppStorageClient } from '@/lib/appStorage';
 import {
   AssetPrice,
   BrokerConnector,
@@ -96,8 +96,8 @@ const parseStoredValue = <T,>(loaded: Record<string, string | null>, key: string
   return raw ? (JSON.parse(raw) as T) : fallback;
 };
 
-export const loadInvestmentState = async (): Promise<LoadedInvestmentState> => {
-  const loaded = await appStorage.getMany(Object.values(INVESTMENT_STORAGE_KEYS));
+export const loadInvestmentState = async (storage: AppStorageClient = appStorage): Promise<LoadedInvestmentState> => {
+  const loaded = await storage.getMany(Object.values(INVESTMENT_STORAGE_KEYS));
   const now = createTimestamp();
   const desktopDbPath = await appStorage.getDbPath();
 
@@ -171,12 +171,12 @@ export const loadInvestmentState = async (): Promise<LoadedInvestmentState> => {
   };
 };
 
-export const saveInvestmentEntries = async (entries: Record<string, string>) => {
-  await appStorage.setMany(entries);
+export const saveInvestmentEntries = async (entries: Record<string, string>, storage: AppStorageClient = appStorage) => {
+  await storage.setMany(entries);
 };
 
-export const loadInvestmentFinanceAuditState = async () => {
-  const loaded = await appStorage.getMany(Object.values(FINANCE_AUDIT_STORAGE_KEYS));
+export const loadInvestmentFinanceAuditState = async (storage: AppStorageClient = appStorage) => {
+  const loaded = await storage.getMany(Object.values(FINANCE_AUDIT_STORAGE_KEYS));
   return {
     financeTransactions: loaded[FINANCE_AUDIT_STORAGE_KEYS.TRANSACTIONS]
       ? (JSON.parse(loaded[FINANCE_AUDIT_STORAGE_KEYS.TRANSACTIONS] as string) as Array<{ month: string }>)

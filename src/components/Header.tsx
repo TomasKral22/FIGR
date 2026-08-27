@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Download, FileSpreadsheet, History, Import, LogOut, Menu, Plus, UserRound } from 'lucide-react';
+import { Cloud, CloudOff, Download, FileSpreadsheet, History, Import, LoaderCircle, LogOut, Menu, Plus, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { CSVImport } from '@/components/CSVImport';
@@ -16,6 +16,8 @@ import {
 import logoLight from '@/assets/logo_figr_light.svg';
 import logoBlue from '@/assets/logo_figr_blue.svg';
 import logoOrange from '@/assets/logo_figr_orange.svg';
+import { appStorage } from '@/lib/appStorage';
+import { useStorageSyncState } from '@/lib/storageSyncState';
 
 interface HeaderProps {
   transactions: Transaction[];
@@ -61,7 +63,17 @@ export const Header = ({
   const isMobile = useIsMobile();
   const logoSrc = resolveLogo(visualTheme);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const syncState = useStorageSyncState();
   const userBadge = useMemo(() => getUserBadge(userDisplayName, userEmail), [userDisplayName, userEmail]);
+  const isSyncBusy = syncState.phase === 'loading' || syncState.phase === 'saving';
+  const hasSyncProblem = syncState.phase === 'offline' || syncState.phase === 'error' || syncState.conflicts.length > 0;
+  const syncLabel = syncState.mode === 'local'
+    ? 'Lokální data'
+    : isSyncBusy
+      ? 'Synchronizuji'
+      : hasSyncProblem
+        ? syncState.conflicts.length ? `Konflikty: ${syncState.conflicts.length}` : syncState.pendingWrites > 0 ? `Čeká ${syncState.pendingWrites} změn` : 'Cloud nedostupný'
+        : 'Cloud uložen';
 
   return (
     <header className="app-header" data-testid="app-header">
@@ -101,6 +113,25 @@ export const Header = ({
         </div>
 
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size={isMobile ? 'icon' : 'sm'}
+            className={hasSyncProblem ? 'text-amber-600' : 'text-muted-foreground'}
+            aria-label={syncLabel}
+            title={syncState.lastError || syncLabel}
+            onClick={() => window.dispatchEvent(new Event('figr:sync-details'))}
+          >
+            {isSyncBusy ? (
+              <LoaderCircle className="h-4 w-4 animate-spin" />
+            ) : hasSyncProblem ? (
+              <CloudOff className="h-4 w-4" />
+            ) : (
+              <Cloud className="h-4 w-4" />
+            )}
+            {!isMobile ? <span>{syncLabel}</span> : null}
+          </Button>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="secondary" size={isMobile ? 'icon' : 'sm'} aria-label="Import a export">

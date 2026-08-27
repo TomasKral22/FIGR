@@ -93,7 +93,7 @@ export const BackupManager = ({ isOpen, onClose }: BackupManagerProps) => {
     if (!isDesktop) return;
 
     const confirmed = window.confirm(
-      'Obnova přepíše aktuální databázi a aplikace se restartuje. Chcete pokračovat?'
+      'Nejdřív se ověří záloha a vytvoří bezpečnostní kopie současného stavu. Poté se obnoví lokální data a aplikace se restartuje. Odlišná cloudová data se nabídnou k rozhodnutí. Pokračovat?'
     );
     if (!confirmed) return;
 
@@ -149,7 +149,9 @@ export const BackupManager = ({ isOpen, onClose }: BackupManagerProps) => {
                 <p className="text-sm font-medium">Jak to funguje</p>
                 <p className="mt-2 text-sm text-muted-foreground">
                   Aplikace vytváří automatickou zálohu zhruba jednou za 24 hodin a můžeš kdykoli
-                  vytvořit i ruční snapshot. Obnova přepíše aktuální databázi a aplikaci restartuje.
+                  vytvořit i ruční snapshot. Před obnovou se záloha ověří a uchová se současný stav.
+                  Odlišná cloudová data vyžadují potvrzení. Záloha obsahuje načtená data tohoto zařízení,
+                  nikoli samostatné soubory příloh. Přílohy je nutné zálohovat zvlášť.
                 </p>
                 {lastBackup && (
                   <p className="mt-2 text-xs text-muted-foreground">

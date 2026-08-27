@@ -16,6 +16,8 @@ export interface InvestmentImportProfileConfig {
   externalId: string[];
 }
 
+export type InvestmentImportMapping = Partial<Record<keyof InvestmentImportProfileConfig, string>>;
+
 const GENERIC_PROFILE: InvestmentImportProfileConfig = {
   ticker: ['ticker', 'symbol', 'instrument', 'instrumentticker', 'product', 'asset', 'code'],
   name: ['name', 'nazev', 'název', 'instrumentname', 'productname', 'description', 'product'],
@@ -121,23 +123,32 @@ const PROFILE_CONFIGS: Record<BrokerProfileKey, Partial<InvestmentImportProfileC
   },
 };
 
-export const getInvestmentImportProfileConfig = (profileKey: BrokerProfileKey): InvestmentImportProfileConfig => {
+export const getInvestmentImportProfileConfig = (
+  profileKey: BrokerProfileKey,
+  mapping: InvestmentImportMapping = {}
+): InvestmentImportProfileConfig => {
   const profile = PROFILE_CONFIGS[profileKey] || {};
 
+  const aliases = (key: keyof InvestmentImportProfileConfig) => [
+    ...(mapping[key] ? [mapping[key] as string] : []),
+    ...(profile[key] || []),
+    ...GENERIC_PROFILE[key],
+  ];
+
   return {
-    ticker: [...(profile.ticker || []), ...GENERIC_PROFILE.ticker],
-    name: [...(profile.name || []), ...GENERIC_PROFILE.name],
-    quantity: [...(profile.quantity || []), ...GENERIC_PROFILE.quantity],
-    price: [...(profile.price || []), ...GENERIC_PROFILE.price],
-    currency: [...(profile.currency || []), ...GENERIC_PROFILE.currency],
-    transactionDate: [...(profile.transactionDate || []), ...GENERIC_PROFILE.transactionDate],
-    transactionType: [...(profile.transactionType || []), ...GENERIC_PROFILE.transactionType],
-    sector: [...(profile.sector || []), ...GENERIC_PROFILE.sector],
-    exDividendDate: [...(profile.exDividendDate || []), ...GENERIC_PROFILE.exDividendDate],
-    payDate: [...(profile.payDate || []), ...GENERIC_PROFILE.payDate],
-    expectedDividendAmount: [...(profile.expectedDividendAmount || []), ...GENERIC_PROFILE.expectedDividendAmount],
-    totalValue: [...(profile.totalValue || []), ...GENERIC_PROFILE.totalValue],
-    externalId: [...(profile.externalId || []), ...GENERIC_PROFILE.externalId],
+    ticker: aliases('ticker'),
+    name: aliases('name'),
+    quantity: aliases('quantity'),
+    price: aliases('price'),
+    currency: aliases('currency'),
+    transactionDate: aliases('transactionDate'),
+    transactionType: aliases('transactionType'),
+    sector: aliases('sector'),
+    exDividendDate: aliases('exDividendDate'),
+    payDate: aliases('payDate'),
+    expectedDividendAmount: aliases('expectedDividendAmount'),
+    totalValue: aliases('totalValue'),
+    externalId: aliases('externalId'),
   };
 };
 

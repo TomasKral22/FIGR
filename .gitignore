@@ -10,6 +10,9 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+release/
+playwright-report/
+tests/.profiles/
 *.local
 .env
 .env.*

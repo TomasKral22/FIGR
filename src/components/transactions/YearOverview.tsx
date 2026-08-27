@@ -19,13 +19,6 @@ interface YearOverviewProps {
 export const YearOverview = ({ months, selectedMonth, onSelectMonth }: YearOverviewProps) => {
   return (
     <div className="space-y-3">
-      <div>
-        <h3 className="text-lg font-semibold sm:text-xl">Roční přehled měsíců</h3>
-        <p className="text-sm text-muted-foreground">
-          Vyber měsíc v kompaktním gridu. Detail se zobrazí hned pod přehledem.
-        </p>
-      </div>
-
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
         {months.map((month) => (
           <MonthCard

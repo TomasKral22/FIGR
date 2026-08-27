@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HashRouter, Routes, Route } from "react-router-dom";
 import { LoaderCircle } from "lucide-react";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { StorageSyncPanel } from './components/StorageSyncPanel';
 
 const Index = lazy(() => import("./pages/Index"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -29,7 +30,8 @@ const AppRoutes = () => {
   const visualTheme = (typeof window !== 'undefined' && window.localStorage.getItem('finance_visual_theme')) || 'dark-blue';
   const authBypassEnabled =
     typeof window !== 'undefined' &&
-    (window.localStorage.getItem('figr_auth_bypass') === 'true' || window.location.hash.includes('testBypass=1'));
+    import.meta.env.DEV &&
+    window.location.hash.includes('testBypass=1');
 
   if (isCloudEnabled && !authBypassEnabled && isLoading) {
     return (
@@ -52,9 +54,10 @@ const AppRoutes = () => {
 
   return (
     <HashRouter>
+      <StorageSyncPanel key={session?.user.id ?? 'local'} />
       <Suspense fallback={<RouteFallback label="Načítám aplikaci…" />}>
         <Routes>
-          <Route path="/" element={<Index />} />
+          <Route path="/" element={<Index key={session?.user.id ?? 'local'} />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>

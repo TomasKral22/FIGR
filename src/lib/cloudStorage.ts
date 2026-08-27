@@ -2,6 +2,16 @@ import { isSupabaseConfigured, supabase } from '@/integrations/supabase/client';
 import { TransactionAttachment } from '@/types/finance';
 
 export type StorageMap = Record<string, string | null>;
+export interface StorageEntryWithMeta {
+  value: string | null;
+  updatedAt: string | null;
+}
+export type StorageMapWithMeta = Record<string, StorageEntryWithMeta>;
+
+export interface CloudReadResult {
+  entries: StorageMapWithMeta;
+  error: string | null;
+}
 
 const USER_STATE_TABLE = 'user_app_state';
 const ATTACHMENT_BUCKET = 'transaction-attachments';
@@ -33,46 +43,51 @@ const parseAttachmentStoragePath = (storagePath?: string) => {
 
 export const isCloudStorageEnabled = async () => Boolean(await getAuthenticatedUserId());
 
-export const getCloudStateMany = async (keys: string[]): Promise<StorageMap | null> => {
-  const userId = await getAuthenticatedUserId();
-  if (!userId) return null;
+const assertCloudUser = async (userId: string) => {
+  if ((await getAuthenticatedUserId()) !== userId) throw new Error('Přihlášený účet se změnil. Synchronizace byla zastavena.');
+};
+
+export const getCloudStateManyWithMeta = async (keys: string[], userId: string): Promise<StorageMapWithMeta> => {
+  await assertCloudUser(userId);
 
   const { data, error } = await supabase
     .from(USER_STATE_TABLE)
-    .select('storage_key, storage_value')
+    .select('storage_key, storage_value, updated_at')
     .eq('user_id', userId)
-    .in('storage_key', keys);
+    .in('storage_key', keys)
+    .abortSignal(AbortSignal.timeout(15000));
 
   if (error) {
-    console.error('Nepodařilo se načíst cloudový stav aplikace.', error);
-    return null;
+    throw new Error(error.message);
   }
 
-  const map = new Map((data || []).map((row) => [row.storage_key, row.storage_value]));
-  return Object.fromEntries(keys.map((key) => [key, map.get(key) ?? null]));
+  await assertCloudUser(userId);
+
+  const map = new Map((data || []).map((row) => [row.storage_key, row]));
+  return Object.fromEntries(
+      keys.map((key) => {
+        const row = map.get(key);
+        return [key, { value: row?.storage_value ?? null, updatedAt: row?.updated_at ?? null }];
+      })
+    );
 };
 
-export const setCloudStateMany = async (entries: Record<string, string>): Promise<boolean> => {
-  const userId = await getAuthenticatedUserId();
-  if (!userId) return false;
-
-  const rows = Object.entries(entries).map(([key, value]) => ({
-    user_id: userId,
-    storage_key: key,
-    storage_value: value,
-    updated_at: new Date().toISOString(),
-  }));
-
-  const { error } = await supabase.from(USER_STATE_TABLE).upsert(rows, {
-    onConflict: 'user_id,storage_key',
-  });
-
-  if (error) {
-    console.error('Nepodařilo se uložit cloudový stav aplikace.', error);
-    return false;
-  }
-
-  return true;
+// A conditional write is atomic in Postgres. Never use an unconditional upsert here.
+export const compareAndSetCloudState = async (
+  userId: string, key: string, value: string, expected: StorageEntryWithMeta
+): Promise<StorageEntryWithMeta | null> => {
+  await assertCloudUser(userId);
+  const request = expected.updatedAt === null
+    ? supabase.from(USER_STATE_TABLE).insert({ user_id: userId, storage_key: key, storage_value: value })
+    : supabase.from(USER_STATE_TABLE).update({ storage_value: value })
+      .eq('user_id', userId).eq('storage_key', key).eq('updated_at', expected.updatedAt);
+  const { data, error } = await request.select('storage_value, updated_at')
+    .abortSignal(AbortSignal.timeout(15000));
+  await assertCloudUser(userId);
+  if (error?.code === '23505') return null;
+  if (error) throw new Error(error.message);
+  const row = data?.[0];
+  return row ? { value: row.storage_value, updatedAt: row.updated_at } : null;
 };
 
 export const saveAttachmentsToCloud = async (

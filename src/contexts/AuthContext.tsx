@@ -10,6 +10,7 @@ import {
 import { Session, User } from '@supabase/supabase-js';
 import { isSupabaseConfigured, supabase } from '@/integrations/supabase/client';
 import { formatSupabaseError } from '@/lib/supabaseErrors';
+import { appStorage } from '@/lib/appStorage';
 
 interface AuthContextValue {
   isCloudEnabled: boolean;
@@ -40,11 +41,13 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     }
 
     let isMounted = true;
+    let authChanged = false;
 
     const hydrate = async () => {
       try {
         const { data } = await supabase.auth.getSession();
-        if (!isMounted) return;
+        if (!isMounted || authChanged) return;
+        appStorage.bindUser(data.session?.user.id ?? null);
         setSession(data.session);
         setUser(data.session?.user ?? null);
         setAuthError(null);
@@ -64,6 +67,8 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
 
     const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       if (!isMounted) return;
+      authChanged = true;
+      appStorage.bindUser(nextSession?.user.id ?? null);
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
       setIsLoading(false);

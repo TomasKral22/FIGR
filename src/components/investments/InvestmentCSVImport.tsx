@@ -20,7 +20,15 @@ import {
   ParsedInvestmentImportFile,
   readInvestmentImportFile,
 } from '@/utils/investmentImportTemplate';
-import { getInvestmentImportProfileConfig, normalizeBrokerTransactionType } from '@/utils/investmentImportProfiles';
+import {
+  getInvestmentImportProfileConfig,
+  InvestmentImportMapping,
+  InvestmentImportProfileConfig,
+  normalizeBrokerTransactionType,
+} from '@/utils/investmentImportProfiles';
+import { BrokerProfileKey } from '@/utils/investmentBrokerDetection';
+import { useAppStorage } from '@/hooks/useAppStorage';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface ImportRow {
   ticker: string;
@@ -49,6 +57,21 @@ interface InvestmentCSVImportProps {
   onImport: (data: ImportRow[]) => Promise<void>;
   sourceAccounts?: InvestmentSourceAccount[];
 }
+
+type SavedImportMappings = Partial<Record<BrokerProfileKey, InvestmentImportMapping>>;
+
+const IMPORT_MAPPINGS_STORAGE_KEY = 'investment_import_saved_mappings';
+const MAPPING_FIELDS: Array<{ key: keyof InvestmentImportProfileConfig; label: string }> = [
+  { key: 'ticker', label: 'Ticker / označení' },
+  { key: 'name', label: 'Název' },
+  { key: 'transactionDate', label: 'Datum' },
+  { key: 'transactionType', label: 'Typ pohybu' },
+  { key: 'quantity', label: 'Množství' },
+  { key: 'price', label: 'Cena za jednotku' },
+  { key: 'totalValue', label: 'Celková hodnota' },
+  { key: 'currency', label: 'Měna' },
+  { key: 'externalId', label: 'Externí ID' },
+];
 
 const normalizeText = (value: string) =>
   value
@@ -134,6 +157,7 @@ const stableRowHash = (parts: Array<string | number>) => {
 };
 
 export const InvestmentCSVImport = ({ onImport, sourceAccounts = [] }: InvestmentCSVImportProps) => {
+  const appStorage = useAppStorage();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<ImportRow[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
@@ -142,11 +166,14 @@ export const InvestmentCSVImport = ({ onImport, sourceAccounts = [] }: Investmen
   const [defaultProvider, setDefaultProvider] = useState<InvestmentProvider>('broker');
   const [sourceInfo, setSourceInfo] = useState<ParsedInvestmentImportFile | null>(null);
   const [selectedSourceAccountId, setSelectedSourceAccountId] = useState('unassigned');
+  const [savedMappings, setSavedMappings] = useState<SavedImportMappings>({});
+  const [mappingDraft, setMappingDraft] = useState<InvestmentImportMapping>({});
+  const [isMappingOpen, setIsMappingOpen] = useState(false);
 
-  const parseRows = (parsedFile: ParsedInvestmentImportFile) => {
+  const parseRows = (parsedFile: ParsedInvestmentImportFile, mapping: InvestmentImportMapping = {}) => {
     const parseErrors: string[] = [];
     const parsedRows: ImportRow[] = [];
-    const profileConfig = getInvestmentImportProfileConfig(parsedFile.detectedProfile.key);
+    const profileConfig = getInvestmentImportProfileConfig(parsedFile.detectedProfile.key, mapping);
 
     parsedFile.rows.forEach((values, index) => {
       const rowErrors: string[] = [];
@@ -284,6 +311,18 @@ export const InvestmentCSVImport = ({ onImport, sourceAccounts = [] }: Investmen
     if (!file) return;
 
     const parsedFile = await readInvestmentImportFile(file);
+    const stored = await appStorage.getMany([IMPORT_MAPPINGS_STORAGE_KEY]);
+    let mappings: SavedImportMappings = {};
+    try {
+      mappings = stored[IMPORT_MAPPINGS_STORAGE_KEY]
+        ? JSON.parse(stored[IMPORT_MAPPINGS_STORAGE_KEY] as string) as SavedImportMappings
+        : {};
+    } catch {
+      mappings = {};
+    }
+    const savedMapping = mappings[parsedFile.detectedProfile.key] || {};
+    setSavedMappings(mappings);
+    setMappingDraft(savedMapping);
     if (parsedFile.rows.length === 0) {
       setErrors(['Soubor musí obsahovat alespoň jeden řádek dat.']);
       setRows([]);
@@ -291,7 +330,36 @@ export const InvestmentCSVImport = ({ onImport, sourceAccounts = [] }: Investmen
       return;
     }
 
-    parseRows(parsedFile);
+    parseRows(parsedFile, savedMapping);
+  };
+
+  const handleMappingChange = (field: keyof InvestmentImportProfileConfig, value: string) => {
+    if (!sourceInfo) return;
+    const nextMapping = { ...mappingDraft };
+    if (value === 'automatic') delete nextMapping[field];
+    else nextMapping[field] = value;
+    setMappingDraft(nextMapping);
+    parseRows(sourceInfo, nextMapping);
+  };
+
+  const handleSaveMapping = async () => {
+    if (!sourceInfo) return;
+    const nextMappings = {
+      ...savedMappings,
+      [sourceInfo.detectedProfile.key]: mappingDraft,
+    };
+    setSavedMappings(nextMappings);
+    await appStorage.setMany({ [IMPORT_MAPPINGS_STORAGE_KEY]: JSON.stringify(nextMappings) });
+  };
+
+  const handleResetMapping = async () => {
+    if (!sourceInfo) return;
+    const nextMappings = { ...savedMappings };
+    delete nextMappings[sourceInfo.detectedProfile.key];
+    setSavedMappings(nextMappings);
+    setMappingDraft({});
+    parseRows(sourceInfo, {});
+    await appStorage.setMany({ [IMPORT_MAPPINGS_STORAGE_KEY]: JSON.stringify(nextMappings) });
   };
 
   const handleImport = async () => {
@@ -314,6 +382,7 @@ export const InvestmentCSVImport = ({ onImport, sourceAccounts = [] }: Investmen
 
   const validCount = rows.filter((row) => row.valid).length;
   const invalidCount = rows.length - validCount;
+  const availableHeaders = sourceInfo?.rows[0] ? Object.keys(sourceInfo.rows[0]) : [];
 
   const handleSourceAccountChange = (value: string) => {
     setSelectedSourceAccountId(value);
@@ -416,6 +485,53 @@ export const InvestmentCSVImport = ({ onImport, sourceAccounts = [] }: Investmen
             <div className="mt-1 text-xs">{sourceInfo.detectedProfile.reasons.join(' · ')}</div>
           ) : null}
         </div>
+      ) : null}
+
+      {sourceInfo && availableHeaders.length > 0 ? (
+        <Collapsible open={isMappingOpen} onOpenChange={setIsMappingOpen}>
+          <div className="rounded-xl border border-border/70 bg-background/40">
+            <CollapsibleTrigger asChild>
+              <Button type="button" variant="ghost" className="w-full justify-between px-4">
+                <span>Mapování sloupců</span>
+                <span className="text-xs font-normal text-muted-foreground">
+                  {Object.keys(mappingDraft).length > 0 ? `${Object.keys(mappingDraft).length} vlastních pravidel` : 'automatické'}
+                </span>
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="border-t border-border/70 p-4">
+              <p className="mb-4 text-sm text-muted-foreground">
+                Pokud FIGR některý sloupec nerozpoznal správně, vyber ho ručně a mapování ulož pro další exporty stejného typu.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {MAPPING_FIELDS.map((field) => (
+                  <div key={field.key} className="space-y-2">
+                    <Label>{field.label}</Label>
+                    <Select
+                      value={mappingDraft[field.key] || 'automatic'}
+                      onValueChange={(value) => handleMappingChange(field.key, value)}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="automatic">Rozpoznat automaticky</SelectItem>
+                        {availableHeaders.map((header) => (
+                          <SelectItem key={header} value={header}>{header}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button type="button" size="sm" onClick={() => void handleSaveMapping()}>
+                  Uložit mapování pro {sourceInfo.detectedProfile.name}
+                </Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => void handleResetMapping()}>
+                  Vrátit automatiku
+                </Button>
+              </div>
+            </CollapsibleContent>
+          </div>
+        </Collapsible>
       ) : null}
 
       {errors.length > 0 && (

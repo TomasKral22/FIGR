@@ -238,7 +238,7 @@ export const BulkTransactionTable = ({
       updateRowDraft(row.id, { account: nextValue }, { account: true });
       return;
     }
-    updateRowDraft(row.id, { sourceAccount: nextValue }, { sourceAccount: true, type: row.draft.type !== 'expense' });
+    updateRowDraft(row.id, { sourceAccount: nextValue }, { sourceAccount: true, type: true });
   };
 
   const handleTargetChange = (row: BulkTransactionRow, value: string) => {

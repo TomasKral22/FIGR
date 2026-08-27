@@ -20,7 +20,7 @@ import { Transaction, TransactionDraft } from '@/types/finance';
 import { draftToTransactionInput, duplicateTransaction } from '@/utils/transactionWorkflow';
 import { formatCurrency, formatMonth } from '@/utils/calculations';
 import { getBudgetAlerts } from '@/utils/categoryAutomation';
-import { appStorage } from '@/lib/appStorage';
+import { useAppStorage } from '@/hooks/useAppStorage';
 import { useAuth } from '@/contexts/AuthContext';
 import { SidebarItemId } from '@/components/Sidebar';
 
@@ -120,9 +120,12 @@ const LazyPanelFallback = ({ label }: { label: string }) => (
   </div>
 );
 const Index = () => {
+  const appStorage = useAppStorage();
   const { user, signOut } = useAuth();
   const { toast } = useToast();
   const {
+    isHydrated,
+    loadError,
     transactions,
     bankAccounts,
     brokerAccounts,
@@ -347,15 +350,15 @@ const Index = () => {
       }
     };
 
-    void loadBudgetAlertNotificationState();
+    void loadBudgetAlertNotificationState().catch(error => console.error('Notification state load failed:', error));
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [appStorage]);
 
   useEffect(() => {
-    if (!hasLoadedBudgetAlertNotificationState.current) return;
+    if (!isHydrated || !hasLoadedBudgetAlertNotificationState.current) return;
 
     const nextLevels = Object.fromEntries(
       currentBudgetAlerts.map((alert) => [`${alert.month}:${alert.limit.id}`, alert.level])
@@ -366,7 +369,7 @@ const Index = () => {
       setBudgetAlertNotificationState(baselineState);
       void appStorage.setMany({
         [BUDGET_ALERT_NOTIFICATION_KEY]: JSON.stringify(baselineState),
-      });
+      }).catch(error => console.error('Notification save failed:', error));
       return;
     }
 
@@ -410,9 +413,9 @@ const Index = () => {
       setBudgetAlertNotificationState(persistedState);
       void appStorage.setMany({
         [BUDGET_ALERT_NOTIFICATION_KEY]: JSON.stringify(persistedState),
-      });
+      }).catch(error => console.error('Notification save failed:', error));
     }
-  }, [budgetAlertNotificationState, currentBudgetAlerts, toast]);
+  }, [budgetAlertNotificationState, currentBudgetAlerts, toast, appStorage, isHydrated]);
 
   const userDisplayName =
     typeof user?.user_metadata?.username === 'string' && user.user_metadata.username.trim().length > 0
@@ -604,6 +607,11 @@ const Index = () => {
       />
     ),
   } satisfies Parameters<typeof MainDashboardPanels>[0]['panels'];
+
+  if (!isHydrated) return <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
+    <p role={loadError ? 'alert' : 'status'}>{loadError || 'Načítám bezpečně uložená data…'}</p>
+    {loadError && <button className="rounded-lg border px-4 py-2" onClick={() => window.location.reload()}>Zkusit načtení znovu</button>}
+  </div>;
 
   return (
     <div className="app-shell">

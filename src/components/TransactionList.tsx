@@ -27,7 +27,7 @@ import { InstitutionAvatar } from '@/components/InstitutionAvatar';
 import { YearOverview } from '@/components/transactions/YearOverview';
 import { MonthlyWorkflowChecklist } from '@/components/MonthlyWorkflowChecklist';
 import { transactionToDraft, validateTransactionDraft } from '@/utils/transactionWorkflow';
-import { appStorage } from '@/lib/appStorage';
+import { useAppStorage } from '@/hooks/useAppStorage';
 
 type TransactionFilter = 'all' | 'income' | 'expense' | 'transfer' | 'investments';
 
@@ -90,6 +90,8 @@ export const TransactionList = ({
   onToggleMonthClosure,
   onFillRecurringForMonth,
 }: TransactionListProps) => {
+  const appStorage = useAppStorage();
+  const [prefsHydrated, setPrefsHydrated] = useState(false);
   const [showTransactions, setShowTransactions] = useState(true);
   const [editingSnapshot, setEditingSnapshot] = useState<AccountMonthlySnapshot | null>(null);
   const [editedBalance, setEditedBalance] = useState('');
@@ -150,25 +152,27 @@ export const TransactionList = ({
         if (typeof parsed.showYearOverview === 'boolean') setShowYearOverview(parsed.showYearOverview);
         if (typeof parsed.showMonthlyChecklist === 'boolean') setShowMonthlyChecklist(parsed.showMonthlyChecklist);
       } catch {
-        // ignore malformed UI prefs
+        return; // Do not overwrite malformed UI preferences.
       }
+      setPrefsHydrated(true);
     };
 
-    void load();
+    void load().catch(error => console.error('Transaction preferences load failed:', error));
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [appStorage]);
 
   useEffect(() => {
+    if (!prefsHydrated) return;
     void appStorage.setMany({
       [TRANSACTION_UI_PREFS_KEY]: JSON.stringify({
         showYearOverview,
         showMonthlyChecklist,
       }),
-    });
-  }, [showMonthlyChecklist, showYearOverview]);
+    }).catch(error => console.error('Transaction preferences save failed:', error));
+  }, [showMonthlyChecklist, showYearOverview, prefsHydrated, appStorage]);
 
   const filteredTransactions = useMemo(
     () => transactions.filter((transaction) => transaction.month.startsWith(selectedYear)),

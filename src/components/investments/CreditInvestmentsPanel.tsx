@@ -31,12 +31,12 @@ interface CreditInvestmentsPanelProps {
     status: CreditInvestment['status'];
     currency: string;
     note?: string;
-  }) => Promise<void>;
+  }) => Promise<unknown>;
   onUpdateCreditInvestment: (
     id: string,
     updates: Partial<Omit<CreditInvestment, 'id' | 'created_at' | 'updated_at'>>
-  ) => Promise<void>;
-  onDeleteCreditInvestment: (id: string) => Promise<void>;
+  ) => Promise<unknown>;
+  onDeleteCreditInvestment: (id: string) => Promise<unknown>;
   onAddCreditRepayment: (payload: {
     credit_investment_id: string;
     payment_date: string;
@@ -44,8 +44,8 @@ interface CreditInvestmentsPanelProps {
     interest_paid: number;
     fee_paid?: number;
     note?: string;
-  }) => Promise<void>;
-  onDeleteCreditRepayment: (id: string) => Promise<void>;
+  }) => Promise<unknown>;
+  onDeleteCreditRepayment: (id: string) => Promise<unknown>;
 }
 
 const STATUS_BADGE_STYLES: Record<CreditInvestment['status'], string> = {

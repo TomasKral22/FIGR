@@ -6,12 +6,22 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  base: './',
   server: {
     host: "::",
     port: 8080,
   },
   plugins: [
     react(),
+    {
+      name: 'production-content-security-policy',
+      apply: 'build',
+      transformIndexHtml: () => [{
+        tag: 'meta',
+        attrs: { 'http-equiv': 'Content-Security-Policy', content: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" },
+        injectTo: 'head',
+      }],
+    },
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",

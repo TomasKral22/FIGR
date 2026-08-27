@@ -22,9 +22,9 @@ interface AssetDetailProps {
   prices: AssetPrice[];
   reportingCurrency: string;
   onBack: () => void;
-  onDeleteAsset: (id: string) => Promise<void>;
-  onDeleteTransaction: (id: string) => Promise<void>;
-  onAddPrice: (price: { asset_id: string; price: number; currency: string; price_date: string }) => Promise<void>;
+  onDeleteAsset: (id: string) => Promise<unknown>;
+  onDeleteTransaction: (id: string) => Promise<unknown>;
+  onAddPrice: (price: { asset_id: string; price: number; currency: string; price_date: string }) => Promise<unknown>;
 }
 
 const formatCurrency = (value: number | null | undefined, currency: string): string =>

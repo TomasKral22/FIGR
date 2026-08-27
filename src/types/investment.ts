@@ -170,8 +170,7 @@ export interface InvestmentValidationIssue {
     | 'stale-price'
     | 'missing-rate'
     | 'orphan-transaction'
-    | 'empty-asset'
-    | 'open-finance-month'
+      | 'empty-asset'
     | 'tracked-value'
     | 'credit-without-repayment';
 }

@@ -116,7 +116,7 @@ export const buildRecurringMonthStatuses = (
 ): RecurringMonthStatus[] =>
   recurringTransactions
     .filter((transaction) => transaction.isActive)
-    .map((recurring) => ({
+    .map<RecurringMonthStatus>((recurring) => ({
       recurringId: recurring.id,
       name: recurring.name,
       amount: recurring.amount,

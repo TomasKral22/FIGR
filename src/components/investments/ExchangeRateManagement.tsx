@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 interface ExchangeRateManagementProps {
   exchangeRates: ExchangeRate[];
   reportingCurrency: string;
-  onAddRate: (rate: { from_currency: string; to_currency: string; rate: number; rate_date: string }) => Promise<void>;
+  onAddRate: (rate: { from_currency: string; to_currency: string; rate: number; rate_date: string }) => Promise<unknown>;
 }
 
 export const ExchangeRateManagement = ({

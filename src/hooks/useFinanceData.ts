@@ -83,6 +83,8 @@ const isSameTransactionPayload = (
 
 export const useFinanceData = () => {
   const { session } = useAuth();
+  const storage = useMemo(() => appStorage.forUser(session?.user.id ?? null), [session?.user.id]);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [brokerAccounts, setBrokerAccounts] = useState<BankAccount[]>([]);
@@ -159,9 +161,11 @@ export const useFinanceData = () => {
   }, [transactions]);
 
   useEffect(() => {
+    let cancelled = false;
     const hydrate = async () => {
       setIsHydrated(false);
-      const state = await loadFinanceState();
+      const state = await loadFinanceState(storage);
+      if (cancelled) return;
 
       setTransactions(state.transactions);
       setBankAccounts(state.bankAccounts);
@@ -189,8 +193,9 @@ export const useFinanceData = () => {
       setIsHydrated(true);
     };
 
-    void hydrate();
-  }, [session?.user.id]);
+    void hydrate().catch(error => { if (!cancelled) setLoadError(error instanceof Error ? error.message : 'Načtení dat selhalo.'); });
+    return () => { cancelled = true; };
+  }, [storage]);
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -220,7 +225,8 @@ export const useFinanceData = () => {
       .catch((error) => {
         console.error('Previous finance state save failed:', error);
       })
-      .then(() => saveFinanceState(stateToSave));
+      .then(() => saveFinanceState(stateToSave, storage))
+      .catch(error => console.error('Finance state save failed:', error));
   }, [
     transactions,
     bankAccounts,
@@ -243,6 +249,7 @@ export const useFinanceData = () => {
     visualTheme,
     lastTransaction,
     isHydrated,
+    storage,
   ]);
 
   useEffect(() => {
@@ -252,21 +259,21 @@ export const useFinanceData = () => {
 
     const loadExchangeRates = async () => {
       if (cancelled) return;
-      const loadedRates = await loadFinanceExchangeRates();
+      const loadedRates = await loadFinanceExchangeRates(storage);
       if (cancelled) return;
-      setExchangeRates(loadedRates);
+      setExchangeRates(current => JSON.stringify(current) === JSON.stringify(loadedRates) ? current : loadedRates);
     };
 
-    void loadExchangeRates();
+    void loadExchangeRates().catch(error => console.error('Exchange rate load failed:', error));
     const intervalId = window.setInterval(() => {
-      void loadExchangeRates();
+      void loadExchangeRates().catch(error => console.error('Exchange rate load failed:', error));
     }, 30000);
 
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [isHydrated, session?.user.id]);
+  }, [isHydrated, storage]);
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -1173,6 +1180,8 @@ export const useFinanceData = () => {
   );
 
   return {
+    isHydrated,
+    loadError,
     transactions,
     bankAccounts,
     brokerAccounts,

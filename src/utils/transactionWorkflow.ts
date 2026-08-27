@@ -30,10 +30,10 @@ const CATEGORY_LABELS: Record<ExpenseCategory, string> = {
 };
 
 const CATEGORY_LOOKUP = new Map<string, ExpenseCategory>(
-  Object.entries(CATEGORY_LABELS).flatMap(([key, value]) => [
+  Object.entries(CATEGORY_LABELS).flatMap<[string, ExpenseCategory]>(([key, value]) => [
     [normalizeSearchString(key), key as ExpenseCategory],
     [normalizeSearchString(value), key as ExpenseCategory],
-    ...(key === 'whims' ? [['kraviny', 'whims' as ExpenseCategory]] : []),
+    ...(key === 'whims' ? [['kraviny', 'whims'] as [string, ExpenseCategory]] : []),
   ])
 );
 

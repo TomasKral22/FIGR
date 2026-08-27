@@ -36,6 +36,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { buildTickerAnalysisPrompt, EXTERNAL_AI_URLS } from '@/services/aiAnalysis';
 import { fetchExchangeRateSnapshot, fetchTickerMarketSnapshot, marketSnapshotToAssetPrice } from '@/services/marketData';
+import type { PortfolioAsset } from '@/types/investment';
 import { useToast } from '@/hooks/use-toast';
 
 interface InvestmentDashboardProps {
@@ -54,6 +55,8 @@ interface InvestmentSavedView {
   workflowCollapsed: boolean;
   connectorsCollapsed: boolean;
 }
+
+const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : String(error);
 
 const INVESTMENT_DASHBOARD_PREFS_KEY = 'finance_investment_dashboard_prefs';
 const INVESTMENT_DASHBOARD_VIEWS_KEY = 'finance_investment_dashboard_saved_views';
@@ -129,6 +132,8 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
   const { toast } = useToast();
   const {
     loading,
+    loadError,
+    fetchData,
     assets,
     transactions,
     prices,
@@ -206,7 +211,7 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
     ? portfolioSummary?.assets.find((asset) => asset.id === selectedAssetId) || null
     : null;
 
-  const selectedAnalysisAsset = useMemo(() => {
+  const selectedAnalysisAsset = useMemo<PortfolioAsset | null>(() => {
     if (!selectedAnalysisAssetId) return null;
 
     const summarizedAsset = portfolioSummary?.assets.find((asset) => asset.id === selectedAnalysisAssetId);
@@ -820,6 +825,15 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
           auditLog={auditLog}
           onRefreshAudit={refreshValidationIssues}
           onExportBackup={exportAccountBackup}
+          dataSummary={{
+            assets: assets.length,
+            transactions: transactions.length,
+            prices: prices.length,
+            sourceAccounts: sourceAccounts.length,
+            trackedInvestments: trackedInvestments.length,
+            creditInvestments: creditInvestments.length,
+            valueSnapshots: valueSnapshots.length,
+          }}
           lastPriceRefreshReport={lastPriceRefreshReport}
         />
       </div>
@@ -954,15 +968,11 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
         </TabsContent>
 
         <TabsContent value="dividends">
-          <DividendOverview
-            assets={assets}
-            transactions={transactions}
-            reportingCurrency={settings?.reporting_currency || 'CZK'}
-          />
+          <DividendOverview portfolioSummary={portfolioSummary} />
         </TabsContent>
 
         <TabsContent value="rates">
-          <ExchangeRateManagement exchangeRates={exchangeRates} onAddExchangeRate={addExchangeRate} />
+          <ExchangeRateManagement exchangeRates={exchangeRates} onAddRate={addExchangeRate} reportingCurrency={settings?.reporting_currency || 'CZK'} />
         </TabsContent>
 
         <TabsContent value="imports" className="space-y-4">
@@ -971,6 +981,12 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
       </Tabs>
     ),
   } satisfies Parameters<typeof InvestmentWorkspacePanels>[0]['panels'];
+
+  if (loadError) return <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <SheetContent className="space-y-4"><SheetHeader><SheetTitle>Investice nelze načíst</SheetTitle></SheetHeader>
+      <p role="alert">{loadError}</p><Button onClick={() => void fetchData()}>Zkusit znovu</Button>
+    </SheetContent>
+  </Sheet>;
 
   if (loading) {
     return (
@@ -1172,6 +1188,15 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
               auditLog={auditLog}
               onRefreshAudit={refreshValidationIssues}
               onExportBackup={exportAccountBackup}
+              dataSummary={{
+                assets: assets.length,
+                transactions: transactions.length,
+                prices: prices.length,
+                sourceAccounts: sourceAccounts.length,
+                trackedInvestments: trackedInvestments.length,
+                creditInvestments: creditInvestments.length,
+                valueSnapshots: valueSnapshots.length,
+              }}
               lastPriceRefreshReport={lastPriceRefreshReport}
             />
           </div>

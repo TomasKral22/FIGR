@@ -26,12 +26,12 @@ interface TrackedInvestmentsPanelProps {
     include_in_portfolio: boolean;
     is_watchlist: boolean;
     note?: string;
-  }) => Promise<void>;
+  }) => Promise<unknown>;
   onUpdateTrackedInvestment: (
     id: string,
     updates: Partial<Omit<TrackedInvestment, 'id' | 'created_at' | 'updated_at'>>
-  ) => Promise<void>;
-  onDeleteTrackedInvestment: (id: string) => Promise<void>;
+  ) => Promise<unknown>;
+  onDeleteTrackedInvestment: (id: string) => Promise<unknown>;
 }
 
 export const TrackedInvestmentsPanel = ({

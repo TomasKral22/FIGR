@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+/// <reference types="vite-plugin-pwa/client" />
 
 interface ImportMetaEnv {
   readonly VITE_SUPABASE_URL?: string;
@@ -11,6 +12,7 @@ interface ImportMeta {
 
 interface DesktopStorageApi {
   getMany(keys: string[]): Promise<Record<string, string | null>>;
+  getManyWithMeta(keys: string[]): Promise<Record<string, { value: string | null; updatedAt: string | null }>>;
   setMany(entries: Record<string, string>): Promise<void>;
   getDbPath(): Promise<string>;
 }
@@ -54,11 +56,26 @@ interface DesktopAttachmentsApi {
   remove(storagePath: string): Promise<boolean>;
 }
 
+interface DesktopInvestmentImportFile {
+  fileName: string;
+  fullPath: string;
+  modifiedAt: string;
+  size: number;
+  fingerprint: string;
+}
+
+interface DesktopImportsApi {
+  selectFolder(): Promise<string | null>;
+  listFiles(folderPath: string): Promise<DesktopInvestmentImportFile[]>;
+  readFile(filePath: string): Promise<{ fileName: string; dataBase64: string }>;
+}
+
 interface Window {
   desktopApp?: {
     platform: string;
     storage: DesktopStorageApi;
     backup: DesktopBackupApi;
     attachments?: DesktopAttachmentsApi;
+    imports?: DesktopImportsApi;
   };
 }

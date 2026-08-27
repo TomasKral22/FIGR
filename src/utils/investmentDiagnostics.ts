@@ -24,8 +24,6 @@ export const buildInvestmentValidationIssues = ({
   creditInvestments,
   creditRepayments,
   trackedInvestments,
-  latestFinanceMonth,
-  closedFinanceMonths,
   todayIso,
 }: {
   assets: InvestmentAsset[];
@@ -36,8 +34,6 @@ export const buildInvestmentValidationIssues = ({
   creditInvestments: CreditInvestment[];
   creditRepayments: CreditInvestmentRepayment[];
   trackedInvestments: TrackedInvestment[];
-  latestFinanceMonth: string | null;
-  closedFinanceMonths: string[];
   todayIso: string;
 }): InvestmentValidationIssue[] => {
   const issues: InvestmentValidationIssue[] = [];
@@ -137,16 +133,6 @@ export const buildInvestmentValidationIssues = ({
         detail: 'Aktivni uverova investice zatim nema evidovanou historii splatek.',
       });
     }
-  }
-
-  if (latestFinanceMonth && !closedFinanceMonths.includes(latestFinanceMonth)) {
-    issues.push({
-      id: `finance-open-${latestFinanceMonth}`,
-      severity: 'warning',
-      code: 'open-finance-month',
-      title: `Mesic ${latestFinanceMonth} ve financich neni uzavreny`,
-      detail: 'Audit upozornuje, ze posledni mesic financni agendy jeste neni uzavren jako zkontrolovany.',
-    });
   }
 
   return issues;

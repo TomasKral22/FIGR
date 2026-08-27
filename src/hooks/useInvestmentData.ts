@@ -90,6 +90,11 @@ const downloadJson = (fileName: string, payload: unknown) => {
 export const useInvestmentData = () => {
   const { toast } = useToast();
   const { session } = useAuth();
+  const storage = useMemo(() => appStorage.forUser(session?.user.id ?? null), [session?.user.id]);
+  const saveEntries = useCallback((entries: Record<string, string>) => {
+    void saveInvestmentEntries(entries, storage).catch(error => console.error('Investment save failed:', error));
+  }, [storage]);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [assets, setAssets] = useState<InvestmentAsset[]>([]);
   const [transactions, setTransactions] = useState<InvestmentTransaction[]>([]);
@@ -138,9 +143,10 @@ export const useInvestmentData = () => {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     setIsHydrated(false);
     try {
-      const state = await loadInvestmentState();
+      const state = await loadInvestmentState(storage);
       setAssets(state.assets);
       setTransactions(state.transactions);
       setPrices(state.prices);
@@ -159,6 +165,7 @@ export const useInvestmentData = () => {
       setIsHydrated(true);
     } catch (error: unknown) {
       console.error('Error fetching investment data:', error);
+      setLoadError(getErrorMessage(error) || 'Investiční data nelze načíst.');
       toast({
         title: 'Chyba',
         description: 'Nepodarilo se nacist investicni data.',
@@ -167,7 +174,7 @@ export const useInvestmentData = () => {
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, storage]);
 
   const calculatePortfolio = useCallback(async () => {
     setCalculatingPortfolio(true);
@@ -199,13 +206,6 @@ export const useInvestmentData = () => {
   }, [assets, transactions, prices, exchangeRates, creditInvestments, trackedInvestments, sourceAccounts, valueSnapshots, settings, toast]);
 
   const refreshValidationIssues = useCallback(async () => {
-    const { financeTransactions, monthClosures } = await loadInvestmentFinanceAuditState();
-
-    const latestFinanceMonth =
-      financeTransactions.length > 0
-        ? financeTransactions.map((item) => item.month).sort((left, right) => right.localeCompare(left))[0]
-        : null;
-
     const issues = buildInvestmentValidationIssues({
       assets,
       transactions,
@@ -215,8 +215,6 @@ export const useInvestmentData = () => {
       creditInvestments,
       creditRepayments,
       trackedInvestments,
-      latestFinanceMonth,
-      closedFinanceMonths: monthClosures.map((item) => item.month),
       todayIso: todayIso(),
     });
     setValidationIssues(issues);
@@ -1109,7 +1107,7 @@ export const useInvestmentData = () => {
 
   const exportAccountBackup = async () => {
     const exportedAt = createTimestamp();
-    const financeLoaded = await appStorage.getMany(Object.values(FINANCE_AUDIT_STORAGE_KEYS));
+    const financeLoaded = await storage.getMany(Object.values(FINANCE_AUDIT_STORAGE_KEYS));
     const backup = {
       exportedAt,
       user: {
@@ -1170,73 +1168,73 @@ export const useInvestmentData = () => {
 
   useEffect(() => {
     if (!isHydrated) return;
-    void saveInvestmentEntries({ [INVESTMENT_STORAGE_KEYS.ASSETS]: JSON.stringify(assets) });
-  }, [assets, isHydrated]);
+    saveEntries({ [INVESTMENT_STORAGE_KEYS.ASSETS]: JSON.stringify(assets) });
+  }, [assets, isHydrated, saveEntries]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    void saveInvestmentEntries({ [INVESTMENT_STORAGE_KEYS.TRANSACTIONS]: JSON.stringify(transactions) });
-  }, [transactions, isHydrated]);
+    saveEntries({ [INVESTMENT_STORAGE_KEYS.TRANSACTIONS]: JSON.stringify(transactions) });
+  }, [transactions, isHydrated, saveEntries]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    void saveInvestmentEntries({ [INVESTMENT_STORAGE_KEYS.PRICES]: JSON.stringify(prices) });
-  }, [prices, isHydrated]);
+    saveEntries({ [INVESTMENT_STORAGE_KEYS.PRICES]: JSON.stringify(prices) });
+  }, [prices, isHydrated, saveEntries]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    void saveInvestmentEntries({ [INVESTMENT_STORAGE_KEYS.EXCHANGE_RATES]: JSON.stringify(exchangeRates) });
-  }, [exchangeRates, isHydrated]);
+    saveEntries({ [INVESTMENT_STORAGE_KEYS.EXCHANGE_RATES]: JSON.stringify(exchangeRates) });
+  }, [exchangeRates, isHydrated, saveEntries]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    void saveInvestmentEntries({ [INVESTMENT_STORAGE_KEYS.IMPORT_BATCHES]: JSON.stringify(importBatches) });
-  }, [importBatches, isHydrated]);
+    saveEntries({ [INVESTMENT_STORAGE_KEYS.IMPORT_BATCHES]: JSON.stringify(importBatches) });
+  }, [importBatches, isHydrated, saveEntries]);
 
   useEffect(() => {
     if (!isHydrated || !settings) return;
-    void saveInvestmentEntries({ [INVESTMENT_STORAGE_KEYS.SETTINGS]: JSON.stringify(settings) });
-  }, [settings, isHydrated]);
+    saveEntries({ [INVESTMENT_STORAGE_KEYS.SETTINGS]: JSON.stringify(settings) });
+  }, [settings, isHydrated, saveEntries]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    void saveInvestmentEntries({ [INVESTMENT_STORAGE_KEYS.CONNECTORS]: JSON.stringify(connectors) });
-  }, [connectors, isHydrated]);
+    saveEntries({ [INVESTMENT_STORAGE_KEYS.CONNECTORS]: JSON.stringify(connectors) });
+  }, [connectors, isHydrated, saveEntries]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    void saveInvestmentEntries({ [INVESTMENT_STORAGE_KEYS.CREDIT_INVESTMENTS]: JSON.stringify(creditInvestments) });
-  }, [creditInvestments, isHydrated]);
+    saveEntries({ [INVESTMENT_STORAGE_KEYS.CREDIT_INVESTMENTS]: JSON.stringify(creditInvestments) });
+  }, [creditInvestments, isHydrated, saveEntries]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    void saveInvestmentEntries({ [INVESTMENT_STORAGE_KEYS.CREDIT_REPAYMENTS]: JSON.stringify(creditRepayments) });
-  }, [creditRepayments, isHydrated]);
+    saveEntries({ [INVESTMENT_STORAGE_KEYS.CREDIT_REPAYMENTS]: JSON.stringify(creditRepayments) });
+  }, [creditRepayments, isHydrated, saveEntries]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    void saveInvestmentEntries({ [INVESTMENT_STORAGE_KEYS.TRACKED_INVESTMENTS]: JSON.stringify(trackedInvestments) });
-  }, [trackedInvestments, isHydrated]);
+    saveEntries({ [INVESTMENT_STORAGE_KEYS.TRACKED_INVESTMENTS]: JSON.stringify(trackedInvestments) });
+  }, [trackedInvestments, isHydrated, saveEntries]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    void saveInvestmentEntries({ [INVESTMENT_STORAGE_KEYS.AUDIT_LOG]: JSON.stringify(auditLog) });
-  }, [auditLog, isHydrated]);
+    saveEntries({ [INVESTMENT_STORAGE_KEYS.AUDIT_LOG]: JSON.stringify(auditLog) });
+  }, [auditLog, isHydrated, saveEntries]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    void saveInvestmentEntries({ [INVESTMENT_STORAGE_KEYS.META]: JSON.stringify(meta) });
-  }, [meta, isHydrated]);
+    saveEntries({ [INVESTMENT_STORAGE_KEYS.META]: JSON.stringify(meta) });
+  }, [meta, isHydrated, saveEntries]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    void saveInvestmentEntries({ [INVESTMENT_STORAGE_KEYS.SOURCE_ACCOUNTS]: JSON.stringify(sourceAccounts) });
-  }, [sourceAccounts, isHydrated]);
+    saveEntries({ [INVESTMENT_STORAGE_KEYS.SOURCE_ACCOUNTS]: JSON.stringify(sourceAccounts) });
+  }, [sourceAccounts, isHydrated, saveEntries]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    void saveInvestmentEntries({ [INVESTMENT_STORAGE_KEYS.VALUE_SNAPSHOTS]: JSON.stringify(valueSnapshots) });
-  }, [valueSnapshots, isHydrated]);
+    saveEntries({ [INVESTMENT_STORAGE_KEYS.VALUE_SNAPSHOTS]: JSON.stringify(valueSnapshots) });
+  }, [valueSnapshots, isHydrated, saveEntries]);
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -1262,6 +1260,7 @@ export const useInvestmentData = () => {
   ]);
 
   return {
+    loadError,
     loading,
     assets,
     transactions,

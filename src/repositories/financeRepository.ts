@@ -15,7 +15,7 @@ import {
   Transaction,
   WealthSnapshot,
 } from '@/types/finance';
-import { appStorage } from '@/lib/appStorage';
+import { appStorage, type AppStorageClient } from '@/lib/appStorage';
 import { convertCurrencyValue, ExchangeRateLike, normalizeCurrencyCode } from '@/utils/currency';
 import {
   DEFAULT_FINANCE_FEATURE_TOGGLES,
@@ -106,8 +106,8 @@ const normalizeVisualTheme = (value: string, legacyTheme: string | null) => {
   return 'dark-blue';
 };
 
-export const loadFinanceState = async (): Promise<LoadedFinanceState> => {
-  const loaded = await appStorage.getMany(Object.values(FINANCE_STORAGE_KEYS));
+export const loadFinanceState = async (storage: AppStorageClient = appStorage): Promise<LoadedFinanceState> => {
+  const loaded = await storage.getMany(Object.values(FINANCE_STORAGE_KEYS));
   const legacyTheme = loaded[FINANCE_STORAGE_KEYS.THEME] ?? localStorage.getItem(FINANCE_STORAGE_KEYS.THEME);
   const rawVisualTheme =
     loaded[FINANCE_STORAGE_KEYS.VISUAL_THEME] ??
@@ -169,8 +169,8 @@ export const loadFinanceState = async (): Promise<LoadedFinanceState> => {
   };
 };
 
-export const saveFinanceState = async (state: FinanceStorageSnapshot) => {
-  await appStorage.setMany({
+export const saveFinanceState = async (state: FinanceStorageSnapshot, storage: AppStorageClient = appStorage) => {
+  await storage.setMany({
     [FINANCE_STORAGE_KEYS.TRANSACTIONS]: JSON.stringify(state.transactions),
     [FINANCE_STORAGE_KEYS.BANK_ACCOUNTS]: JSON.stringify(state.bankAccounts),
     [FINANCE_STORAGE_KEYS.BROKER_ACCOUNTS]: JSON.stringify(state.brokerAccounts),
@@ -194,8 +194,8 @@ export const saveFinanceState = async (state: FinanceStorageSnapshot) => {
   });
 };
 
-export const loadFinanceExchangeRates = async () => {
-  const loaded = await appStorage.getMany([FINANCE_STORAGE_KEYS.INVESTMENT_EXCHANGE_RATES]);
+export const loadFinanceExchangeRates = async (storage: AppStorageClient = appStorage) => {
+  const loaded = await storage.getMany([FINANCE_STORAGE_KEYS.INVESTMENT_EXCHANGE_RATES]);
   return parseStoredValue<ExchangeRateLike[]>(loaded, FINANCE_STORAGE_KEYS.INVESTMENT_EXCHANGE_RATES, []).sort((a, b) =>
     b.rate_date.localeCompare(a.rate_date)
   );

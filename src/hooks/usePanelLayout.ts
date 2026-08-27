@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { appStorage } from '@/lib/appStorage';
+import { useAppStorage } from '@/hooks/useAppStorage';
+
+const EMPTY_HIDDEN: never[] = [];
 
 const normalizeItems = <T extends string>(value: unknown, validIds: T[]) => {
   const ids = Array.isArray(value) ? value.filter((item): item is T => validIds.includes(item as T)) : [];
@@ -19,8 +21,14 @@ const normalizeHidden = <T extends string>(value: unknown, validIds: T[]) =>
 export const usePanelLayout = <T extends string>(
   storageKey: string,
   defaultOrder: T[],
-  defaultHidden: T[] = []
+  defaultHidden: T[] = EMPTY_HIDDEN
 ) => {
+  const appStorage = useAppStorage();
+  // Callers pass array literals; depend on their contents, not a fresh array each render.
+  const orderKey = JSON.stringify(defaultOrder);
+  const hiddenKey = JSON.stringify(defaultHidden);
+  const defaults = useMemo(() => ({ order: JSON.parse(orderKey) as T[], hidden: JSON.parse(hiddenKey) as T[] }), [orderKey, hiddenKey]);
+  const [hydrated, setHydrated] = useState(false);
   const [panelOrder, setPanelOrder] = useState<T[]>(defaultOrder);
 
   const [hiddenPanels, setHiddenPanels] = useState<T[]>(defaultHidden);
@@ -37,32 +45,33 @@ export const usePanelLayout = <T extends string>(
 
       try {
         if (loaded[`${storageKey}:order`]) {
-          setPanelOrder(normalizeItems(JSON.parse(loaded[`${storageKey}:order`] || '[]'), defaultOrder));
+          setPanelOrder(normalizeItems(JSON.parse(loaded[`${storageKey}:order`] || '[]'), defaults.order));
         }
         if (loaded[`${storageKey}:hidden`]) {
           setHiddenPanels(
-            normalizeHidden(JSON.parse(loaded[`${storageKey}:hidden`] || JSON.stringify(defaultHidden)), defaultOrder)
+            normalizeHidden(JSON.parse(loaded[`${storageKey}:hidden`] || JSON.stringify(defaults.hidden)), defaults.order)
           );
         }
       } catch {
-        setPanelOrder(defaultOrder);
-        setHiddenPanels(defaultHidden);
+        return; // Keep malformed preferences untouched for recovery.
       }
+      setHydrated(true);
     };
 
-    void load();
+    void load().catch(error => console.error('Panel layout load failed:', error));
 
     return () => {
       cancelled = true;
     };
-  }, [defaultHidden, defaultOrder, storageKey]);
+  }, [defaults, storageKey, appStorage]);
 
   useEffect(() => {
+    if (!hydrated) return;
     void appStorage.setMany({
       [`${storageKey}:order`]: JSON.stringify(panelOrder),
       [`${storageKey}:hidden`]: JSON.stringify(hiddenPanels),
-    });
-  }, [hiddenPanels, panelOrder, storageKey]);
+    }).catch(error => console.error('Panel layout save failed:', error));
+  }, [hiddenPanels, panelOrder, storageKey, appStorage, hydrated]);
 
   const movePanel = (panelId: T, direction: 'up' | 'down') => {
     setPanelOrder((current) => {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Clock3, CopyCheck, LineChart, RefreshCw, ShieldAlert, TrendingDown, TrendingUp } from 'lucide-react';
-import { appStorage } from '@/lib/appStorage';
+import { useAppStorage } from '@/hooks/useAppStorage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -58,6 +58,7 @@ export const DecisionDashboardPanel = ({
   onOpenMonthWorkflow,
   onOpenRecurring,
 }: DecisionDashboardPanelProps) => {
+  const appStorage = useAppStorage();
   const [freshnessSummary, setFreshnessSummary] = useState<InvestmentFreshnessSummary>({
     missingCount: 0,
     staleCount: 0,
@@ -184,11 +185,11 @@ export const DecisionDashboardPanel = ({
       });
     };
 
-    void loadFreshness();
+    void loadFreshness().catch(error => console.error('Investment freshness load failed:', error));
     return () => {
       cancelled = true;
     };
-  }, [transactions.length]);
+  }, [transactions.length, appStorage]);
 
   const dismissTip = () => {
     setShowTip(false);

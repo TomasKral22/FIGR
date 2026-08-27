@@ -1,14 +1,16 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
-const { app } = require('electron');
+const crypto = require('crypto');
+
+function createDatabaseStore({ userDataPath, backupDir: configuredBackupDir }) {
+if (!path.isAbsolute(userDataPath) || !path.isAbsolute(configuredBackupDir)) throw new Error('Datové cesty musí být absolutní.');
 
 let db;
 const AUTO_BACKUP_KEY = 'system_last_auto_backup_at';
 const MAX_AUTO_BACKUPS = 14;
 
 function getDbPath() {
-  const userDataPath = app.getPath('userData');
   if (!fs.existsSync(userDataPath)) {
     fs.mkdirSync(userDataPath, { recursive: true });
   }
@@ -39,7 +41,7 @@ function closeDb() {
 }
 
 function getBackupDir() {
-  const backupDir = path.join(app.getPath('documents'), 'FIGR', 'Backups');
+  const backupDir = configuredBackupDir;
   if (!fs.existsSync(backupDir)) {
     fs.mkdirSync(backupDir, { recursive: true });
   }
@@ -67,7 +69,7 @@ function listBackups() {
   const backupDir = getBackupDir();
   return fs
     .readdirSync(backupDir)
-    .filter((fileName) => fileName.endsWith('.sqlite'))
+    .filter((fileName) => fileName.endsWith('.sqlite') && fs.lstatSync(path.join(backupDir, fileName)).isFile() && !fs.lstatSync(path.join(backupDir, fileName)).isSymbolicLink())
     .map((fileName) => mapBackupFile(path.join(backupDir, fileName)))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
@@ -78,11 +80,12 @@ function checkpointDb() {
 }
 
 function createBackup(kind = 'manual') {
+  if (!['auto', 'manual', 'pre-restore'].includes(kind)) throw new Error('Neplatný typ zálohy.');
   const database = initDb();
   checkpointDb();
 
   const backupDir = getBackupDir();
-  const backupPath = path.join(backupDir, `${kind}-${formatStamp()}.sqlite`);
+  const backupPath = path.join(backupDir, `${kind}-${formatStamp()}-${crypto.randomUUID().slice(0, 8)}.sqlite`);
   const escapedPath = backupPath.replace(/'/g, "''");
 
   database.exec(`VACUUM INTO '${escapedPath}'`);
@@ -92,7 +95,7 @@ function createBackup(kind = 'manual') {
 function pruneAutoBackups() {
   const autoBackups = listBackups().filter((backup) => backup.kind === 'auto');
   autoBackups.slice(MAX_AUTO_BACKUPS).forEach((backup) => {
-    if (fs.existsSync(backup.fullPath)) {
+    if (path.dirname(backup.fullPath) === getBackupDir() && fs.lstatSync(backup.fullPath).isFile() && !fs.lstatSync(backup.fullPath).isSymbolicLink()) {
       fs.unlinkSync(backup.fullPath);
     }
   });
@@ -106,6 +109,21 @@ function getMany(keys) {
   for (const key of keys) {
     const row = stmt.get(key);
     result[key] = row ? row.value : null;
+  }
+
+  return result;
+}
+
+function getManyWithMeta(keys) {
+  const database = initDb();
+  const stmt = database.prepare('SELECT key, value, updated_at FROM app_storage WHERE key = ?');
+  const result = {};
+
+  for (const key of keys) {
+    const row = stmt.get(key);
+    result[key] = row
+      ? { value: row.value, updatedAt: row.updated_at }
+      : { value: null, updatedAt: null };
   }
 
   return result;
@@ -154,35 +172,74 @@ function createAutomaticBackupIfNeeded() {
 }
 
 function restoreBackup(fileName) {
-  const backupPath = path.join(getBackupDir(), path.basename(fileName));
-  if (!fs.existsSync(backupPath)) {
-    throw new Error('Zaloha nebyla nalezena.');
+  if (typeof fileName !== 'string' || path.basename(fileName) !== fileName || !fileName.endsWith('.sqlite')) {
+    throw new Error('Neplatný název zálohy.');
   }
+  const backupPath = path.join(getBackupDir(), fileName);
+  const info = fs.lstatSync(backupPath);
+  if (!info.isFile() || info.isSymbolicLink()) throw new Error('Záloha musí být běžný soubor.');
+  let source;
+  let rows;
+  try {
+    source = new Database(backupPath, { readonly: true, fileMustExist: true });
+    if (source.pragma('quick_check', { simple: true }) !== 'ok') throw new Error('Záloha je poškozená.');
+    rows = source.prepare('SELECT key, value, updated_at FROM app_storage').all();
+    if (!rows.every(row => typeof row.key === 'string' && typeof row.value === 'string' && typeof row.updated_at === 'string')) {
+      throw new Error('Záloha obsahuje neplatná data.');
+    }
+    for (const row of rows) {
+      if (row.key.endsWith(':__figr_sync_journal_v2')) {
+        const journal = JSON.parse(row.value);
+        if (journal?.version !== 2 || !journal.entries || !Array.isArray(journal.recoveries)) throw new Error('Neplatná synchronizační záloha.');
+        for (const entry of Object.values(journal.entries)) {
+          if (entry.value !== null) {
+            entry.pending = true;
+            entry.base = null;
+            // A restored snapshot needs explicit review before replacing a different cloud copy.
+            entry.localConflict = true;
+            delete entry.conflict;
+          }
+        }
+        row.value = JSON.stringify(journal);
+      }
+    }
+  } finally { source?.close(); }
 
-  closeDb();
-
-  const dbPath = getDbPath();
-  const walPath = `${dbPath}-wal`;
-  const shmPath = `${dbPath}-shm`;
-
-  if (fs.existsSync(dbPath)) fs.unlinkSync(dbPath);
-  if (fs.existsSync(walPath)) fs.unlinkSync(walPath);
-  if (fs.existsSync(shmPath)) fs.unlinkSync(shmPath);
-
-  fs.copyFileSync(backupPath, dbPath);
-  initDb();
-  return true;
+  // Both source validation and a safety snapshot must succeed before changing any live row.
+  const safetyBackup = createBackup('pre-restore');
+  const database = initDb();
+  const insert = database.prepare('INSERT INTO app_storage (key, value, updated_at) VALUES (@key, @value, @updated_at)');
+  database.transaction(() => {
+    database.prepare('DELETE FROM app_storage').run();
+    for (const row of rows) insert.run(row);
+  })();
+  return { safetyBackup };
 }
 
-module.exports = {
+return {
   closeDb,
   createAutomaticBackupIfNeeded,
   createBackup,
   getBackupDir,
   getDbPath,
   getMany,
+  getManyWithMeta,
   initDb,
   listBackups,
   restoreBackup,
   setMany,
 };
+}
+
+let defaultStore;
+const currentStore = () => {
+  if (!defaultStore) {
+    const { app } = require('electron');
+    defaultStore = createDatabaseStore({ userDataPath: app.getPath('userData'), backupDir: path.join(app.getPath('documents'), 'FIGR', 'Backups') });
+  }
+  return defaultStore;
+};
+module.exports = { createDatabaseStore };
+for (const name of ['closeDb', 'createAutomaticBackupIfNeeded', 'createBackup', 'getBackupDir', 'getDbPath', 'getMany', 'getManyWithMeta', 'initDb', 'listBackups', 'restoreBackup', 'setMany']) {
+  module.exports[name] = (...args) => currentStore()[name](...args);
+}

@@ -21,6 +21,15 @@ Produkční lokální build:
 npm run desktop
 ```
 
+## Windows instalátor a přenosné EXE
+
+```sh
+npm run desktop:dist
+npm run test:desktop
+```
+
+Výsledky sestavení najdete v `release/latest-build.json`. Postup instalace, ověření, ochranu dat a zbývající rozsah plánu popisuje [vydání 0.1.0](docs/RELEASE-0.1.0.md).
+
 ## Technologie
 
 - Vite
