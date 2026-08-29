@@ -4,10 +4,7 @@ import { HiddenPanelsBar, ReorderablePanel } from '@/components/ReorderablePanel
 import { usePanelLayout } from '@/hooks/usePanelLayout';
 
 export type InvestmentWorkspacePanelId =
-  | 'workflow'
-  | 'connectors'
   | 'actions'
-  | 'audit'
   | 'portfolio'
   | 'sources'
   | 'tracked'
@@ -15,10 +12,7 @@ export type InvestmentWorkspacePanelId =
   | 'marketAssets';
 
 const PANEL_LABELS: Record<InvestmentWorkspacePanelId, string> = {
-  workflow: 'Investiční workflow',
-  connectors: 'Broker konektory',
   actions: 'Akce a nástroje',
-  audit: 'Audit a kontrola',
   portfolio: 'Souhrn portfolia',
   sources: 'Investiční účty a zdroje',
   tracked: 'Evidované pozice',
@@ -27,10 +21,7 @@ const PANEL_LABELS: Record<InvestmentWorkspacePanelId, string> = {
 };
 
 const PANEL_DESCRIPTIONS: Record<InvestmentWorkspacePanelId, string> = {
-  workflow: 'Doporučený postup a zdroje dat',
-  connectors: 'Napojení brokerů a synchronizační vrstva',
   actions: 'Import, přepočet a operace nad investicemi',
-  audit: 'Stav dat, validace a export zálohy',
   portfolio: 'Vývoj, rozdělení a výkon portfolia',
   sources: 'Brokeři, Investown, Edward a další platformy',
   tracked: 'Watchlist a ručně evidované pozice',
@@ -58,10 +49,7 @@ export const InvestmentWorkspacePanels = ({ panels, editing = false }: Investmen
     endDrag,
     dragOverPanelId,
   } = usePanelLayout<InvestmentWorkspacePanelId>('finance_investment_panels_v1', [
-    'workflow',
-    'connectors',
     'actions',
-    'audit',
     'portfolio',
     'sources',
     'tracked',

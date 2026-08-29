@@ -45,7 +45,7 @@ interface InvestmentDashboardProps {
 }
 
 type InvestmentTabKey = 'assets' | 'prices' | 'dividends' | 'rates' | 'imports';
-type InvestmentFocusSection = 'portfolio' | 'tracked' | 'credit' | 'audit' | 'assets';
+type InvestmentFocusSection = 'portfolio' | 'tracked' | 'credit' | 'assets';
 
 interface InvestmentSavedView {
   id: string;
@@ -62,7 +62,8 @@ const INVESTMENT_DASHBOARD_PREFS_KEY = 'finance_investment_dashboard_prefs';
 const INVESTMENT_DASHBOARD_VIEWS_KEY = 'finance_investment_dashboard_saved_views';
 const INVESTMENT_DASHBOARD_TIP_KEY = 'finance_investment_dashboard_tip_hidden';
 const ALOCANO_PORTFOLIO_URL = 'https://alocano.cz/portfolio';
-const LEGACY_INVESTMENT_LAYOUT_ENABLED = import.meta.env.VITE_SHOW_LEGACY_INVESTMENT_LAYOUT === 'true';
+// Historical duplicate layout is intentionally retired; the panel workspace below is the only investment UI.
+const LEGACY_INVESTMENT_LAYOUT_ENABLED = false;
 
 const DEFAULT_INVESTMENT_VIEWS: InvestmentSavedView[] = [
   {
@@ -86,14 +87,6 @@ const DEFAULT_INVESTMENT_VIEWS: InvestmentSavedView[] = [
     name: 'Uverove investice',
     tab: 'assets',
     focusSection: 'credit',
-    workflowCollapsed: true,
-    connectorsCollapsed: true,
-  },
-  {
-    id: 'audit-check',
-    name: 'Audit a kontrola',
-    tab: 'assets',
-    focusSection: 'audit',
     workflowCollapsed: true,
     connectorsCollapsed: true,
   },
@@ -304,7 +297,8 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
 
       const rawViews = window.localStorage.getItem(INVESTMENT_DASHBOARD_VIEWS_KEY);
       if (rawViews) {
-        setSavedViews(JSON.parse(rawViews) as InvestmentSavedView[]);
+        const views = JSON.parse(rawViews) as InvestmentSavedView[];
+        setSavedViews(views.filter((view) => view.focusSection !== ('audit' as string)));
       }
     } catch {
       setSavedViews([]);
@@ -688,9 +682,6 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
       } else if (key === '3') {
         event.preventDefault();
         applySavedView(DEFAULT_INVESTMENT_VIEWS[2]);
-      } else if (key === '4') {
-        event.preventDefault();
-        applySavedView(DEFAULT_INVESTMENT_VIEWS[3]);
       }
     };
 
@@ -704,96 +695,6 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
   };
 
   const investmentPanels = {
-    workflow: (
-      <>
-        <SectionToggle
-          title="Investicni workflow a zdroje dat"
-          description="Doporuceny postup prace s importy, cenami a analytikou."
-          collapsed={isWorkflowCollapsed}
-          onToggle={() => setIsWorkflowCollapsed((value) => !value)}
-        />
-
-        {isWorkflowCollapsed ? null : (
-          <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
-            <Card className="border-primary/20 bg-primary/5">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Link2 className="h-4 w-4 text-primary" />
-                  Doporuceny investicni workflow
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-3 md:grid-cols-3">
-                <div className="rounded-lg border border-border/60 bg-card p-3">
-                  <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Krok 1</p>
-                  <p className="font-medium">Nacist data z brokera</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Idealne importem exportu brokera. Sablonu pouzij jen tehdy, kdyz broker nema vhodny export.
-                  </p>
-                </div>
-                <div className="rounded-lg border border-border/60 bg-card p-3">
-                  <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Krok 2</p>
-                  <p className="font-medium">Doplnit ceny a kurzy</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Portfolio pak spravne prepocita hodnotu, ziskovost i menove prepočty.
-                  </p>
-                </div>
-                <div className="rounded-lg border border-border/60 bg-card p-3">
-                  <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Krok 3</p>
-                  <p className="font-medium">Vyhodnotit titul v externi AI</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Pro detailni analyzu vyber ticker, zkopiruj prompt a otevri ho v ChatGPT nebo Claude.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Zdroje dat</CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-3">
-                <div className="rounded-lg border border-border/60 bg-card p-3">
-                  <p className="font-medium">Export brokera</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Preferovana cesta pro Trading 212, IBKR a dalsi brokery s dostupnym exportem obchodu.
-                  </p>
-                </div>
-                <div className="rounded-lg border border-border/60 bg-card p-3">
-                  <p className="font-medium">Univerzalni sablona FIGR</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Zalozni cesta pro rucni doplneni nebo jednorazove cisteni dat pred importem.
-                  </p>
-                </div>
-                <div className="rounded-lg border border-dashed border-border/60 bg-muted/20 p-3">
-                  <p className="flex items-center gap-2 font-medium">
-                    <Link2 className="h-4 w-4 text-primary" />
-                    Online ceny a audit
-                  </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Aktualni ceny nacitame server-side. Validace dat a audit bezne ukazuji, co chybi nebo co je zastarale.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-      </>
-    ),
-    connectors: (
-      <>
-        <SectionToggle
-          title="Broker konektory"
-          description="Pripravene konektory pro napojeni brokeru a budoucí synchronizaci."
-          collapsed={isConnectorsCollapsed}
-          onToggle={() => setIsConnectorsCollapsed((value) => !value)}
-        />
-        {isConnectorsCollapsed ? null : (
-          <div className="mt-4">
-            <BrokerConnectionsPanel connectors={connectors} onMarkConfigured={markConnectorConfigured} />
-          </div>
-        )}
-      </>
-    ),
     actions: (
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={() => void calculatePortfolio()} disabled={calculatingPortfolio}>
@@ -816,27 +717,6 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
           <Plus className="mr-2 h-4 w-4" />
           Pridat rucni transakci
         </Button>
-      </div>
-    ),
-    audit: (
-      <div ref={auditSectionRef}>
-        <InvestmentAuditPanel
-          syncStatus={syncStatus}
-          validationIssues={validationIssues}
-          auditLog={auditLog}
-          onRefreshAudit={refreshValidationIssues}
-          onExportBackup={exportAccountBackup}
-          dataSummary={{
-            assets: assets.length,
-            transactions: transactions.length,
-            prices: prices.length,
-            sourceAccounts: sourceAccounts.length,
-            trackedInvestments: trackedInvestments.length,
-            creditInvestments: creditInvestments.length,
-            valueSnapshots: valueSnapshots.length,
-          }}
-          lastPriceRefreshReport={lastPriceRefreshReport}
-        />
       </div>
     ),
     portfolio: (
@@ -1017,8 +897,8 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
                 <div className="space-y-1 text-sm">
                   <p className="font-medium text-primary">Investicni pracovni prostor</p>
                   <p className="text-muted-foreground">
-                    Alt + 1 az 4 prepina rychle pohledy. Alt + R obnovi ceny, Alt + I otevre import a Alt + N novou rucni transakci.
-                    Ulozene pohledy si pamatuji aktivni sekci i stav panelu.
+                    Alt + 1 az 3 prepina rychle pohledy. Alt + R obnovi ceny, Alt + I otevre import a Alt + N novou rucni transakci.
+                    Ulozene pohledy si pamatuji aktivni sekci a zvolenou kartu.
                   </p>
                 </div>
                 <Button type="button" variant="ghost" size="sm" onClick={dismissDashboardTip}>

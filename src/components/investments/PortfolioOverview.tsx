@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, Database, PiggyBank, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, PiggyBank, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PortfolioSummary } from '@/types/investment';
@@ -33,7 +33,6 @@ export const PortfolioOverview = ({ portfolioSummary, loading }: PortfolioOvervi
     dividendCalendar,
     dividendTaxEstimate,
     excludedValue,
-    sourceBreakdown,
     performance,
     dataQuality,
   } = portfolioSummary;
@@ -49,7 +48,6 @@ export const PortfolioOverview = ({ portfolioSummary, loading }: PortfolioOvervi
     },
     { label: 'Evidované portfolio', value: formatCurrency(trackedCurrentValue, reportingCurrency), hint: 'Ručně vedené hodnoty' },
     { label: 'Úvěrové investice', value: formatCurrency(creditCurrentValue, reportingCurrency), hint: `${activeCreditInvestmentsCount} aktivních půjček` },
-    { label: 'Investováno', value: totalInvested > 0 ? formatCurrency(totalInvested, reportingCurrency) : 'Neúplná data', hint: 'Pouze doložené vklady' },
   ];
 
   return (
@@ -75,10 +73,7 @@ export const PortfolioOverview = ({ portfolioSummary, loading }: PortfolioOvervi
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
-        <Card><CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><Database className="h-4 w-4 text-primary" />Majetek podle zdroje</CardTitle></CardHeader><CardContent>{sourceBreakdown.length > 0 ? <div className="grid gap-3 sm:grid-cols-2">{sourceBreakdown.map((source) => <div key={source.sourceAccountId || 'unassigned'} className="rounded-xl border border-border/70 bg-background/50 p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-medium">{source.label}</p><p className="text-xs text-muted-foreground">{source.valuationMode === 'snapshot' ? 'Snapshot účtu' : 'Součet pozic'}</p></div><div className="text-right"><p className="font-semibold">{formatCurrency(source.value, source.currency)}</p>{source.excludedValue > 0 ? <p className="text-xs text-muted-foreground">vlastní část</p> : null}</div></div>{source.excludedValue > 0 ? <p className="mt-2 text-xs text-muted-foreground">Celkem {formatCurrency(source.grossValue, source.currency)} · cizí prostředky {formatCurrency(source.excludedValue, source.currency)}</p> : null}<p className="mt-2 text-xs text-muted-foreground">Aktualizace: {source.lastUpdatedAt?.slice(0, 10) || 'bez data'}</p></div>)}</div> : <p className="text-sm text-muted-foreground">Zatím nejsou dostupné žádné oceněné zdroje.</p>}</CardContent></Card>
-        <Card className={dataQuality.status === 'complete' ? 'border-success/30' : 'border-warning/30'}><CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base">{dataQuality.status === 'complete' ? <CheckCircle2 className="h-4 w-4 text-success" /> : <AlertTriangle className="h-4 w-4 text-warning" />}Kvalita dat {dataQuality.score} %</CardTitle></CardHeader><CardContent className="space-y-3 text-sm"><div className="h-2 overflow-hidden rounded-full bg-muted"><div className={`h-full ${dataQuality.status === 'complete' ? 'bg-success' : dataQuality.status === 'partial' ? 'bg-warning' : 'bg-destructive'}`} style={{ width: `${dataQuality.score}%` }} /></div>{dataQuality.messages.length > 0 ? dataQuality.messages.map((message) => <p key={message} className="text-muted-foreground">• {message}</p>) : <p className="text-success">Všechny započtené hodnoty mají potřebná data.</p>}<div className="grid grid-cols-2 gap-2 pt-1 text-xs text-muted-foreground"><span>Chybí ceny: {dataQuality.missingPrices}</span><span>Náhradní ceny: {dataQuality.fallbackPrices}</span><span>Chybí kurzy: {dataQuality.missingExchangeRates}</span><span>Staré zdroje: {dataQuality.staleSources}</span><span>Vyloučeno: {dataQuality.excludedValueCount}</span></div></CardContent></Card>
-      </div>
+      <Card className={dataQuality.status === 'complete' ? 'border-success/30' : 'border-warning/30'}><CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base">{dataQuality.status === 'complete' ? <CheckCircle2 className="h-4 w-4 text-success" /> : <AlertTriangle className="h-4 w-4 text-warning" />}Kvalita dat {dataQuality.score} %</CardTitle></CardHeader><CardContent className="space-y-3 text-sm"><div className="h-2 overflow-hidden rounded-full bg-muted"><div className={`h-full ${dataQuality.status === 'complete' ? 'bg-success' : dataQuality.status === 'partial' ? 'bg-warning' : 'bg-destructive'}`} style={{ width: `${dataQuality.score}%` }} /></div>{dataQuality.messages.length > 0 ? dataQuality.messages.map((message) => <p key={message} className="text-muted-foreground">• {message}</p>) : <p className="text-success">Všechny započtené hodnoty mají potřebná data.</p>}<div className="grid grid-cols-2 gap-2 pt-1 text-xs text-muted-foreground"><span>Chybí ceny: {dataQuality.missingPrices}</span><span>Náhradní ceny: {dataQuality.fallbackPrices}</span><span>Chybí kurzy: {dataQuality.missingExchangeRates}</span><span>Staré zdroje: {dataQuality.staleSources}</span><span>Vyloučeno: {dataQuality.excludedValueCount}</span></div></CardContent></Card>
 
       {portfolioHistory.length > 1 ? <Card><CardHeader><CardTitle>Vývoj investičního majetku v čase</CardTitle></CardHeader><CardContent><div className={isMobile ? 'h-[220px]' : 'h-[300px]'}><ResponsiveContainer width="100%" height="100%"><LineChart data={portfolioHistory}><CartesianGrid strokeDasharray="3 3" className="stroke-border" /><XAxis dataKey="date" tickFormatter={(date) => new Date(date).toLocaleDateString('cs-CZ', { month: 'short', year: '2-digit' })} className="text-muted-foreground" /><YAxis tickFormatter={(value) => formatCurrency(value, reportingCurrency)} className="text-muted-foreground" width={isMobile ? 72 : 100} /><Tooltip content={({ active, payload, label }) => !active || !payload?.length ? null : <div className="rounded-lg border border-border bg-popover p-3 shadow-lg"><p className="text-sm text-muted-foreground">{new Date(label).toLocaleDateString('cs-CZ')}</p><p className="text-lg font-bold">{formatCurrency(payload[0].value as number, reportingCurrency)}</p></div>} /><Line type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} activeDot={{ r: 6, fill: 'hsl(var(--primary))' }} /></LineChart></ResponsiveContainer></div></CardContent></Card> : null}
     </div>

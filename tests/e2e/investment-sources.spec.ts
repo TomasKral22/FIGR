@@ -16,6 +16,13 @@ test('Investown zdroj a snapshot se započítají do jednotného portfolia a př
   await openHome(page);
   await page.getByRole('button', { name: 'Investice', exact: true }).first().click();
 
+  const investmentPanel = page.getByRole('dialog', { name: 'Investice' });
+  await expect(investmentPanel.getByText('Investicni workflow a zdroje dat')).toHaveCount(0);
+  await expect(investmentPanel.getByText('Broker konektory', { exact: true })).toHaveCount(0);
+  await expect(investmentPanel.getByText('Stav investičních dat', { exact: true })).toHaveCount(0);
+  await expect(investmentPanel.getByRole('button', { name: /Audit a kontrola/ })).toHaveCount(0);
+  await expect(investmentPanel.getByText('Majetek podle zdroje', { exact: true })).toHaveCount(0);
+  await expect(investmentPanel.getByText('Investováno', { exact: true })).toHaveCount(1);
   await expect(page.getByRole('link', { name: 'Otevřít Alocano' })).toHaveAttribute('href', 'https://alocano.cz/portfolio');
   await expect(page.getByRole('link', { name: 'Otevřít Alocano' })).toHaveAttribute('target', '_blank');
   await expect(page.getByText('Investiční účty a zdroje')).toBeVisible();
