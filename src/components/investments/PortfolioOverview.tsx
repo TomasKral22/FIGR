@@ -37,7 +37,9 @@ export const PortfolioOverview = ({ portfolioSummary, loading }: PortfolioOvervi
     dataQuality,
   } = portfolioSummary;
   const isProfit = (performance.totalReturn ?? portfolioSummary.profitLoss ?? 0) >= 0;
-  const latestDividend = dividendCalendar[dividendCalendar.length - 1];
+  // A dividend remains part of history after the final position is sold, but it
+  // should not make the current-portfolio overview look populated.
+  const latestDividend = currentValue !== null ? dividendCalendar[dividendCalendar.length - 1] : undefined;
   const quickStats = [
     {
       label: 'Tržní portfolio',
@@ -68,7 +70,7 @@ export const PortfolioOverview = ({ portfolioSummary, loading }: PortfolioOvervi
         <div className={`grid gap-4 ${isMobile ? 'grid-cols-2' : 'sm:grid-cols-4 xl:grid-cols-1'}`}>
           <Card><CardContent className="flex items-center gap-4 p-5"><div className="rounded-xl bg-primary/10 p-3 text-primary"><PiggyBank className="h-5 w-5" /></div><div><p className="text-sm text-muted-foreground">Investováno</p><p className="text-xl font-semibold">{totalInvested > 0 ? formatCurrency(totalInvested, reportingCurrency) : '—'}</p></div></CardContent></Card>
           <Card><CardContent className="flex items-center gap-4 p-5"><div className={`rounded-xl p-3 ${isProfit ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>{isProfit ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}</div><div><p className="text-sm text-muted-foreground">Výkonnost</p><p className={`text-xl font-semibold ${isProfit ? 'text-success' : 'text-destructive'}`}>{performance.totalReturnPercent !== null ? formatPercent(performance.totalReturnPercent) : profitLossPercent !== null ? formatPercent(profitLossPercent) : '—'}</p><p className="text-xs text-muted-foreground">{performance.totalReturnPercent !== null ? 'Celé portfolio' : 'Jen známé pozice'}</p></div></CardContent></Card>
-          <Card><CardContent className="flex items-center gap-4 p-5"><div className="rounded-xl bg-warning/10 p-3 text-warning"><Wallet className="h-5 w-5" /></div><div><p className="text-sm text-muted-foreground">Poslední dividenda</p><p className="text-lg font-semibold">{latestDividend ? formatCurrency(latestDividend.amount, latestDividend.currency) : '—'}</p><p className="text-xs text-muted-foreground">Odhad daně {formatCurrency(dividendTaxEstimate, reportingCurrency)}</p></div></CardContent></Card>
+          <Card><CardContent className="flex items-center gap-4 p-5"><div className="rounded-xl bg-warning/10 p-3 text-warning"><Wallet className="h-5 w-5" /></div><div><p className="text-sm text-muted-foreground">Poslední dividenda</p><p className="text-lg font-semibold">{latestDividend ? formatCurrency(latestDividend.amount, latestDividend.currency) : '—'}</p><p className="text-xs text-muted-foreground">{latestDividend ? `Odhad daně ${formatCurrency(dividendTaxEstimate, reportingCurrency)}` : 'Žádné aktivní portfolio'}</p></div></CardContent></Card>
           <Card><CardContent className="flex items-center gap-4 p-5"><div className="rounded-xl bg-primary/10 p-3 text-primary"><Wallet className="h-5 w-5" /></div><div><p className="text-sm text-muted-foreground">Watchlist</p><p className="text-xl font-semibold">{watchlistCount}</p></div></CardContent></Card>
         </div>
       </div>

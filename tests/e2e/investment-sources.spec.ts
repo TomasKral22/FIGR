@@ -12,6 +12,80 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+test('historie prodaného portfolia se nevydává za aktivní investiční data', async ({ page }) => {
+  const now = new Date().toISOString();
+  await seedFinanceStorage(page, {
+    investmentAssets: [
+      {
+        id: 'asset-sold',
+        ticker: 'SOLD',
+        name: 'Prodaná pozice',
+        asset_type: 'stock',
+        provider: 'broker',
+        sector: null,
+        currency: 'EUR',
+        source_account_id: null,
+        created_at: now,
+        updated_at: now,
+      },
+    ],
+    investmentTransactions: [
+      {
+        id: 'buy-sold',
+        asset_id: 'asset-sold',
+        transaction_type: 'buy',
+        quantity: 1,
+        price_per_unit: 100,
+        total_value: 100,
+        currency: 'EUR',
+        transaction_date: '2026-01-01',
+        notes: null,
+        import_batch_id: null,
+        source_account_id: null,
+        created_at: now,
+      },
+      {
+        id: 'sell-sold',
+        asset_id: 'asset-sold',
+        transaction_type: 'sell',
+        quantity: 1,
+        price_per_unit: 110,
+        total_value: 110,
+        currency: 'EUR',
+        transaction_date: '2026-02-01',
+        notes: null,
+        import_batch_id: null,
+        source_account_id: null,
+        created_at: now,
+      },
+      {
+        id: 'dividend-sold',
+        asset_id: 'asset-sold',
+        transaction_type: 'dividend',
+        quantity: 1,
+        price_per_unit: 74.71,
+        total_value: 74.71,
+        currency: 'EUR',
+        transaction_date: '2026-01-15',
+        notes: null,
+        import_batch_id: null,
+        source_account_id: null,
+        created_at: now,
+      },
+    ],
+  });
+
+  await openHome(page);
+  await page.getByRole('button', { name: 'Investice', exact: true }).first().click();
+
+  const investmentPanel = page.getByRole('dialog', { name: 'Investice' });
+  await expect(investmentPanel.getByRole('heading', { name: 'Kvalita dat 0 %' })).toBeVisible();
+  const dividendCard = investmentPanel.getByText('Poslední dividenda', { exact: true }).locator('..');
+  await expect(dividendCard.getByText('—', { exact: true })).toBeVisible();
+  await expect(dividendCard.getByText('Žádné aktivní portfolio', { exact: true })).toBeVisible();
+  await expect(dividendCard.getByText(/74[,.]71/)).toHaveCount(0);
+});
+
 test('Investown zdroj a snapshot se započítají do jednotného portfolia a přežijí reload', async ({ page }) => {
   await openHome(page);
   await page.getByRole('button', { name: 'Investice', exact: true }).first().click();

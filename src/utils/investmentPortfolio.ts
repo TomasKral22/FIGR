@@ -399,13 +399,16 @@ export const calculatePortfolioSummary = ({
   const snapshotInvested = sumOwnedAmounts(snapshotInvestedBySource);
   const totalInvested = marketInvestedValue + trackedInvested + creditInvested + snapshotInvested;
   const currentValue = marketCurrentValueAmount + trackedCurrentValue + creditCurrentValue + snapshotCurrentValue;
+  // Historical transactions and empty asset definitions are not an active portfolio.
+  // In particular, a fully sold portfolio must not report perfect data quality merely
+  // because its buy/sell/dividend history is still retained for the user.
   const hasPortfolioData =
-    assets.length > 0 ||
-    transactions.length > 0 ||
-    trackedInvestments.length > 0 ||
-    creditInvestments.length > 0 ||
-    activeSources.length > 0 ||
-    valueSnapshots.length > 0;
+    portfolioAssets.length > 0 ||
+    trackedInvestments.some((item) => !item.is_watchlist && item.include_in_portfolio) ||
+    creditInvestments.some((item) => item.status !== 'repaid') ||
+    activeSources.some(
+      (source) => source.valuation_mode === 'snapshot' && latestSnapshotBySource.has(source.id)
+    );
   const performanceCoverageComplete =
     totalInvested > 0 &&
     missingPrices === 0 &&
