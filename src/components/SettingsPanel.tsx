@@ -29,6 +29,7 @@ const sidebarLabels: Record<SidebarItemId, string> = {
   accounts: 'Účty',
   monthWorkflow: 'Měsíční workflow',
   investments: 'Investice',
+  calculators: 'Kalkulačky',
   goals: 'Cíle',
   transactionAreas: 'Oblasti transakcí',
   recurring: 'Trvalé příkazy',

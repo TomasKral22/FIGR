@@ -1,4 +1,4 @@
-import { BarChart3, FolderTree, Goal, Home, Landmark, RefreshCw, Settings2, TrendingUp } from 'lucide-react';
+import { BarChart3, Calculator, FolderTree, Goal, Home, Landmark, RefreshCw, Settings2, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export type SidebarItemId =
@@ -6,6 +6,7 @@ export type SidebarItemId =
   | 'accounts'
   | 'monthWorkflow'
   | 'investments'
+  | 'calculators'
   | 'goals'
   | 'transactionAreas'
   | 'recurring'
@@ -14,6 +15,8 @@ export type SidebarItemId =
 
 interface SidebarProps {
   itemOrder: SidebarItemId[];
+  activeItem?: SidebarItemId;
+  onOpenCalculators: () => void;
   onOpenOverview: () => void;
   onOpenAccounts: () => void;
   onOpenMonthWorkflow: () => void;
@@ -29,6 +32,8 @@ const navButtonClass = 'w-full justify-start gap-3 px-3 py-2.5 text-left';
 
 export const Sidebar = ({
   itemOrder,
+  activeItem = 'overview',
+  onOpenCalculators,
   onOpenOverview,
   onOpenAccounts,
   onOpenMonthWorkflow,
@@ -51,6 +56,7 @@ export const Sidebar = ({
     accounts: { label: 'Účty', icon: Landmark, onClick: onOpenAccounts },
     monthWorkflow: { label: 'Měsíční workflow', icon: RefreshCw, onClick: onOpenMonthWorkflow },
     investments: { label: 'Investice', icon: TrendingUp, onClick: onOpenInvestments },
+    calculators: { label: 'Kalkulačky', icon: Calculator, onClick: onOpenCalculators },
     goals: { label: 'Cíle', icon: Goal, onClick: onOpenGoals },
     transactionAreas: { label: 'Oblasti transakcí', icon: FolderTree, onClick: onOpenTransactionAreas },
     recurring: { label: 'Trvalé příkazy', icon: RefreshCw, onClick: onOpenRecurring },
@@ -71,7 +77,7 @@ export const Sidebar = ({
             const Icon = item.icon;
 
             return (
-              <Button key={itemId} variant="ghost" className={navButtonClass} onClick={item.onClick}>
+              <Button key={itemId} variant={activeItem === itemId ? 'secondary' : 'ghost'} aria-current={activeItem === itemId ? 'page' : undefined} className={navButtonClass} onClick={item.onClick}>
                 <Icon className="h-4 w-4" />
                 <span>{item.label}</span>
               </Button>

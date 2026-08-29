@@ -61,6 +61,7 @@ const getErrorMessage = (error: unknown) => error instanceof Error ? error.messa
 const INVESTMENT_DASHBOARD_PREFS_KEY = 'finance_investment_dashboard_prefs';
 const INVESTMENT_DASHBOARD_VIEWS_KEY = 'finance_investment_dashboard_saved_views';
 const INVESTMENT_DASHBOARD_TIP_KEY = 'finance_investment_dashboard_tip_hidden';
+const ALOCANO_PORTFOLIO_URL = 'https://alocano.cz/portfolio';
 const LEGACY_INVESTMENT_LAYOUT_ENABLED = import.meta.env.VITE_SHOW_LEGACY_INVESTMENT_LAYOUT === 'true';
 
 const DEFAULT_INVESTMENT_VIEWS: InvestmentSavedView[] = [
@@ -999,8 +1000,14 @@ export const InvestmentDashboard = ({ isOpen, onClose }: InvestmentDashboardProp
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <SheetContent side="right" className="w-full overflow-y-auto p-4 sm:max-w-[95vw] md:p-6">
-        <SheetHeader className="pb-4">
+        <SheetHeader className="flex-row items-center justify-between space-y-0 pb-4 pr-10 text-left">
           <SheetTitle>Investice</SheetTitle>
+          <Button asChild variant="outline" size="sm" className="shrink-0 rounded-full">
+            <a href={ALOCANO_PORTFOLIO_URL} target="_blank" rel="noopener noreferrer">
+              Otevřít Alocano
+              <ExternalLink className="ml-2 h-4 w-4" />
+            </a>
+          </Button>
         </SheetHeader>
 
         <div className="space-y-4 md:space-y-6">

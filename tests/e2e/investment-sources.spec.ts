@@ -16,6 +16,8 @@ test('Investown zdroj a snapshot se započítají do jednotného portfolia a př
   await openHome(page);
   await page.getByRole('button', { name: 'Investice', exact: true }).first().click();
 
+  await expect(page.getByRole('link', { name: 'Otevřít Alocano' })).toHaveAttribute('href', 'https://alocano.cz/portfolio');
+  await expect(page.getByRole('link', { name: 'Otevřít Alocano' })).toHaveAttribute('target', '_blank');
   await expect(page.getByText('Investiční účty a zdroje')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Kvalita dat 0 %' })).toBeVisible();
 

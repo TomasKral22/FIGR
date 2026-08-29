@@ -1,5 +1,6 @@
 ﻿import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, X } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useToast } from '@/hooks/use-toast';
@@ -54,11 +55,15 @@ const CategoryAutomationPanel = lazy(() =>
 const SettingsPanel = lazy(() =>
   import('@/components/SettingsPanel').then((module) => ({ default: module.SettingsPanel }))
 );
+const CalculatorsWorkspace = lazy(() =>
+  import('@/components/calculators/CalculatorsWorkspace').then((module) => ({ default: module.CalculatorsWorkspace }))
+);
 const DEFAULT_SIDEBAR_ORDER: SidebarItemId[] = [
   'overview',
   'accounts',
   'monthWorkflow',
   'investments',
+  'calculators',
   'goals',
   'transactionAreas',
   'recurring',
@@ -109,6 +114,11 @@ const normalizeSidebarOrder = (value: unknown): SidebarItemId[] => {
     return true;
   });
 
+  // Add the new section next to investments without reordering existing custom items.
+  if (!seen.has('calculators') && seen.has('investments')) {
+    ordered.splice(ordered.indexOf('investments') + 1, 0, 'calculators');
+    seen.add('calculators');
+  }
   return [...ordered, ...DEFAULT_SIDEBAR_ORDER.filter((item) => !seen.has(item))];
 };
 
@@ -120,6 +130,8 @@ const LazyPanelFallback = ({ label }: { label: string }) => (
   </div>
 );
 const Index = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const calculatorsOpen = searchParams.get('view') === 'calculators';
   const appStorage = useAppStorage();
   const { user, signOut } = useAuth();
   const { toast } = useToast();
@@ -446,13 +458,21 @@ const Index = () => {
 
   const sidebarProps = {
     itemOrder: sidebarOrder,
+    activeItem: (calculatorsOpen ? 'calculators' : 'overview') as SidebarItemId,
+    onOpenCalculators: () => {
+      setSearchParams(previous => { const next = new URLSearchParams(previous); next.set('view', 'calculators'); next.delete('calculator'); return next; });
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      setIsMobileMenuOpen(false);
+    },
     onOpenOverview: () => {
+      setSearchParams(previous => { const next = new URLSearchParams(previous); next.delete('view'); next.delete('calculator'); return next; });
       window.scrollTo({ top: 0, behavior: 'smooth' });
       setIsMobileMenuOpen(false);
     },
     onOpenAccounts: () => { setIsAccountSetupOpen(true); setIsMobileMenuOpen(false); },
     onOpenMonthWorkflow: () => {
-      document.getElementById('month-workflow')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setSearchParams(previous => { const next = new URLSearchParams(previous); next.delete('view'); next.delete('calculator'); return next; });
+      requestAnimationFrame(() => document.getElementById('month-workflow')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
       setIsMobileMenuOpen(false);
     },
     onOpenAnalytics: () => { setIsAnnualReportsOpen(true); setIsMobileMenuOpen(false); },
@@ -645,7 +665,11 @@ const Index = () => {
           </Sheet>
         )}
 
-        <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
+        <main className="min-w-0 flex-1 px-4 py-6 md:px-8 md:py-8">
+          {calculatorsOpen && <Suspense fallback={<p role="status">Načítám kalkulačky…</p>}>
+            <CalculatorsWorkspace accountWealth={wealthSnapshots[0]?.totalNetWorth ?? null} onOpenInvestments={() => setIsInvestmentsOpen(true)} />
+          </Suspense>}
+          <div hidden={calculatorsOpen}>
           <div className="section-stack">
           <MainDashboardPanels panels={mainDashboardPanels} editing={isLayoutEditing} />
           {false ? (
@@ -874,6 +898,7 @@ const Index = () => {
           ) : null}
             </>
           ) : null}
+          </div>
           </div>
         </main>
       </div>
